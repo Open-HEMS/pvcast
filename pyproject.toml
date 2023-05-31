@@ -3,11 +3,11 @@ requires = ["flit"]
 build-backend = "flit.buildapi"
 
 [project]
-name =  "py-project-toml"
+name =  "pvcast"
 authors = [
-    {name = "Daniel Ciborowski", email = "dciborow@microsoft.com"},
+    {name = "Stefan de Lange", email = "example@unknown.com"},
 ]
-description = "Sample Python Project for creating a new Python Module"
+description = "Open-source python package to make short-term solar power forecasts."
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -21,6 +21,13 @@ classifiers = [
 ]
 requires-python = ">=3.8.1"
 dynamic = ["version"]
+
+dependencies = [
+    "numpy==1.24.3",
+    "pandas==2.0.2",
+    "pvlib==0.9.5",
+    "pyyaml==6.0",
+]
 
 [project.optional-dependencies]
 spark = [
