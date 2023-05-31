@@ -40,5 +40,8 @@
 			}
 		}
 	},
-	"onCreateCommand": "pre-commit install-hooks"
+	"onCreateCommand": "pre-commit install-hooks",
+	"features": {
+		"git-lfs": "latest"
+	}
 }
