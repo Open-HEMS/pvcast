@@ -89,10 +89,7 @@ class PVModelChain:
                     modules_per_string=1,
                     name=module_name,
                 )
-                if name is not None:
-                    system_models.append(self._build_model_chain([arr], inverter, name))
-                else:
-                    system_models.append(self._build_model_chain([arr], inverter, module_name))
+                system_models.append(self._build_model_chain([arr], inverter, module_name if name is None else name))
         return system_models
 
     def _build_system_string(
