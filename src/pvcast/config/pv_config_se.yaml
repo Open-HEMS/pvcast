@@ -3,12 +3,16 @@
 # general configuration
 general:
   weather: 'scrapper'
+  location:
+    latitude: 52.35845515630293
+    longitude: 4.88115070391368
+    altitude: 0
 
 plant:
   # PVSystem level. Each entry in list represents one ModelChain(PVSystem) object.
   - name: 'EastWest'
     inverter: 'SolarEdge_Technologies_Ltd___SE4000__240V_'
-    microinverter: true
+    microinverter: false
     arrays:
       # Array level. Each entry in list represents one Array object.
       # Each array is assumed to have it's own MPPT.

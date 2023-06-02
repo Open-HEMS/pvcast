@@ -1,0 +1,30 @@
+# configuration file for pvcast
+
+# general configuration
+general:
+  weather: 'scrapper'
+  location:
+    latitude: 52.35845515630293
+    longitude: 4.88115070391368
+    altitude: 0
+
+plant:
+  # PVSystem level. Each entry in list represents one ModelChain(PVSystem) object.
+  - name: 'EastWest'
+    inverter: 'Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_'
+    microinverter: true
+    arrays:
+      # Array level. Each entry in list represents one Array object.
+      # Each array is assumed to have it's own MPPT.
+      - name: 'zone_1_schuin'
+        tilt: 30
+        azimuth: 247
+        modules_per_string: 5
+        strings: 1
+        module: 'JA_Solar_JAM72S01_385_PR'
+      - name: 'zone_2_plat'
+        tilt: 15
+        azimuth: 160
+        modules_per_string: 8
+        strings: 1
+        module: 'JA_Solar_JAM72S01_385_PR'
