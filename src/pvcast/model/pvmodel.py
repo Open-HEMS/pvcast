@@ -142,7 +142,7 @@ class PVModelChain:
         return self._config
 
     @property
-    def location(self) -> tuple([float, float]):
+    def location(self) -> Location:
         """Get the location of the PV system."""
         return self._location
 

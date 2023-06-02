@@ -22,11 +22,18 @@ def main():
     init_logger()
 
     # read the configuration
-    config_reader = ConfigReader(Path("src/pvcast/config" + "/pv_config.yaml"))
+    config_reader = ConfigReader(Path("src/pvcast/config" + "/pv_config_enphase.yaml"))
     config = config_reader.config
+    lat = config["general"]["location"]["latitude"]
+    lon = config["general"]["location"]["longitude"]
+    alt = config["general"]["location"]["altitude"]
 
     # create the PV model
-    pv_model = PVModelChain(config["plant"], location=(52.35845515630293, 4.88115070391368))
+    model_chain = PVModelChain(config["plant"], location=(lat, lon), altitude=alt)
+
+    # get the PV model
+    model = model_chain.pvmodel
+    print(model)
 
 
 if __name__ == "__main__":
