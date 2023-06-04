@@ -1,6 +1,4 @@
-"""Script to retrieve CEC inverters and modules from PVLib."""
-
-from __future__ import annotations
+"""Script to retrieve CEC inverters and modules from PVLib and save them to CSV."""
 
 import pathlib as pl
 
@@ -20,18 +18,16 @@ def get_cec_modules():
     return cec_modules
 
 
-def save_to_csv(data: pd.DataFrame, path: pl.Path, transpose: bool = False):
-    """Save datafram to CSV files."""
+def save_to_csv(data: pd.DataFrame, path: pl.Path):
+    """Save datafram to CSV file."""
+    cols = data.columns
+    data = data.transpose()
+    data["Name"] = cols
 
-    if transpose:
-        cols = data.columns
-        data = data.transpose()
-        data["Name"] = cols
-
-        # Move name to first column
-        names = data["Name"]
-        data.drop(labels=["Name"], axis=1, inplace=True)
-        data.insert(0, "Name", names)
+    # Move name to first column
+    names = data["Name"]
+    data.drop(labels=["Name"], axis=1, inplace=True)
+    data.insert(0, "Name", names)
 
     data.to_csv(path, index=False)
 
@@ -46,8 +42,8 @@ def main():
     data_path.mkdir(exist_ok=True)
 
     # Save data to CSV files
-    save_to_csv(cec_inverters, data_path / "cec_inverters.csv", transpose=True)
-    save_to_csv(cec_modules, data_path / "cec_modules.csv", transpose=True)
+    save_to_csv(cec_inverters, data_path / "cec_inverters_pvlib.csv")
+    save_to_csv(cec_modules, data_path / "cec_modules_pvlib.csv")
 
 
 if __name__ == "__main__":
