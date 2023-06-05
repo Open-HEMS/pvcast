@@ -1,15 +1,16 @@
 """Implements a PV system model."""
 
 import logging
+from pathlib import Path
 from types import MappingProxyType
-from typing import Optional
+from typing import Optional, Tuple
 
+import pandas as pd
 import pvlib
-from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
-from pvlib.modelchain import ModelChain
-from pvlib.pvsystem import PVSystem, Array, FixedMount
 from pvlib.location import Location
-
+from pvlib.modelchain import ModelChain
+from pvlib.pvsystem import Array, FixedMount, PVSystem
+from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,8 +18,12 @@ _LOGGER = logging.getLogger(__name__)
 class PVModelChain:
     """Implements a PV model chain. Basically a wrapper around pvlib."""
 
+    base_cec_data_path = Path(__file__).parent.parent / "data/proc"
+    inv_path = base_cec_data_path / "cec_inverters.csv"
+    mod_path = base_cec_data_path / "cec_modules.csv"
+
     def __init__(
-        self, config: MappingProxyType, location: tuple([float, float]), altitude: float = 0.0, tz: str = "UTC"
+        self, config: MappingProxyType, location: Tuple[float, float], altitude: float = 0.0, time_z: str = "UTC"
     ):
         """Initialize a PV system model.
 
@@ -30,12 +35,50 @@ class PVModelChain:
         :param altitude: The altitude of the PV system.
         :param tz: The timezone of the PV system.
         """
-        self._config = config
-        self._location = Location(latitude=location[0], longitude=location[1], altitude=altitude, tz=tz)
-        self._cec_modules = pvlib.pvsystem.retrieve_sam("CECMod")
-        self._cec_inverters = pvlib.pvsystem.retrieve_sam("CECInverter")
+        self.config = config
+        self.location = Location(latitude=location[0], longitude=location[1], altitude=altitude, tz=time_z)
         self._temp_params = TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"]
-        self._pv_model: list([ModelChain]) = self._create_pv_model()
+        self.pv_model: list([ModelChain]) = self._create_pv_model()
+
+    def _retrieve_sam_wrapper(self, path: Path) -> pd.DataFrame:
+        """Retrieve SAM database.
+
+        :param path: The path to the SAM database.
+        :return: The SAM database as a pandas DataFrame.
+        """
+        if not path.exists():
+            raise FileNotFoundError(f"Database {path} does not exist.")
+
+        # retrieve database
+        pv_df = pvlib.pvsystem.retrieve_sam(name=None, path=str(path))
+        pv_df = pv_df.transpose()
+        _LOGGER.debug("Retrieved %s entries from %s.", len(pv_df), path)
+        return pv_df
+
+    def _retrieve_parameters(self, device: str, inverter: bool) -> dict:
+        """Retrieve module or inverter parameters from the pvlib/SAM databases.
+
+        :param device: The name of the module or inverter.
+        :param inverter: True if the device is an inverter, False if it is a PV module.
+        :return: The parameters of the device.
+        """
+        # retrieve parameter database
+        candidates = self._retrieve_sam_wrapper(self.inv_path if inverter else self.mod_path)
+
+        # check if there are duplicates
+        duplicates = candidates[candidates.index.duplicated(keep=False)]
+        if not duplicates.empty:
+            _LOGGER.debug("Dropping %s duplicate entries.", len(duplicates))
+            candidates = candidates.drop_duplicates(keep="first")
+
+        # check if device is in the database
+        try:
+            params = candidates.loc[candidates.index == device].to_dict("records")[0]
+            _LOGGER.debug("Found device %s in the database.", device)
+        except KeyError as exc:
+            raise KeyError(f"Device {device} not found in the database.") from exc
+
+        return params
 
     def _create_pv_model(self) -> list([ModelChain]):
         """Create a PV system model from a user supplied config.
@@ -45,7 +88,7 @@ class PVModelChain:
         pv_systems = []
 
         # loop over all systems
-        for _, system in enumerate(self._config):
+        for _, system in enumerate(self.config):
             _LOGGER.debug("Creating PV system model for system %s", system["name"])
             uses_micro: bool = system["microinverter"]
             inverter: str = system["inverter"]
@@ -83,7 +126,7 @@ class PVModelChain:
                 module_name = f"{array['name']}_array_{module_id}"
                 arr = Array(
                     mount=mount,
-                    module_parameters=self._cec_modules[array["module"]],
+                    module_parameters=self._retrieve_parameters(array["module"], False),
                     temperature_model_parameters=self._temp_params,
                     strings=1,
                     modules_per_string=1,
@@ -107,7 +150,7 @@ class PVModelChain:
             mount = FixedMount(surface_tilt=array["tilt"], surface_azimuth=array["azimuth"])
             arr = Array(
                 mount=mount,
-                module_parameters=self._cec_modules[array["module"]],
+                module_parameters=self._retrieve_parameters(array["module"], False),
                 temperature_model_parameters=self._temp_params,
                 strings=array["strings"],
                 modules_per_string=array["modules_per_string"],
@@ -118,10 +161,9 @@ class PVModelChain:
 
     def _build_model_chain(self, pv_arrays: list([Array]), inverter: str, name: str) -> ModelChain:
         # create the PV system
-        inverter = self._cec_inverters[inverter]
         pv_system = PVSystem(
             arrays=pv_arrays,
-            inverter_parameters=inverter,
+            inverter_parameters=self._retrieve_parameters(inverter, True),
             inverter=inverter,
             name=name,
         )
@@ -129,24 +171,9 @@ class PVModelChain:
         # create the model chain
         modelchain = ModelChain(
             pv_system,
-            self._location,
+            self.location,
             name=name,
             aoi_model="physical",
         )
 
         return modelchain
-
-    @property
-    def config(self) -> dict:
-        """Get the configuration of the PV system."""
-        return self._config
-
-    @property
-    def location(self) -> Location:
-        """Get the location of the PV system."""
-        return self._location
-
-    @property
-    def pvmodel(self) -> ModelChain:
-        """Get the PV system model."""
-        return self._pv_model

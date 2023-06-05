@@ -1,6 +1,7 @@
 """Reads PV plant configuration from a YAML file."""
 
 from pathlib import Path
+
 import yaml
 
 
