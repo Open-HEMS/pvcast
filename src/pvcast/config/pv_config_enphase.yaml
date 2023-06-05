@@ -15,7 +15,6 @@ plant:
     microinverter: true
     arrays:
       # Array level. Each entry in list represents one Array object.
-      # Each array is assumed to have it's own MPPT.
       - name: 'zone_1_schuin'
         tilt: 30
         azimuth: 247
