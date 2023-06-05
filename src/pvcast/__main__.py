@@ -1,7 +1,7 @@
 """Module that contains the command line application."""
 
-from pathlib import Path
 import logging
+from pathlib import Path
 
 from .config.configreader import ConfigReader
 from .model.pvmodel import PVModelChain
@@ -22,7 +22,7 @@ def main():
     init_logger()
 
     # read the configuration
-    config_reader = ConfigReader(Path("src/pvcast/config" + "/pv_config_enphase.yaml"))
+    config_reader = ConfigReader(Path("src/pvcast/config" + "/pv_config_se.yaml"))
     config = config_reader.config
     lat = config["general"]["location"]["latitude"]
     lon = config["general"]["location"]["longitude"]
@@ -32,7 +32,7 @@ def main():
     model_chain = PVModelChain(config["plant"], location=(lat, lon), altitude=alt)
 
     # get the PV model
-    model = model_chain.pvmodel
+    model = model_chain.pv_model
     print(model)
 
 
