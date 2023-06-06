@@ -130,3 +130,6 @@ dmypy.json
 
 # data
 src/pvcast/data/raw
+
+# secrets.yaml
+secrets.yaml
