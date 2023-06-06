@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from pvcast.config.configreader import ConfigReader
-from pvcast.weather.weather import WeatherAPIClearOutside
+from pvcast.weather.clearoutside import WeatherAPIClearOutside
 
 LOC_EUW = (52.3585, 4.8810, 0.0)
 LOC_USW = (40.6893, -74.0445, 0.0)
