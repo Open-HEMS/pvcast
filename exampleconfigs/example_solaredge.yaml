@@ -1,0 +1,35 @@
+# configuration file for pvcast
+# solar-edge inverter configuration
+
+---
+general:
+  weather_sources:
+    - type: internal
+      source: clearoutside
+    - type: internal
+      source: openweathermap
+      api_key: !secret openweathermap_api_key
+  location:
+    latitude: !secret lat
+    longitude: !secret lon
+    altitude: !secret alt
+  timezone: !secret time_zone
+  long_lived_token: !secret long_lived_token
+
+plant:
+  - name: EastWest
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: East
+        tilt: 30
+        azimuth: 90
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: West
+        tilt: 30
+        azimuth: 270
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_

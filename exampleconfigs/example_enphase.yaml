@@ -1,0 +1,35 @@
+# configuration file for pvcast
+# solar-edge inverter configuration
+
+---
+general:
+  weather_sources:
+    - type: internal
+      source: clearoutside
+    - type: internal
+      source: openweathermap
+      api_key: !secret openweathermap_api_key
+  location:
+    latitude: !secret lat
+    longitude: !secret lon
+    altitude: !secret alt
+  timezone: !secret time_zone
+  long_lived_token: !secret long_lived_token
+
+plant:
+  - name: EastWest
+    inverter: Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_
+    microinverter: true
+    arrays:
+      - name: zone_1_schuin
+        tilt: 30
+        azimuth: 247
+        modules_per_string: 5
+        strings: 1
+        module: JA_Solar_JAM72S01_385_PR
+      - name: zone_2_plat
+        tilt: 15
+        azimuth: 160
+        modules_per_string: 8
+        strings: 1
+        module: JA_Solar_JAM72S01_385_PR
