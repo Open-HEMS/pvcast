@@ -5,9 +5,7 @@ import pathlib as pl
 
 import pandas as pd
 import pvlib
-
 from const import INV_PVLIB_PATH, MOD_PVLIB_PATH
-
 
 _LOGGER = logging.getLogger(__name__)
 

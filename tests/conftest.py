@@ -12,15 +12,21 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 
 from __future__ import annotations
 
+from pathlib import Path
 from dataclasses import replace
+
 import pytest
-import unittest.mock as mock
 
 from pvcast.weather.weather import WeatherAPIClearOutside
+from pvcast.config.configreader import ConfigReader
 
 LOC_EUW = (52.3585, 4.8810, 0.0)
 LOC_USW = (40.6893, -74.0445, 0.0)
 LOC_AUS = (-31.9741, 115.8517, 0.0)
+
+TEST_CONF_PATH_SEC = Path(__file__).parent.parent / "tests" / "test_config_sec.yaml"
+TEST_CONF_PATH_NO_SEC = Path(__file__).parent.parent / "tests" / "test_config_no_sec.yaml"
+TEST_SECRETS_PATH = Path(__file__).parent.parent / "tests" / "test_secrets.yaml"
 
 
 # check with different lat/lon/alt
@@ -45,3 +51,24 @@ def weather_co_too_many_req():
     # set the url to a wrong url (require replace() bc dataclass is frozen)
     obj = replace(WeatherAPIClearOutside(*LOC_EUW), url_base="http://httpbin.org/status/429", format_url=False)
     return obj
+
+
+@pytest.fixture()
+def configreader_secfile_sectags():
+    """Fixture for the configreader."""
+    return ConfigReader(TEST_CONF_PATH_SEC, TEST_SECRETS_PATH)
+
+
+@pytest.fixture()
+def configreader_no_secfile_no_sectags():
+    """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
+    return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
+
+
+@pytest.fixture()
+def configreader_no_secfile_sectags():
+    """
+    Fixture for the configreader initialized without a secrets file but with !secret tags in config.
+    This should raise an exception.
+    """
+    return ConfigReader(config_file_path=TEST_CONF_PATH_SEC)
