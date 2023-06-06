@@ -1,9 +1,15 @@
 """Script to retrieve CEC inverters and modules from PVLib and save them to CSV."""
 
+import logging
 import pathlib as pl
 
 import pandas as pd
 import pvlib
+
+from const import INV_PVLIB_PATH, MOD_PVLIB_PATH
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def get_cec_inverters():
@@ -34,16 +40,23 @@ def save_to_csv(data: pd.DataFrame, path: pl.Path):
 
 def main():
     """Main function."""
+    # configure logging
+    logging.basicConfig(level=logging.DEBUG)
+    fmt = "%(asctime)s %(levelname)s (%(threadName)s) " + "[%(name)s] %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+
+    # stdout handler
+    logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+
     cec_inverters = get_cec_inverters()
     cec_modules = get_cec_modules()
 
-    # Create data directory if it does not exist
-    data_path = pl.Path("data")
-    data_path.mkdir(exist_ok=True)
-
     # Save data to CSV files
-    save_to_csv(cec_inverters, data_path / "cec_inverters_pvlib.csv")
-    save_to_csv(cec_modules, data_path / "cec_modules_pvlib.csv")
+    _LOGGER.info("Saving PVLib CEC inverters to %s", INV_PVLIB_PATH)
+    save_to_csv(cec_inverters, INV_PVLIB_PATH)
+    _LOGGER.info("Saving PVLib CEC modules to %s", MOD_PVLIB_PATH)
+    save_to_csv(cec_modules, MOD_PVLIB_PATH)
+    _LOGGER.info("Done.")
 
 
 if __name__ == "__main__":

@@ -9,13 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pvlib
 
-RAW_DATA_PATH = Path(__file__).parent.parent / "data/raw"
-INV_PVLIB_PATH = RAW_DATA_PATH / "cec_inverters_pvlib.csv"
-INV_SAM_PATH = RAW_DATA_PATH / "cec_inverters_sam.csv"
-MOD_PVLIB_PATH = RAW_DATA_PATH / "cec_modules_pvlib.csv"
-MOD_SAM_PATH = RAW_DATA_PATH / "cec_modules_sam.csv"
+from const import INV_PROC_PATH, MOD_PROC_PATH, INV_PVLIB_PATH, INV_SAM_PATH, MOD_PVLIB_PATH, MOD_SAM_PATH
 
-PROC_DATA_PATH = Path(__file__).parent.parent / "data/proc"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +41,9 @@ def main():
     # stdout handler
     logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt, datefmt=datefmt))
 
+    # print paths
+    _LOGGER.info("INV_PVLIB_PATH: %s", INV_PVLIB_PATH)
+
     # merge PVLib and SAM databases
     pvlib_inv_df = retrieve_sam_wrapper(INV_PVLIB_PATH)
     _LOGGER.info("pvlib_inv_df length: %s", len(pvlib_inv_df))
@@ -73,8 +71,8 @@ def main():
     mod_df = mod_df.sort_values(by=["index"])
 
     # save databases
-    inv_df.to_csv(PROC_DATA_PATH / "cec_inverters.csv", index=False)
-    mod_df.to_csv(PROC_DATA_PATH / "cec_modules.csv", index=False)
+    inv_df.to_csv(INV_PROC_PATH, index=False)
+    mod_df.to_csv(MOD_PROC_PATH, index=False)
 
 
 if __name__ == "__main__":
