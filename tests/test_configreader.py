@@ -1,7 +1,10 @@
 """Test the configreader module."""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+from pytz import UnknownTimeZoneError
 
 from pvcast.config.configreader import ConfigReader
 
@@ -37,3 +40,13 @@ class TestConfigReader:
         """Test the configreader without a config file."""
         with pytest.raises(TypeError):
             ConfigReader()
+
+    def test_configreader_wrong_config_file(self):
+        """Test the configreader with a wrong config file."""
+        with pytest.raises(FileNotFoundError):
+            ConfigReader(Path("wrongfile.yaml")).config
+
+    def test_invalid_timezone(self, configreader_wrong_timezone):
+        """Test the configreader with an invalid timezone."""
+        with pytest.raises(UnknownTimeZoneError):
+            configreader_wrong_timezone.config

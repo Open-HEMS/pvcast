@@ -1,13 +1,15 @@
 """Reads PV plant configuration from a YAML file."""
 
+from __future__ import annotations
+
 import logging
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytz
-from voluptuous import Required, Schema, Optional, Coerce
 import yaml
-
+from pytz import UnknownTimeZoneError
+from voluptuous import Coerce, Optional, Required, Schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,8 +72,11 @@ class ConfigReader:
             config = yaml.safe_load(config_file)
             self._validate_config(config)
 
-        # Convert time zone string to pytz.timezone object
-        config["general"]["timezone"] = pytz.timezone(config["general"]["timezone"])
+        # check if the timezone is valid
+        try:
+            config["general"]["timezone"] = pytz.timezone(config["general"]["timezone"])
+        except UnknownTimeZoneError as exc:
+            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['timezone']}") from exc
 
         return config
 
