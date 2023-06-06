@@ -5,9 +5,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Tuple
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ class WeatherAPI(ABC):
             elif response.status_code == 429:
                 raise WeatherAPIErrorTooManyReq()
             else:
-                raise WeatherAPIError()
+                raise WeatherAPIError(response.status_code)
 
 
 @dataclass(frozen=True)
@@ -107,7 +107,7 @@ class WeatherAPIErrorNoData(WeatherAPIError):
 
 @dataclass(frozen=True)
 class WeatherAPIErrorTooManyReq(WeatherAPIError):
-    """Exception class for weather API errors."""
+    """Exception error 429, too many requests."""
 
     message: str = field(default="Too many requests")
     error: int = field(default=429)
@@ -115,15 +115,23 @@ class WeatherAPIErrorTooManyReq(WeatherAPIError):
 
 @dataclass(frozen=True)
 class WeatherAPIErrorWrongURL(WeatherAPIError):
-    """Exception class for weather API errors."""
+    """Exception error 404, wrong URL."""
 
     message: str = field(default="Wrong URL")
     error: int = field(default=404)
 
 
 @dataclass(frozen=True)
+class WeatherAPIErrorTimeout(WeatherAPIError):
+    """Exception error 408, timeout."""
+
+    message: str = field(default="API timeout")
+    error: int = field(default=408)
+
+
+@dataclass(frozen=True)
 class WeatherAPIErrorNoLocation(WeatherAPIError):
-    """Exception class for weather API errors."""
+    """Exception error 404, no data for location."""
 
     message: str = field(default="No data for location available")
 
@@ -145,7 +153,11 @@ class WeatherAPIClearOutside(WeatherAPI):
         else:
             url = self.url_base
 
-        response = requests.get(url)
+        # do the request
+        try:
+            response = requests.get(url, timeout=10)
+        except requests.exceptions.Timeout as exc:
+            raise WeatherAPIErrorTimeout() from exc
 
         # response handling
         self.api_error_handler(response)
@@ -166,8 +178,8 @@ class WeatherAPIClearOutside(WeatherAPI):
         # parse the data
         try:
             table = BeautifulSoup(response.content, "html.parser").find_all(id="day_0")[0]
-        except IndexError:
-            raise WeatherAPIErrorNoData.from_date(self.start_forecast.strftime("%Y-%m-%d"))
+        except IndexError as exc:
+            raise WeatherAPIErrorNoData.from_date(self.start_forecast.strftime("%Y-%m-%d")) from exc
 
         list_names = table.find_all(class_="fc_detail_label")
         list_tables = table.find_all("ul")[1:]
