@@ -1,9 +1,11 @@
 """Module that contains the command line application."""
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 
-from .webserver.webserver import run
+from .webserver import webserver
 
 
 def init_logger():
@@ -25,7 +27,7 @@ def main():
     # run webserver
     config_path = Path("config.yaml")
     secrets_path = Path("secrets.yaml")
-    run(config_path, secrets_path)
+    webserver.run(config_path, secrets_path)
 
 
 if __name__ == "__main__":

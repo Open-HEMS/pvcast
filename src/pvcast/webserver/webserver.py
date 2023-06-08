@@ -16,6 +16,7 @@ Endpoints:
         - /forecast/energy/ptu/<name>: Get the forecasted energy output in kWh at 15 minute intervals.
         - /forecast/energy/hour/<name>: Get the forecasted energy output in kWh at hourly intervals.
         - /forecast/energy/day/<name>: Get the forecasted energy output in kWh at daily intervals.
+        - /forecast/updateweather: Async way to force update the weather forecast data.
 
   - PV historic endpoints. These endpoints return expected energy based on 20 year average historic PVGIS data.
     TMY data is used for the historic energy endpoints. TMY is a typical meteorological year, which is a dataset of
@@ -31,11 +32,11 @@ Endpoints:
 
         {
             "name": <name>,
+            "unit": <unit>,
             "data": [
                 {
                     "date": <date>,
-                    "value": <value>,
-                    "unit": <unit>
+                    "value": <value>
                 },
                 ...
             ]
@@ -50,40 +51,35 @@ Endpoints:
 
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 
-from flask import Flask, jsonify, request, Blueprint
+from flasgger import Swagger
+from flask import Blueprint, Flask, jsonify, request
 from flask.views import MethodView
 from flask_restful import Api
-from flasgger import Swagger
 
 from ..config.configreader import ConfigReader
+
 # from pvcast.forecast.forecast import Forecast
 # from pvcast.historic.historic import Historic
 
 app = Flask(__name__)
 api = Api(app)
-swag = Swagger(app, template_file='api_schema.yaml',
-    parse=True, config={
-    'headers': [],
-    'specs': [
-        {
-            'endpoint': 'apispec',
-            'route': '/apispec.json',
-            'test': 'test'
-        }
-    ],
-    'openapi': '3.0.1'
-})
+swag = Swagger(
+    app,
+    template_file="api_schema.yaml",
+    parse=True,
+    config={
+        "headers": [],
+        "specs": [{"endpoint": "apispec", "route": "/apispec.json", "test": "test"}],
+        "openapi": "3.0.1",
+    },
+)
 
 
-
-
-
-
-
-
-@app.route('/')
+@app.route("/")
 def index():
     return "Hello, World!"
 
@@ -99,8 +95,3 @@ def run(config_path: Path, secrets_path: Path):
     global config_reader
     config_reader = ConfigReader(config_path, secrets_path)
     app.run(debug=True)
-
-
-
-
-

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 LOC_EUW = (52.3585, 4.8810, 0.0)
