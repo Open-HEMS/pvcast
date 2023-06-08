@@ -2,16 +2,19 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Tuple
+from dataclasses import InitVar, dataclass, field
+
+# import Any type
+from typing import Any, Tuple
 
 import pandas as pd
 import requests
+from pandas import Timedelta, Timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass()
 class WeatherAPI(ABC):
     """Abstract WeatherAPI class."""
 
@@ -21,28 +24,30 @@ class WeatherAPI(ABC):
     alt: float = field(default=0.0)
     format_url: bool = field(default=True)  # whether to format the url with lat, lon, alt. Mostly for testing.
 
+    # url
+    _url_base: str = field(default=None, init=False)  # base url to the API
+    _url: str = field(default=None, init=False)  # url to the API
+
+    # maximum age of weather data in seconds
+    max_age: Timedelta = field(default=Timedelta(hours=1))
+    _last_update: Timestamp = field(default=None, init=False)
+
+    # raw response data from the API
+    _raw_data: requests.Response = field(default=None, init=False)
+
     @property
     def start_forecast(self) -> pd.Timestamp:
-        """Get the start date of the forecast.
-
-        :return: The start date of the forecast.
-        """
+        """Get the start date of the forecast."""
         return pd.Timestamp.now(tz="UTC").floor("D")
 
     @property
     def end_forecast(self) -> pd.Timestamp:
-        """Get the end date of the forecast.
-
-        :return: The end date of the forecast.
-        """
+        """Get the end date of the forecast."""
         return self.start_forecast + pd.Timedelta(days=1)
 
     @property
     def forecast_dates(self) -> pd.DatetimeIndex:
-        """Get the dates of the forecast.
-
-        :return: The dates of the forecast.
-        """
+        """Get the dates of the forecast."""
         return pd.date_range(self.start_forecast, self.end_forecast, freq="H")
 
     @property
@@ -51,21 +56,44 @@ class WeatherAPI(ABC):
         return (self.lat, self.lon, self.alt)
 
     @abstractmethod
-    def _do_api_request(self) -> requests.Response:
-        """Do a request to the API and store the response in self._response.
+    def _process_data(self) -> pd.DataFrame:
+        """Process data from the weather API.
 
-        :return: The API data.
+        :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
 
-    @abstractmethod
     def get_weather(self) -> pd.DataFrame:
         """Get weather data from API response.
 
-        :return: The weather data as a dictionary where the format is: {"date": {"variable": value}}.
+        :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
+        # get weather API data, if needed. If not, use cached data.
+        response = self._api_request_if_needed()
+
+        # handle errors from the API
+        self._api_error_handler(response)
+
+        # process and return the data
+        try:
+            return self._process_data()
+        except Exception as e:
+            _LOGGER.error(f"Error processing data: {e}")
+            raise e
+
+    # url formatter function
+    def __post_init__(self) -> None:
+        """Post init function."""
+        if self.format_url:
+            self._url = self._url_formatter()
+        else:
+            self._url = self._url_base
+
+    @abstractmethod
+    def _url_formatter(self) -> str:
+        """Format the url to the API."""
 
     @staticmethod
-    def api_error_handler(response: requests.Response) -> None:
+    def _api_error_handler(response: requests.Response) -> None:
         """Handle errors from the API.
 
         :param response: The response from the API.
@@ -78,6 +106,27 @@ class WeatherAPI(ABC):
                 raise WeatherAPIErrorTooManyReq()
             else:
                 raise WeatherAPIError(response.status_code)
+
+    def _api_request_if_needed(self) -> requests.Response:
+        """Check if we need to do a request or not when weather data is outdated."""
+
+        if self._raw_data is not None and Timestamp.now(tz="UTC") - self._last_update < self.max_age:
+            _LOGGER.debug("Using cached weather data.")
+            return self._raw_data
+
+        # do the request
+        try:
+            response = requests.get(self._url, timeout=10)
+        except requests.exceptions.Timeout as exc:
+            raise WeatherAPIErrorTimeout() from exc
+
+        # request error handling
+        self._api_error_handler(response)
+
+        # return the response
+        self._raw_data = response
+        self._last_update = Timestamp.now(tz="UTC")
+        return response
 
 
 @dataclass(frozen=True)

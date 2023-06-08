@@ -8,50 +8,30 @@ from dataclasses import dataclass, field
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+from pandas import DataFrame, Timedelta, Timestamp
 
 from pvcast.weather.weather import WeatherAPI, WeatherAPIErrorNoData, WeatherAPIErrorTimeout
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass()
 class WeatherAPIClearOutside(WeatherAPI):
     """Weather API class that scrapes the data from Clear Outside."""
 
-    url_base: str = field(default="https://clearoutside.com/forecast/")
+    _url_base: str = field(default="https://clearoutside.com/forecast/")
 
-    def _do_api_request(self) -> requests.Response:
-        """Do a request to the API and return the response.
+    def _url_formatter(self) -> str:
+        """Format the url to the API."""
+        return f"{self._url_base}{str(round(self.lat, 2))}/{str(round(self.lon, 2))}/{str(round(self.alt, 2))}"
 
-        :return: The API data.
-        """
-        # format the url, mainly for testing
-        if self.format_url:
-            url = f"{self.url_base}{str(round(self.lat, 2))}/{str(round(self.lon, 2))}/{str(round(self.alt, 2))}"
-        else:
-            url = self.url_base
-
-        # do the request
-        try:
-            response = requests.get(url, timeout=10)
-        except requests.exceptions.Timeout as exc:
-            raise WeatherAPIErrorTimeout() from exc
-
-        # response handling
-        self.api_error_handler(response)
-
-        # return the response
-        return response
-
-    def get_weather(self) -> dict:
-        """Get weather data from the API.
+    def _process_data(self, response: requests.Response) -> DataFrame:
+        """Process weather data scraped from the clear outside website.
 
         Credits to https://github.com/davidusb-geek/emhass for the parsing code.
 
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
-        # do the request
-        response = self._do_api_request()
 
         # parse the data
         try:
@@ -68,7 +48,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         list_tables = [list_tables[i] for i in sel_cols]
 
         # building the raw DF container
-        raw_data = pd.DataFrame(index=range(24), columns=col_names, dtype=float)
+        raw_data = DataFrame(index=range(24), columns=col_names, dtype=float)
         for count_col, col in enumerate(col_names):
             list_rows = list_tables[count_col].find_all("li")
             for count_row, row in enumerate(list_rows):
