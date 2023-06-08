@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from const import TEST_CONF_PATH_ERROR, TEST_CONF_PATH_NO_SEC, TEST_CONF_PATH_SEC, TEST_SECRETS_PATH
 from pytz import UnknownTimeZoneError
 
 from pvcast.config.configreader import ConfigReader
@@ -11,6 +12,32 @@ from pvcast.config.configreader import ConfigReader
 
 class TestConfigReader:
     """Test the configreader module."""
+
+    @pytest.fixture
+    def configreader_secfile_sectags(self):
+        """Fixture for the configreader."""
+        return ConfigReader(TEST_CONF_PATH_SEC, TEST_SECRETS_PATH)
+
+    @pytest.fixture
+    def configreader_no_secfile_no_sectags(self):
+        """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
+        return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
+
+    @pytest.fixture
+    def configreader_no_secfile_sectags(self):
+        """
+        Fixture for the configreader initialized without a secrets file but with !secret tags in config.
+        This should raise an exception.
+        """
+        return ConfigReader(config_file_path=TEST_CONF_PATH_SEC)
+
+    @pytest.fixture
+    def configreader_wrong_timezone(self):
+        """
+        Fixture for the configreader initialized with a timezone that does not exist.
+        This should raise an exception.
+        """
+        return ConfigReader(config_file_path=TEST_CONF_PATH_ERROR)
 
     def test_configreader_no_secrets(self, configreader_no_secfile_no_sectags):
         """Test the configreader without a secrets file and no !secret tags in config."""
