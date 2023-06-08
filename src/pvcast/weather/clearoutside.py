@@ -9,8 +9,7 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from pvcast.weather.weather import (WeatherAPI, WeatherAPIErrorNoData,
-                                    WeatherAPIErrorTimeout)
+from pvcast.weather.weather import WeatherAPI, WeatherAPIErrorNoData, WeatherAPIErrorTimeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,11 +21,11 @@ class WeatherAPIClearOutside(WeatherAPI):
     url_base: str = field(default="https://clearoutside.com/forecast/")
 
     def _do_api_request(self) -> requests.Response:
-        """Do a request to the API and store the response in self._response.
+        """Do a request to the API and return the response.
 
         :return: The API data.
         """
-        # get the data from clear outside
+        # format the url, mainly for testing
         if self.format_url:
             url = f"{self.url_base}{str(round(self.lat, 2))}/{str(round(self.lon, 2))}/{str(round(self.alt, 2))}"
         else:

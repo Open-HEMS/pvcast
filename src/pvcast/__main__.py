@@ -3,8 +3,7 @@
 import logging
 from pathlib import Path
 
-from .config.configreader import ConfigReader
-from .model.pvmodel import PVModelChain
+from .webserver.webserver import run
 
 
 def init_logger():
@@ -19,21 +18,14 @@ def init_logger():
 
 def main():
     """Entry point for the application script"""
+
+    # initialize logger
     init_logger()
 
-    # read the configuration
-    config_reader = ConfigReader(Path("src/pvcast/config" + "/pv_config_se.yaml"))
-    config = config_reader.config
-    lat = config["general"]["location"]["latitude"]
-    lon = config["general"]["location"]["longitude"]
-    alt = config["general"]["location"]["altitude"]
-
-    # create the PV model
-    model_chain = PVModelChain(config["plant"], location=(lat, lon), altitude=alt)
-
-    # get the PV model
-    model = model_chain.pv_model
-    print(model)
+    # run webserver
+    config_path = Path("config.yaml")
+    secrets_path = Path("secrets.yaml")
+    run(config_path, secrets_path)
 
 
 if __name__ == "__main__":

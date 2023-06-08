@@ -1,0 +1,92 @@
+openapi: 3.1.0
+info:
+  title: Proof-of-Concept
+servers:
+- url: http://127.0.0.1:5000/
+- url: https://127.0.0.1:5000/
+paths:
+  /product:
+    post:
+      tags:
+      - Product
+      summary: Add a new product
+      description: Create new product listings.
+      operationId: addProduct
+      requestBody:
+        description: Product object to be added to your catalog
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RawItem'
+        required: true
+      responses:
+        200:
+          description: Product created
+          content: {}
+        405:
+          description: Invalid input
+          content: {}
+        501:
+          description: Not Yet Implemented
+          content: {}
+      x-codegen-request-body-name: body
+components:
+  schemas:
+    RawItem:
+      type: object
+      required:
+      - upc
+      properties:
+        id:
+          type: integer
+          format: int32
+        itemNumber:
+          type: string
+          description: Your unique code pertaining only to this product
+          example: 1006-10
+        upc:
+          type: integer
+          description: Universal Product Code
+          format: int32
+
+
+      #  tags:
+      #     - forecast
+      #   parameters:
+      #     - in: path
+      #       name: name
+      #       schema:
+      #         type: string
+      #       required: true
+      #       description: The name of the PV system as defined in the YAML configuration file.
+      #     - in: query
+      #       name: date
+      #       schema:
+      #         type: string
+      #       required: false
+      #       description: The maximum look-ahead date in the format YYYY-MM-DD.
+      #   responses:
+      #     200:
+      #       description: The forecasted power output in watts at 15 minute intervals.
+      #       content:
+      #         application/json:
+      #           schema:
+      #             type: object
+      #             properties:
+      #               name:
+      #                 type: string
+      #                 description: The name of the PV system.
+      #               data:
+      #                 type: array
+      #                 items:
+      #                   type: object
+      #                   properties:
+      #                     date:
+      #                       type: string
+      #                       description: The date in the format YYYY-MM-DD HH:MM.
+      #                     value:
+      #                       type: number
+      #                       description: The power output in watts.
+      #                     unit:
+      #                       type: string
+      #                       description: The unit of the power output, i.e. W.
