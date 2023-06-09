@@ -7,8 +7,6 @@ from const import LOC_AUS, LOC_EUW, LOC_USW
 from pandas import DataFrame
 
 from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
-                                    WeatherAPIErrorNoData,
-                                    WeatherAPIErrorTimeout,
                                     WeatherAPIErrorTooManyReq,
                                     WeatherAPIErrorWrongURL)
 

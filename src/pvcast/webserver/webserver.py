@@ -55,33 +55,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flasgger import Swagger
-from flask import Blueprint, Flask, jsonify, request
-from flask.views import MethodView
-from flask_restful import Api
+from flask import Flask, jsonify
+from flask_restx import Api
+from waitress import serve
 
 from ..config.configreader import ConfigReader
-
-# from pvcast.forecast.forecast import Forecast
-# from pvcast.historic.historic import Historic
+from .apis import api
 
 app = Flask(__name__)
-api = Api(app)
-swag = Swagger(
-    app,
-    template_file="api_schema.yaml",
-    parse=True,
-    config={
-        "headers": [],
-        "specs": [{"endpoint": "apispec", "route": "/apispec.json", "test": "test"}],
-        "openapi": "3.0.1",
-    },
-)
+api.init_app(app)
 
+# webserver configuration
+port = 5000
+web_ui_url = "0.0.0.0"
 
-@app.route("/")
-def index():
-    return "Hello, World!"
+# global configuration
+config_reader = None
 
 
 def run(config_path: Path, secrets_path: Path):
@@ -94,4 +83,7 @@ def run(config_path: Path, secrets_path: Path):
     # read the configuration
     global config_reader
     config_reader = ConfigReader(config_path, secrets_path)
-    app.run(debug=True)
+
+    # start server
+    app.logger.info("Launching pvcast webserver at: http://" + web_ui_url + ":" + str(port))
+    serve(app, host=web_ui_url, port=port, threads=2)
