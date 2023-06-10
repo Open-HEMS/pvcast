@@ -17,47 +17,69 @@ forecast is computed for all available weather forecast data. The following endp
 """
 from __future__ import annotations
 
+import logging
+
 from flask_restx import Namespace, Resource, SchemaModel
+
+from .schemas import fc_out_energy, fc_out_power
+
+_LOGGER = logging.getLogger(__name__)
 
 # define the API namespace
 api = Namespace("forecast", "Short-term PV power and energy forecast data.")
 
 
-# # define the model and add it to the API
-# fc_model = SchemaModel("Forecast", fc_schema)
-# api.models[fc_model.name] = fc_model
+# define the models and add them to the API
+energy_models = {}
+power_models = {}
+
+# create energy and power models for each schema
+for name, schema in fc_out_energy.items():
+    energy_model = SchemaModel(name, schema)
+    energy_models[name] = energy_model
+    api.models[energy_model.name] = energy_model
+
+for name, schema in fc_out_power.items():
+    power_model = SchemaModel(name, schema)
+    power_models[name] = power_model
+    api.models[power_model.name] = power_model
 
 
-# @api.route("/updateweather", methods=["POST"])
-# class UpdateWeather(Resource):
-#     @api.doc(description="Force update the weather forecast data.")
-#     def post(self):
-#         return {}
+@api.route("/updateweather", methods=["POST"])
+class UpdateWeather(Resource):
+    @api.doc(description="Force update the weather forecast data.")
+    def post(self):
+        """Force update the weather forecast data."""
+        return {}
 
 
-# @api.route("/power/ptu/<name>", methods=["GET"])
-# class ForecastPowerPTU(Resource):
-#     @api.doc(model=fc_model.name)
-#     def get(self, name):
-#         return {}
+@api.route("/power/ptu/<name>", methods=["GET"])
+class ForecastPowerPTU(Resource):
+    @api.doc(model=power_models["ptu"])
+    def get(self, name):
+        """Forecasted power output in Watts at 15 minute intervals."""
+        return {}
 
 
-# @api.route("/power/hour/<name>", methods=["GET"])
-# class ForecastPowerHour(Resource):
-#     @api.doc(model=fc_model.name)
-#     def get(self, name):
-#         return {}
+@api.route("/power/hour/<name>", methods=["GET"])
+class ForecastPowerHour(Resource):
+    @api.doc(model=power_models["hour"])
+    def get(self, name):
+        """Forecasted power output in Watts at hourly intervals."""
+        return {}
 
 
-# @api.route("/energy/ptu/<name>", methods=["GET"])
-# class ForecastEnergyPTU(Resource):
-#     @api.doc(model=fc_model.name)
-#     def get(self, name):
-#         return {}
+@api.route("/energy/ptu/<name>", methods=["GET"])
+class ForecastEnergyPTU(Resource):
+    @api.doc(model=energy_models["ptu"])
+    def get(self, name):
+        """Forecasted energy output in kWh at 15 minute intervals."""
+        return {}
 
 
-# @api.route("/energy/hour/<name>", methods=["GET"])
-# class ForecastEnergyHour(Resource):
-#     @api.doc(model=fc_model.name)
-#     def get(self, name):
-#         return {}
+@api.route("/energy/hour/<name>", methods=["GET"])
+class ForecastEnergyHour(Resource):
+    @api.doc(model=energy_models["hour"])
+    def get(self, name):
+        """Forecasted energy output in kWh at hourly intervals."""
+        return {}

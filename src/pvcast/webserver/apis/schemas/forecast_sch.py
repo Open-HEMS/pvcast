@@ -26,24 +26,15 @@ _fc_out = {
 }
 
 # energy forecasts
-_fc_out_energy = deepcopy(_fc_out)
-_fc_out_energy["properties"]["unit"]["enum"] = ["Wh", "kWh"]
-
-fc_out_energy_ptu = deepcopy(_fc_out_energy)
-fc_out_energy_ptu["properties"]["frequency"]["enum"] = ["ptu"]
-
-fc_out_energy_hour = deepcopy(_fc_out_energy)
-fc_out_energy_hour["properties"]["frequency"]["enum"] = ["hour"]
-
-fc_out_energy_day = deepcopy(_fc_out_energy)
-fc_out_energy_day["properties"]["frequency"]["enum"] = ["day"]
+energy_freqs = ["ptu", "hour", "day"]
+fc_out_energy = {freq: deepcopy(_fc_out) for freq in energy_freqs}
+for freq in energy_freqs:
+    fc_out_energy[freq]["properties"]["unit"]["enum"] = ["Wh", "kWh"]
+    fc_out_energy[freq]["properties"]["frequency"]["enum"] = [freq]
 
 # power forecasts
-_fc_out_power = deepcopy(_fc_out)
-_fc_out_power["properties"]["unit"]["enum"] = ["W", "kW"]
-
-fc_out_power_ptu = deepcopy(_fc_out_power)
-fc_out_power_ptu["properties"]["frequency"]["enum"] = ["ptu"]
-
-fc_out_power_hour = deepcopy(_fc_out_power)
-fc_out_power_hour["properties"]["frequency"]["enum"] = ["hour"]
+power_freqs = ["ptu", "hour"]
+fc_out_power = {freq: deepcopy(_fc_out) for freq in power_freqs}
+for freq in power_freqs:
+    fc_out_power[freq]["properties"]["unit"]["enum"] = ["W", "kW"]
+    fc_out_power[freq]["properties"]["frequency"]["enum"] = [freq]
