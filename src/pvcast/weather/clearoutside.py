@@ -10,7 +10,8 @@ import requests
 from bs4 import BeautifulSoup
 from pandas import DataFrame, Timedelta, Timestamp
 
-from pvcast.weather.weather import WeatherAPI, WeatherAPIErrorNoData, WeatherAPIErrorTimeout
+from pvcast.weather.weather import (WeatherAPI, WeatherAPIErrorNoData,
+                                    WeatherAPIErrorTimeout)
 
 _LOGGER = logging.getLogger(__name__)
 
