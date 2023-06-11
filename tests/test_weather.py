@@ -6,9 +6,7 @@ import requests
 from const import LOC_AUS, LOC_EUW, LOC_USW
 from pandas import DataFrame
 
-from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
-                                    WeatherAPIErrorTooManyReq,
-                                    WeatherAPIErrorWrongURL)
+from pvcast.weather.weather import WeatherAPI, WeatherAPIError, WeatherAPIErrorTooManyReq, WeatherAPIErrorWrongURL
 
 
 class TestWeather:

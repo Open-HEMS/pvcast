@@ -4,8 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from const import (TEST_CONF_PATH_ERROR, TEST_CONF_PATH_NO_SEC,
-                   TEST_CONF_PATH_SEC, TEST_SECRETS_PATH)
+from const import TEST_CONF_PATH_ERROR, TEST_CONF_PATH_NO_SEC, TEST_CONF_PATH_SEC, TEST_SECRETS_PATH
 from pytz import UnknownTimeZoneError
 
 from pvcast.config.configreader import ConfigReader
