@@ -29,6 +29,21 @@ class PVPlantModel:
     Implements the entire PV model chain based on the parameters set in config.yaml. This class is basically a wrapper
     around pvlib. Each entry in the plant list in config.yaml file should be instantiated as a PVModelChain object.
     In case of a PV system with microinverters, each microinverter is represented by one PVModelChain object.
+
+    For example, if the plant entry in config.yaml is:
+
+    plant:
+        # PVModelChain object 1
+        - name: EastWest
+        ...
+        # PVModelChain object 2
+        - name: NorthSouth
+        ...
+
+    Then we should have two PVPlantModel objects, one for each entry in the list under `plant:` in config.yaml.
+
+    :param config: The PV plant configuration dictionary. TODO: add validation via voluptuous.
+    :param loc: The location of the PV plant.
     """
 
     config: InitVar[dict]
@@ -205,10 +220,10 @@ class PVSystemManager:
     _pv_plants: list[PVPlantModel] = field(init=False, repr=False)
 
     def __post_init__(self, lat: float, lon: float, tz: BaseTzInfo, alt: float, inv_path: Path, mod_path: Path):
-        self._loc = Location(lat, lon, alt, tz)
+        self._loc = Location(lat, lon, alt, tz, name=f"PV plant at {lat}, {lon}")
         inv_param = self._retrieve_sam_wrapper(inv_path)
         mod_param = self._retrieve_sam_wrapper(mod_path)
-        self._pv_model = self._create_pv_plant(inv_param, mod_param)
+        self._pv_plants = self._create_pv_plants(inv_param, mod_param)
 
     @property
     def location(self):
@@ -237,7 +252,7 @@ class PVSystemManager:
         :return: The parameters of the device.
         """
         # retrieve parameter database
-        candidates = self._inv_param if inverter else self._mod_param
+        candidates: DataFrame = self._inv_param if inverter else self._mod_param
 
         # check if there are duplicates
         duplicates = candidates[candidates.index.duplicated(keep=False)]
@@ -254,20 +269,10 @@ class PVSystemManager:
 
         return params
 
-    def _create_pv_plant(self, inv_param: DataFrame, mod_param: DataFrame) -> list[PVPlantModel]:
+    def _create_pv_plants(self, inv_param: DataFrame, mod_param: DataFrame) -> list[PVPlantModel]:
         """
         Create a PVPlantModel object from a user supplied config.
-        For example, if the plant entry in config.yaml is:
 
-        plant:
-            # PVModelChain object 1
-          - name: EastWest
-            ...
-            # PVModelChain object 2
-          - name: NorthSouth
-            ...
-
-        Then this method will return a list of two PVModelChain objects, one for each PVModelChain object in the config.
 
         :return: List of PV system model chains. One ModelChain instance for each inverter in the config.
         """
@@ -281,3 +286,5 @@ class PVSystemManager:
                 mod_param=mod_param,
             )
             pv_plants.append(pv_plant)
+
+        return pv_plants

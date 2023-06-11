@@ -9,7 +9,7 @@ from pvlib.modelchain import ModelChain
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
-from pvcast.model.pvmodelv2 import PVPlantModel, PVSystemManager
+from pvcast.model.pvmodel import PVPlantModel, PVSystemManager
 
 
 class TestPVModelChain:
@@ -64,7 +64,7 @@ class TestPVModelChain:
         config = basic_config
         location = (latitude, longitude) = (10.0, 20.0)
         altitude = 100.0
-        time_z = "UTC"
+        time_z = "Europe/Amsterdam"
         pv_sys_mngr = PVSystemManager(config, *location, altitude, time_z)
 
         assert pv_sys_mngr.config == config
@@ -72,26 +72,3 @@ class TestPVModelChain:
         assert pv_sys_mngr.location.longitude == longitude
         assert pv_sys_mngr.location.altitude == altitude
         assert pv_sys_mngr.location.tz == time_z
-
-    # def test_pv_model_chain_init(self, basic_config):
-    #     config = basic_config
-    #     location = (latitude, longitude) = (10.0, 20.0)
-    #     altitude = 100.0
-    #     time_z = "UTC"
-    #     pv_model_chain = PVModelChain(config, location, altitude, time_z)
-
-    #     assert pv_model_chain.config == config
-    #     assert pv_model_chain.location.latitude == latitude
-    #     assert pv_model_chain.location.longitude == longitude
-    #     assert pv_model_chain.location.altitude == altitude
-    #     assert pv_model_chain.location.tz == time_z
-
-    # def test_create_pv_model(self, basic_config):
-    #     config = basic_config
-    #     location = (10.0, 20.0)
-    #     altitude = 100.0
-    #     time_z = "UTC"
-    #     pv_model_chain = PVModelChain(config, location, altitude, time_z)
-    #     pv_systems = pv_model_chain._create_pv_model()
-    #     assert len(pv_systems) == 1
-    #     assert isinstance(pv_systems[0][0], ModelChain)
