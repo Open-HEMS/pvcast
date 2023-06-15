@@ -1,20 +1,20 @@
 """Read weather forecast data and put it into a format that can be used by the pvcast module."""
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import InitVar, dataclass, field
-
-# import Any type
+from dataclasses import dataclass, field
 from typing import Any, Tuple
 
 import pandas as pd
 import requests
-from pandas import Timedelta, Timestamp
+from pandas import DataFrame, DatetimeIndex, Timedelta, Timestamp
 
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass()
+@dataclass
 class WeatherAPI(ABC):
     """Abstract WeatherAPI class."""
 
@@ -36,33 +36,33 @@ class WeatherAPI(ABC):
     _raw_data: requests.Response = field(default=None, init=False)
 
     @property
-    def start_forecast(self) -> pd.Timestamp:
+    def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
-        return pd.Timestamp.now(tz="UTC").floor("D")
+        return Timestamp.now(tz="UTC").floor("D")
 
     @property
-    def end_forecast(self) -> pd.Timestamp:
+    def end_forecast(self) -> DatetimeIndex:
         """Get the end date of the forecast."""
-        return self.start_forecast + pd.Timedelta(days=1)
+        return self.start_forecast + Timedelta(days=1)
 
     @property
-    def forecast_dates(self) -> pd.DatetimeIndex:
+    def forecast_dates(self) -> DatetimeIndex:
         """Get the dates of the forecast."""
         return pd.date_range(self.start_forecast, self.end_forecast, freq="H")
 
     @property
-    def location(self) -> Tuple[float, float, float]:
+    def location(self) -> tuple[float, float, float]:
         """Get the location of the forecast in the format (lat, lon, alt)."""
         return (self.lat, self.lon, self.alt)
 
     @abstractmethod
-    def _process_data(self) -> pd.DataFrame:
+    def _process_data(self) -> DataFrame:
         """Process data from the weather API.
 
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
 
-    def get_weather(self) -> pd.DataFrame:
+    def get_weather(self) -> DataFrame:
         """Get weather data from API response.
 
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.

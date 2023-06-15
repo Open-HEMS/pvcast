@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import InitVar, dataclass, field
+from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
 from typing import List, Optional, Tuple
@@ -11,9 +13,9 @@ from typing import List, Optional, Tuple
 import pandas as pd
 import pvlib
 import pytz
-from pandas import DataFrame
+from pandas import DataFrame, DatetimeIndex, Series
 from pvlib.location import Location
-from pvlib.modelchain import ModelChain
+from pvlib.modelchain import ModelChain, ModelChainResult
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 from pytz import BaseTzInfo, timezone
@@ -21,6 +23,32 @@ from pytz import BaseTzInfo, timezone
 from .const import BASE_CEC_DATA_PATH
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class ForecastType(str, Enum):
+    """Enum for the type of PVPlantResults."""
+
+    FORECAST = "forecast"
+    CLEARSKY = "clearsky"
+    HISTORICAL = "historic"
+
+
+@dataclass
+class PVPlantResult:
+    """Object to store the aggregated results of the PVPlantModel simulation.
+
+    :param name: The name of the PV plant.
+    :param type: The type of the result: forecast based on weather data, clearsky, or historic based on PVGIS.
+    :param ac: The AC power output of the aggregated ModelChains in PV plant.
+    :param weather: The weather data used for the simulation.
+    :param pvlibresults: Raw data, list of pvlib ModelChainResult objects.
+    """
+
+    name: str
+    type: ForecastType
+    ac: Series = field(repr=False)
+    weather: DataFrame = field(repr=False)
+    pvlibresults: list[ModelChainResult] = field(repr=False)
 
 
 @dataclass
@@ -47,15 +75,35 @@ class PVPlantModel:
     """
 
     config: InitVar[dict]
-    location: InitVar[Location]
+    location: Location = field(repr=False)
     inv_param: DataFrame = field(repr=False)
     mod_param: DataFrame = field(repr=False)
     temp_param: dict = field(default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"], repr=False)
     _pv_plant: list[ModelChain] = field(init=False, repr=False)
+    name: str = field(init=False)
+    _forecast: PVPlantResult | None = field(init=False, repr=False)
+    _clearsky: PVPlantResult | None = field(init=False, repr=False)
+    _historic: PVPlantResult | None = field(init=False, repr=False)
 
-    def __post_init__(self, config: dict, loc: Location):
+    def __post_init__(self, config: dict):
         pv_systems = self._create_pv_systems(config)
-        self._pv_plant = self._build_model_chain(pv_systems, config["name"], loc)
+        self._pv_plant = self._build_model_chain(pv_systems, self.location, config["name"])
+        self.name = config["name"]
+
+    @property
+    def forecast(self) -> PVPlantResult | None:
+        """Return the forecast results of the PV plant."""
+        return self._forecast
+
+    @property
+    def clearsky(self) -> PVPlantResult | None:
+        """Return the clearsky results of the PV plant."""
+        return self._clearsky
+
+    @property
+    def historic(self) -> PVPlantResult | None:
+        """Return the historic results of the PV plant."""
+        return self._historic
 
     def _create_pv_systems(self, config: dict) -> list[PVSystem]:
         """
@@ -192,6 +240,67 @@ class PVPlantModel:
         """
         return [ModelChain(system, location, name=name, aoi_model="physical") for system in pv_systems]
 
+    def run_forecast(self, weather_df: pd.DataFrame) -> None:
+        """Run the forecast for the PV system based on short term weather data.
+
+        :param weather_df: The weather forecast DataFrame.
+        """
+        # run the forecast for each model chain
+        results = []
+        for model_chain in self._pv_plant:
+            model_chain.run_model(weather_df)
+            results.append(model_chain.results)
+
+        # combine the results
+        self._forecast = self._aggregate(results, "ac")
+
+    def run_clearsky(self, datetimes: pd.DatetimeIndex) -> None:
+        """Run the forecast for the PV system based on clear sky weather data obtained from the location object."""
+        # get clear sky weather data
+        weather_df = self.location.get_clearsky(datetimes)
+
+        # run the forecast for each model chain
+        plant_copy = copy.deepcopy(self._pv_plant)
+
+        results = []
+        for model_chain in plant_copy:
+            # set aoi_model to "physical" and spectral_model to "no_loss" to use the clear sky data
+            model_chain.aoi_model = "physical"
+            model_chain.spectral_model = "no_loss"
+            model_chain.run_model(weather_df)
+            results.append(model_chain.results)
+
+        # combine the results
+        self._clearsky = self._aggregate(results, "ac")
+
+    def run_historic(self, freq: str = "M") -> None:
+        """Run simulation for the PV system based on TMY historic weather data obtained from PVGIS.
+
+        :param freq: Freq of returned results. Can be "H" for hourly, "D" for daily, "M" for monthly, "A" for annual.
+        """
+        raise NotImplementedError
+
+    def _aggregate(self, results: list[ModelChainResult], key: str) -> Series:
+        """Aggregate the results of the model chains into a single dataframe.
+
+        :param results: List of model chain result objects.
+        :param key: The key to aggregate on. Can be "ac", "dc", ..., but currently only "ac" is supported.
+        :return: The aggregated results.
+        """
+        # check if key is valid
+        if key not in ["ac"]:
+            raise NotImplementedError(f"Aggregation on {key} is not supported.")
+
+        # extract results.key
+        data = [getattr(result, key) for result in results]
+
+        # combine results
+        df: DataFrame = pd.concat(data, axis=1)
+        df = df.sum(axis=1).clip(lower=0)
+
+        # convert to Series and return
+        return df.squeeze()
+
 
 @dataclass
 class PVSystemManager:
@@ -217,7 +326,7 @@ class PVSystemManager:
     alt: InitVar[float] = field(default=0.0, repr=False)
     inv_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_inverters.csv", repr=False)
     mod_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_modules.csv", repr=False)
-    _pv_plants: list[PVPlantModel] = field(init=False, repr=False)
+    _pv_plants: dict[PVPlantModel] = field(init=False, repr=False)
 
     def __post_init__(self, lat: float, lon: float, tz: BaseTzInfo, alt: float, inv_path: Path, mod_path: Path):
         self._loc = Location(lat, lon, alt, tz, name=f"PV plant at {lat}, {lon}")
@@ -228,6 +337,17 @@ class PVSystemManager:
     @property
     def location(self):
         return self._loc
+
+    def get_pv_plant(self, name: str) -> PVPlantModel:
+        """Get a PV plant model by name.
+
+        :param name: The name of the PV plant.
+        :return: The PV plant model.
+        """
+        try:
+            return self._pv_plants[name]
+        except KeyError as exc:
+            raise KeyError(f"PV plant {name} not found.") from exc
 
     def _retrieve_sam_wrapper(self, path: Path) -> pd.DataFrame:
         """Retrieve SAM database.
@@ -269,7 +389,7 @@ class PVSystemManager:
 
         return params
 
-    def _create_pv_plants(self, inv_param: DataFrame, mod_param: DataFrame) -> list[PVPlantModel]:
+    def _create_pv_plants(self, inv_param: DataFrame, mod_param: DataFrame) -> dict[PVPlantModel]:
         """
         Create a PVPlantModel object from a user supplied config.
 
@@ -277,7 +397,7 @@ class PVSystemManager:
         :return: List of PV system model chains. One ModelChain instance for each inverter in the config.
         """
         _LOGGER.debug("Creating PV plant model.")
-        pv_plants = []
+        pv_plants = {}
         for plant_config in self.config:
             pv_plant = PVPlantModel(
                 config=plant_config,
@@ -285,6 +405,51 @@ class PVSystemManager:
                 inv_param=inv_param,
                 mod_param=mod_param,
             )
-            pv_plants.append(pv_plant)
+            pv_plants[plant_config["name"]] = pv_plant
 
         return pv_plants
+
+    @property
+    def plant_names(self) -> list[str]:
+        """Return the names of the PV plants."""
+        return self._pv_plants.keys()
+
+    def run(
+        self,
+        name: str,
+        type: ForecastType,
+        weather_df: DataFrame | None = None,
+        datetimes: DatetimeIndex | None = None,
+    ) -> PVPlantModel:
+        """Run the simulation.
+
+        :param name: The name of the PV plant.
+        :param type: The type of forecast to run.
+        :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
+                           If type is ForecastType.CLEARSKY, weather_df requires only timestamps to forecast. Actual weather
+                           data can be provided, but will be ignored.
+        :param datetimes: The timestamps to forecast. Only required if type is ForecastType.CLEARSKY.
+        :return: The PV plant model object, which contains the results of the simulation.
+        """
+        # check if weather data is provided
+        if type is ForecastType.FORECAST and weather_df is None:
+            raise ValueError(
+                f"Weather data must be provided for PV forecast of type {str(ForecastType.FORECAST.name)}."
+            )
+        if type is ForecastType.CLEARSKY and datetimes is None:
+            raise ValueError(f"Datetimes must be provided for PV forecast of type {ForecastType.CLEARSKY.name}.")
+
+        # get PV plant
+        pv_plant = self.get_pv_plant(name)
+
+        # run simulation
+        if type is ForecastType.HISTORICAL:
+            pv_plant.run_historical()
+        elif type is ForecastType.CLEARSKY:
+            pv_plant.run_clearsky(datetimes)
+        elif type is ForecastType.FORECAST:
+            pv_plant.run_forecast(weather_df)
+        else:
+            raise ValueError(f"Forecast type {type} not supported.")
+
+        return pv_plant
