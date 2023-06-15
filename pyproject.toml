@@ -33,6 +33,7 @@ dependencies = [
     "flask-restx==1.1.0",
     "waitress==2.1.2",
     "jsonschema==4.17.3",
+    "matplotlib==3.7.1",
 ]
 
 [project.optional-dependencies]
