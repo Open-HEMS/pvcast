@@ -133,3 +133,6 @@ src/pvcast/data/raw
 
 # secrets.yaml
 secrets.yaml
+
+# owm data
+notebooks/weather_data/openweathermap/data
