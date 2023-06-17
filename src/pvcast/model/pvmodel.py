@@ -14,11 +14,11 @@ import pandas as pd
 import pvlib
 from pandas import DataFrame, DatetimeIndex, Series, Timedelta
 from pandas.tseries.frequencies import to_offset
+from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 from pvlib.modelchain import ModelChain, ModelChainResult
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
-from pvlib.iotools import get_pvgis_tmy
 from pytz import BaseTzInfo, timezone
 
 from .const import BASE_CEC_DATA_PATH

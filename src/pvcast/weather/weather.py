@@ -4,17 +4,16 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field, InitVar
+from dataclasses import InitVar, dataclass, field
 from typing import Any, Tuple, Union
-from pytz import BaseTzInfo
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import requests
-from pandas import DataFrame, DatetimeIndex, Timedelta, Timestamp, Series
-
-from pvlib.irradiance import campbell_norman, get_extra_radiation, disc
+from pandas import DataFrame, DatetimeIndex, Series, Timedelta, Timestamp
+from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
+from pytz import BaseTzInfo
 
 _LOGGER = logging.getLogger(__name__)
 
