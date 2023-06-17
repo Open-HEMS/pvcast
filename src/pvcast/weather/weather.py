@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Any, Tuple
+from dataclasses import dataclass, field, InitVar
+from typing import Any, Tuple, Union
+from pytz import BaseTzInfo
 
 import pandas as pd
+import numpy as np
 import requests
-from pandas import DataFrame, DatetimeIndex, Timedelta, Timestamp
+from pandas import DataFrame, DatetimeIndex, Timedelta, Timestamp, Series
+
+from pvlib.irradiance import campbell_norman, get_extra_radiation, disc
+from pvlib.location import Location
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,9 +24,7 @@ class WeatherAPI(ABC):
     """Abstract WeatherAPI class."""
 
     # require lat, lon to have at least 2 decimal places of precision
-    lat: float
-    lon: float
-    alt: float = field(default=0.0)
+    location: Location
     format_url: bool = field(default=True)  # whether to format the url with lat, lon, alt. Mostly for testing.
 
     # url
@@ -49,11 +52,6 @@ class WeatherAPI(ABC):
     def forecast_dates(self) -> DatetimeIndex:
         """Get the dates of the forecast."""
         return pd.date_range(self.start_forecast, self.end_forecast, freq="H")
-
-    @property
-    def location(self) -> tuple[float, float, float]:
-        """Get the location of the forecast in the format (lat, lon, alt)."""
-        return (self.lat, self.lon, self.alt)
 
     @abstractmethod
     def _process_data(self) -> DataFrame:
@@ -127,6 +125,74 @@ class WeatherAPI(ABC):
         self._raw_data = response
         self._last_update = Timestamp.now(tz="UTC")
         return response
+
+    def cloud_cover_to_irradiance(self, cloud_cover: Series, how: str = "clearsky_scaling", **kwargs):
+        """
+        Convert cloud cover to irradiance. A wrapper method.
+
+        NB: Code copied from pvlib.forecast as the pvlib forecast module is deprecated as of pvlib 0.9.1!
+
+        :param cloud_cover: Cloud cover as a pandas Series
+        :param how: Selects the method for conversion. Can be one of clearsky_scaling or campbell_norman.
+        :param **kwargs: Passed to the selected method.
+        :return: Irradiance, columns include ghi, dni, dhi.
+        """
+        how = how.lower()
+        if how == "clearsky_scaling":
+            irrads = self._cloud_cover_to_irradiance_clearsky_scaling(cloud_cover, **kwargs)
+        elif how == "campbell_norman":
+            irrads = self._cloud_cover_to_irradiance_campbell_norman(cloud_cover, **kwargs)
+        else:
+            raise ValueError(f"Invalid how argument: {how}")
+
+        return irrads
+
+    def _cloud_cover_to_irradiance_clearsky_scaling(self, cloud_cover: Series, method="linear", **kwargs):
+        """ """
+        solpos = self.location.get_solarposition(cloud_cover.index)
+        cs = self.location.get_clearsky(cloud_cover.index, model="ineichen", solar_position=solpos)
+
+        method = method.lower()
+        if method == "linear":
+            ghi = self._cloud_cover_to_ghi_linear(cloud_cover, cs["ghi"], **kwargs)
+        else:
+            raise ValueError(f"Invalid method argument: {method}")
+
+        dni = disc(ghi, solpos["zenith"], cloud_cover.index)["dni"]
+        dhi = ghi - dni * np.cos(np.radians(solpos["zenith"]))
+
+        irrads = pd.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
+        return irrads
+
+    def _cloud_cover_to_irradiance_campbell_norman(self, cloud_cover: Series, **kwargs):
+        """ """
+        solar_position = self.location.get_solarposition(cloud_cover.index)
+        dni_extra = get_extra_radiation(cloud_cover.index)
+
+        transmittance = self.cloud_cover_to_transmittance_linear(cloud_cover, **kwargs)
+
+        irrads = campbell_norman(solar_position["apparent_zenith"], transmittance, dni_extra=dni_extra)
+        irrads = irrads.fillna(0)
+
+        return irrads
+
+    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear, offset=35, **kwargs):
+        """Convert cloud cover to GHI using a linear relationship."""
+        offset = offset / 100.0
+        cloud_cover = cloud_cover / 100.0
+        ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
+        return ghi
+
+    def cloud_cover_to_transmittance_linear(self, cloud_cover: Series, offset: float = 0.75, **kwargs):
+        """
+        Convert cloud cover (percentage) to atmospheric transmittance
+        using a linear model.
+
+        :param cloud_cover: Cloud cover in [%] as a pandas Series.
+        :param offset: Determines the maximum transmittance for the linear model.
+        :return: Atmospheric transmittance as a pandas Series.
+        """
+        return ((100.0 - cloud_cover) / 100.0) * offset
 
 
 @dataclass(frozen=True)
