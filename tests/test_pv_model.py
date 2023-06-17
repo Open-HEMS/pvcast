@@ -13,9 +13,13 @@ from pvcast.model.pvmodel import ForecastType, PVPlantModel, PVSystemManager
 
 
 class TestPVModelChain:
-    location = (latitude, longitude) = (10.0, 20.0)
-    altitude = 100.0
+    location = (latitude, longitude) = (52.35855344250755, 4.881086336486702)
+    altitude = 10.0
     time_z = "Europe/Amsterdam"
+    start_date = pd.Timestamp("2015-06-01")
+    end_date = pd.Timestamp("2015-07-01")
+    freq = pd.to_timedelta("1h")
+    datetimes = pd.date_range(start_date, end_date - freq, freq=freq, tz=time_z)
 
     @pytest.fixture
     def basic_config(self):
@@ -68,6 +72,20 @@ class TestPVModelChain:
     def pv_sys_mngr(self, basic_config):
         return PVSystemManager(basic_config, *self.location, self.altitude, self.time_z)
 
+    @pytest.fixture
+    def pvplant_clearsky(self, pv_sys_mngr: PVSystemManager):
+        pv_plant = pv_sys_mngr.run(name="EastWest", type=ForecastType.CLEARSKY, datetimes=self.datetimes)
+        return pv_plant
+
+    @pytest.fixture
+    def pvplant_historical(self, pv_sys_mngr: PVSystemManager):
+        pv_plant = pv_sys_mngr.run(name="EastWest", type=ForecastType.HISTORICAL)
+        return pv_plant
+
+    @pytest.fixture(params=["A", "M", "W", "D", "H"])
+    def freq(self, request):
+        return request.param
+
     def test_pv_sys_mngr_init(self, basic_config, pv_sys_mngr: PVSystemManager):
         assert pv_sys_mngr.config == basic_config
         assert pv_sys_mngr.location.latitude == self.latitude
@@ -89,14 +107,40 @@ class TestPVModelChain:
         with pytest.raises(KeyError):
             pv_sys_mngr.get_pv_plant("North")
 
-    def test_pv_sys_mngr_run(self, pv_sys_mngr: PVSystemManager):
-        # start and end dates for clearsky forecast
-        start_date = pd.Timestamp("2015-06-01")
-        end_date = pd.Timestamp("2015-06-02")
-        datetimes = pd.date_range(start_date, end_date, freq="1h", tz=self.time_z)
+    def test_pv_sys_mngr_clearsky(self, pvplant_clearsky: PVPlantModel):
+        assert isinstance(pvplant_clearsky.clearsky.ac, pd.Series)
+        assert pvplant_clearsky.clearsky.type == ForecastType.CLEARSKY
+        assert (pvplant_clearsky.clearsky.ac >= 0.0).all(), "Clearsky forecast should be non-negative"
+        assert pvplant_clearsky.clearsky.ac.index.equals(self.datetimes)
+        assert pvplant_clearsky.name == "EastWest"
+        assert pvplant_clearsky.clearsky.type == ForecastType.CLEARSKY
 
-        # run clearsky forecast
-        pv_plant = pv_sys_mngr.run(name="EastWest", type=ForecastType.CLEARSKY, datetimes=datetimes)
-        assert isinstance(pv_plant.clearsky, pd.Series)
-        assert pv_plant.clearsky.index.equals(datetimes)
-        assert pv_plant.name == "EastWest"
+    def test_pv_plant_result_resample(self, pvplant_clearsky: PVPlantModel):
+        # resample to 30min
+        resampled_result = pvplant_clearsky.clearsky.resample("30min")
+        assert resampled_result.freq == "30min"
+        assert resampled_result.ac.index.freq == "30min"
+
+    def test_pv_sys_mngr_historic(self, pvplant_historical: PVPlantModel):
+        assert isinstance(pvplant_historical.historic.ac, pd.Series)
+        assert pvplant_historical.historic.type == ForecastType.HISTORICAL
+        assert (pvplant_historical.historic.ac >= 0.0).all(), "Historic forecast should be non-negative"
+
+    def test_historic_resample(self, pvplant_historical: PVPlantModel):
+        # resample to monthly
+        resampled_result = pvplant_historical.historic.resample("M")
+        assert resampled_result.freq == "M"
+        assert resampled_result.ac.index.freq == "M"
+        print(resampled_result.ac.head(30))
+
+    def test_historic_energy(self, pvplant_historical: PVPlantModel, freq):
+        energy_result = pvplant_historical.historic.energy(freq=freq)
+        assert energy_result.freq == "H"  # original power data freq does not change
+        assert energy_result.ac_energy.index.freq == freq
+        print(energy_result.ac_energy.head(30))
+
+    def test_clearsky_energy(self, pvplant_clearsky: PVPlantModel, freq):
+        energy_result = pvplant_clearsky.clearsky.energy(freq=freq)
+        assert energy_result.freq == "H"
+        assert energy_result.ac_energy.index.freq == freq
+        print(energy_result.ac_energy.head(30))
