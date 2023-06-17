@@ -24,15 +24,20 @@ class WeatherAPIClearOutside(WeatherAPI):
 
     def _url_formatter(self) -> str:
         """Format the url to the API."""
-        return f"{self._url_base}{str(round(self.lat, 2))}/{str(round(self.lon, 2))}/{str(round(self.alt, 2))}"
+        encode = lambda x: str(round(x, 2))
+        lat = encode(self.location.latitude)
+        lon = encode(self.location.longitude)
+        alt = encode(self.location.altitude)
+        return f"{self._url_base}{lat}/{lon}/{alt}"
 
-    def _process_data(self, response: requests.Response) -> DataFrame:
+    def _process_data(self) -> DataFrame:
         """Process weather data scraped from the clear outside website.
 
         Credits to https://github.com/davidusb-geek/emhass for the parsing code.
 
-        :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
+        This function takes no arguments, but response.content must be retrieved from self._raw_data.
         """
+        response = self._raw_data
 
         # parse the data
         try:

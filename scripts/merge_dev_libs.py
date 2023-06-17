@@ -3,6 +3,8 @@ Script to retrieve inverter / PV module CSV files from PVLib and System Advisor 
 them into a single CSV file.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 

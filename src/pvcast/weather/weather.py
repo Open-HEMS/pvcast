@@ -37,6 +37,14 @@ class WeatherAPI(ABC):
     # raw response data from the API
     _raw_data: requests.Response = field(default=None, init=False)
 
+    # url formatter function
+    def __post_init__(self) -> None:
+        """Post init function."""
+        if self.format_url:
+            self._url = self._url_formatter()
+        else:
+            self._url = self._url_base
+
     @property
     def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
@@ -59,13 +67,15 @@ class WeatherAPI(ABC):
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
 
-    def get_weather(self) -> DataFrame:
+    def get_weather(self, live: bool = False) -> DataFrame:
         """Get weather data from API response.
 
+        :param live: Before returning weather data force a weather API update.
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
         # get weather API data, if needed. If not, use cached data.
-        response = self._api_request_if_needed()
+        _LOGGER.debug("Getting weather data, force live data=%s", live)
+        response = self._api_request_if_needed(live)
 
         # handle errors from the API
         self._api_error_handler(response)
@@ -77,13 +87,29 @@ class WeatherAPI(ABC):
             _LOGGER.error(f"Error processing data: {e}")
             raise e
 
-    # url formatter function
-    def __post_init__(self) -> None:
-        """Post init function."""
-        if self.format_url:
-            self._url = self._url_formatter()
-        else:
-            self._url = self._url_base
+    def _api_request_if_needed(self, live: bool = False) -> requests.Response:
+        """Check if we need to do a request or not when weather data is outdated.
+
+        :param live: Force an update by ignoring the max_age.
+        """
+
+        if self._raw_data is not None and Timestamp.now(tz="UTC") - self._last_update < self.max_age and not live:
+            _LOGGER.debug("Using cached weather data.")
+            return self._raw_data
+
+        # do the request
+        try:
+            response = requests.get(self._url, timeout=10)
+        except requests.exceptions.Timeout as exc:
+            raise WeatherAPIErrorTimeout() from exc
+
+        # request error handling
+        self._api_error_handler(response)
+
+        # return the response
+        self._raw_data = response
+        self._last_update = Timestamp.now(tz="UTC")
+        return response
 
     @abstractmethod
     def _url_formatter(self) -> str:
@@ -103,27 +129,6 @@ class WeatherAPI(ABC):
                 raise WeatherAPIErrorTooManyReq()
             else:
                 raise WeatherAPIError(response.status_code)
-
-    def _api_request_if_needed(self) -> requests.Response:
-        """Check if we need to do a request or not when weather data is outdated."""
-
-        if self._raw_data is not None and Timestamp.now(tz="UTC") - self._last_update < self.max_age:
-            _LOGGER.debug("Using cached weather data.")
-            return self._raw_data
-
-        # do the request
-        try:
-            response = requests.get(self._url, timeout=10)
-        except requests.exceptions.Timeout as exc:
-            raise WeatherAPIErrorTimeout() from exc
-
-        # request error handling
-        self._api_error_handler(response)
-
-        # return the response
-        self._raw_data = response
-        self._last_update = Timestamp.now(tz="UTC")
-        return response
 
     def cloud_cover_to_irradiance(self, cloud_cover: Series, how: str = "clearsky_scaling", **kwargs):
         """
