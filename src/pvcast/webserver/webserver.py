@@ -58,14 +58,13 @@ from typing import List
 
 from flask import Flask, jsonify
 from flask_restx import Api
+from pvlib.location import Location
 from waitress import serve
 
-from pvlib.location import Location
-
 from ..config.configreader import ConfigReader
+from ..weather import API_FACTORY
 from ..weather.clearoutside import WeatherAPIClearOutside
 from ..weather.weather import WeatherAPI
-from ..weather import API_FACTORY
 from .apis import api
 
 app = Flask(__name__)
