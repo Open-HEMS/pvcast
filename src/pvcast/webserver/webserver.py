@@ -54,12 +54,18 @@ Endpoints:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import List
 
 from flask import Flask, jsonify
 from flask_restx import Api
 from waitress import serve
 
+from pvlib.location import Location
+
 from ..config.configreader import ConfigReader
+from ..weather.clearoutside import WeatherAPIClearOutside
+from ..weather.weather import WeatherAPI
+from ..weather import API_FACTORY
 from .apis import api
 
 app = Flask(__name__)
@@ -69,8 +75,27 @@ api.init_app(app)
 port = 5000
 web_ui_url = "0.0.0.0"
 
-# global configuration
-config_reader = None
+
+def config_to_weather_apis(config: dict) -> List[WeatherAPI]:
+    """Create weather API objects from weather_sources list in the configuration.
+
+    :param config: The configuration dictionary.
+    :return: A weather api.
+    """
+    weather_sources = config["general"]["weather_sources"]
+
+    location = Location(
+        latitude=config["general"]["location"]["latitude"],
+        longitude=config["general"]["location"]["longitude"],
+        tz=config["general"]["location"]["timezone"],
+        altitude=config["general"]["location"]["altitude"],
+    )
+
+    weather_api = []
+    for weather_source in weather_sources:
+        api_name = weather_source["source"]
+        weather_api.append(API_FACTORY.get_weather_api(api_name, location=location))
+    return weather_api
 
 
 def run(config_path: Path, secrets_path: Path):
@@ -83,6 +108,10 @@ def run(config_path: Path, secrets_path: Path):
     # read the configuration
     global config_reader
     config_reader = ConfigReader(config_path, secrets_path)
+
+    # add the weather api
+    global weather_api
+    weather_apis = config_to_weather_apis(config_reader.config)
 
     # start server
     app.logger.info("Launching pvcast webserver at: http://" + web_ui_url + ":" + str(port))
