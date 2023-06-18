@@ -12,8 +12,8 @@ general:
   location:
     latitude: !secret lat
     longitude: !secret lon
+    timezone: !secret time_zone
     altitude: !secret alt
-  timezone: !secret time_zone
   long_lived_token: !secret long_lived_token
 
 plant:

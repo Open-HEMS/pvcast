@@ -6,15 +6,12 @@ general:
   weather_sources:
     - type: internal
       source: clearoutside
-    - type: internal
-      source: openweathermap
-      api_key: openweathermap_api_key
   location:
-    latitude: lat
-    longitude: lon
-    altitude: alt
-  timezone: time_zone
-  long_lived_token: long_lived_token
+    latitude: !secret lat
+    longitude: !secret lon
+    timezone: !secret time_zone
+    altitude: !secret alt
+  long_lived_token: !secret long_lived_token
 
 # PV system configuration
 plant:

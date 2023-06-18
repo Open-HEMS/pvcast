@@ -74,9 +74,9 @@ class ConfigReader:
 
         # check if the timezone is valid
         try:
-            config["general"]["timezone"] = pytz.timezone(config["general"]["timezone"])
+            config["general"]["location"]["timezone"] = pytz.timezone(config["general"]["location"]["timezone"])
         except UnknownTimeZoneError as exc:
-            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['timezone']}") from exc
+            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['location']['timezone']}") from exc
 
         return config
 
@@ -100,8 +100,8 @@ class ConfigReader:
                         Required("latitude"): float,
                         Required("longitude"): float,
                         Required("altitude"): Coerce(float),
+                        Required("timezone"): str,
                     },
-                    Required("timezone"): str,
                     Required("long_lived_token"): str,
                 },
                 Required("plant"): [

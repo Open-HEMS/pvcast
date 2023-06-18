@@ -13,7 +13,7 @@ general:
     latitude: 52.35845515630293
     longitude: 4.88115070391368
     altitude: 0
-  timezone: Europe/Amsterdam
+    timezone: Europe/Amsterdam
   long_lived_token: mylonglivedtoken
 
 plant:

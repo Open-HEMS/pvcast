@@ -13,7 +13,7 @@ general:
     latitude: 52.35845515630293
     longitude: 4.88115070391368
     altitude: 0
-  timezone: Wrong/Timezone
+    timezone: Wrong/Timezone
   long_lived_token: mylonglivedtoken
 
 plant:
