@@ -10,8 +10,7 @@ import requests
 from bs4 import BeautifulSoup
 from pandas import DataFrame, Timedelta, Timestamp
 
-from pvcast.weather.weather import (WeatherAPI, WeatherAPIErrorNoData,
-                                    WeatherAPIErrorTimeout)
+from ..weather.weather import WeatherAPI, WeatherAPIErrorNoData
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,13 +36,39 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         This function takes no arguments, but response.content must be retrieved from self._raw_data.
         """
+        # raw response data from request
         response = self._raw_data
 
+        # response (source) data bucket
+        source_df = DataFrame(index=self.source_dates)
+
         # parse the data
-        try:
-            table = BeautifulSoup(response.content, "html.parser").find_all(id="day_0")[0]
-        except IndexError as exc:
-            raise WeatherAPIErrorNoData.from_date(self.start_forecast.strftime("%Y-%m-%d")) from exc
+        n_days = int(self.max_forecast_days / Timedelta(days=1))
+        for day_int in range(n_days):
+            table = BeautifulSoup(response.content, "html.parser").find_all(id=f"day_{day_int}")[0]
+            if table is None:
+                _LOGGER.warning("No table found for day %s.", day_int)
+                break
+
+            # find the elements in the table
+            data = self._find_elements(table, day_int)
+            if data.isna().values.all(axis=0).all():
+                _LOGGER.warning("All data NaN for day %s.", day_int)
+                break
+
+            # insert the data into the source data bucket
+            source_df.loc[data.index, data.columns] = data
+
+        # return the source data bucket
+        return source_df
+
+    def _find_elements(self, table: list, day: int) -> DataFrame:
+        """Find weather data elements in the table.
+
+        :param table: The table to search.
+        :param day: The day of the table.
+        :return: Weather data dataframe for one day (24 hours).
+        """
 
         list_names = table.find_all(class_="fc_detail_label")
         list_tables = table.find_all("ul")[1:]
@@ -61,16 +86,14 @@ class WeatherAPIClearOutside(WeatherAPI):
                 raw_data.loc[count_row, col] = float(row.get_text())
 
         # treating index
-        freq_scrap = pd.to_timedelta(60, "minutes")
-        forecast_dates_scrap = pd.date_range(
-            start=self.start_forecast, end=self.end_forecast - freq_scrap, freq=freq_scrap
-        )
+        freq_scrap = self.freq_source
+        start_forecast = self.start_forecast + Timedelta(days=1) * day
+        end_forecast = self.start_forecast + Timedelta(days=1) * (day + 1)
+        forecast_dates_scrap = pd.date_range(start=start_forecast, end=end_forecast - freq_scrap, freq=freq_scrap)
 
         # interpolating and reindexing
         raw_data.set_index(forecast_dates_scrap, inplace=True)
         raw_data.drop_duplicates(inplace=True)
-        raw_data = raw_data.reindex(self.forecast_dates)
-        raw_data.interpolate(method="linear", axis=0, limit=None, limit_direction="both", inplace=True)
 
         # select subset of columns
         raw_data = raw_data[
@@ -90,5 +113,4 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         # convert wind speed to m/s
         raw_data["wind_speed"] = raw_data["wind_speed"] * 0.44704
-
         return raw_data

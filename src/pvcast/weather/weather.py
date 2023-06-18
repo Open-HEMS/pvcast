@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import InitVar, dataclass, field
-from typing import Any, Tuple, Union
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -26,13 +26,20 @@ class WeatherAPI(ABC):
     location: Location
     format_url: bool = field(default=True)  # whether to format the url with lat, lon, alt. Mostly for testing.
 
+    # maximum number of days to include in the forecast
+    max_forecast_days: Timedelta = field(default=Timedelta(days=7))
+
+    # frequency of the source data and the output data
+    freq_source: Timedelta = field(default=Timedelta(hours=1))  # frequency of the source data. This is fixed!
+    freq_output: Timedelta = field(default=Timedelta(hours=1))  # frequency of the output data. Can be changed.
+
     # url
     _url_base: str = field(default=None, init=False)  # base url to the API
     _url: str = field(default=None, init=False)  # url to the API
 
     # maximum age of weather data in seconds
     max_age: Timedelta = field(default=Timedelta(hours=1))
-    _last_update: Timestamp = field(default=None, init=False)
+    _last_update: Timestamp = field(default=Timestamp(0), init=False)  # last time the weather data was updated
 
     # raw response data from the API
     _raw_data: requests.Response = field(default=None, init=False)
@@ -48,27 +55,30 @@ class WeatherAPI(ABC):
     @property
     def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
-        return Timestamp.now(tz="UTC").floor("D")
+        return Timestamp.now(tz=self.location.tz).floor("H")
 
     @property
-    def end_forecast(self) -> DatetimeIndex:
+    def end_forecast(self) -> Timestamp:
         """Get the end date of the forecast."""
-        return self.start_forecast + Timedelta(days=1)
+        return self.start_forecast + self.max_forecast_days - self.freq_source
 
     @property
-    def forecast_dates(self) -> DatetimeIndex:
-        """Get the dates of the forecast."""
-        return pd.date_range(self.start_forecast, self.end_forecast, freq="H")
+    def source_dates(self) -> DatetimeIndex:
+        """Get the datetimeindex to store the forecast."""
+        return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz=self.location.tz)
 
     @abstractmethod
     def _process_data(self) -> DataFrame:
         """Process data from the weather API.
 
+        The index of the returned dataframe should be a DatetimeIndex in local time.
+
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
 
     def get_weather(self, live: bool = False) -> DataFrame:
-        """Get weather data from API response.
+        """
+        Get weather data from API response. This function will always return data return in local timezone.
 
         :param live: Before returning weather data force a weather API update.
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
@@ -82,7 +92,14 @@ class WeatherAPI(ABC):
 
         # process and return the data
         try:
-            return self._process_data()
+            processed_data: DataFrame = self._process_data()
+            if not (processed_data.index == self.source_dates).all():
+                raise WeatherAPIError("Source dates do not match processed data.")
+
+            # resample to the output frequency and interpolate
+            proc_data = processed_data.resample(self.freq_output).interpolate(method="linear")
+            return proc_data
+
         except Exception as e:
             _LOGGER.error(f"Error processing data: {e}")
             raise e
@@ -152,7 +169,14 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_irradiance_clearsky_scaling(self, cloud_cover: Series, method="linear", **kwargs):
-        """ """
+        """
+        Convert cloud cover to irradiance using the clearsky scaling method.
+
+        :param cloud_cover: Cloud cover as a pandas Series
+        :param method: Selects the method for conversion. Can be one of linear.
+        :param **kwargs: Passed to the selected method.
+        :return: Irradiance, columns include ghi, dni, dhi.
+        """
         solpos = self.location.get_solarposition(cloud_cover.index)
         cs = self.location.get_clearsky(cloud_cover.index, model="ineichen", solar_position=solpos)
 
@@ -169,7 +193,13 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_irradiance_campbell_norman(self, cloud_cover: Series, **kwargs):
-        """ """
+        """
+        Convert cloud cover to irradiance using the Campbell and Norman model.
+
+        :param cloud_cover: Cloud cover in [%] as a pandas Series.
+        :param **kwargs: Passed to the selected method.
+        :return: Irradiance as a pandas DataFrame with columns ghi, dni, dhi.
+        """
         solar_position = self.location.get_solarposition(cloud_cover.index)
         dni_extra = get_extra_radiation(cloud_cover.index)
 
@@ -180,8 +210,16 @@ class WeatherAPI(ABC):
 
         return irrads
 
-    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear, offset=35, **kwargs):
-        """Convert cloud cover to GHI using a linear relationship."""
+    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset=35, **kwargs):
+        """
+        Convert cloud cover to GHI using a linear relationship.
+
+        :param cloud_cover: Cloud cover in [%] as a pandas Series.
+        :param ghi_clear: Clear sky GHI as a pandas Series.
+        :param offset: Determines the maximum GHI for the linear model.
+        :param **kwargs: Passed to the selected method.
+        :return: GHI as a pandas Series.
+        """
         offset = offset / 100.0
         cloud_cover = cloud_cover / 100.0
         ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
@@ -194,6 +232,7 @@ class WeatherAPI(ABC):
 
         :param cloud_cover: Cloud cover in [%] as a pandas Series.
         :param offset: Determines the maximum transmittance for the linear model.
+        :param **kwargs: Passed to the selected method.
         :return: Atmospheric transmittance as a pandas Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
@@ -252,3 +291,32 @@ class WeatherAPIErrorNoLocation(WeatherAPIError):
     """Exception error 404, no data for location."""
 
     message: str = field(default="No data for location available")
+
+
+@dataclass(frozen=True)
+class WeatherAPIFactory:
+    _apis: dict[str, WeatherAPI] = field(default_factory=dict)
+
+    def register(self, api_id: str, weather_api_class: WeatherAPI) -> None:
+        """
+        Register a new weather API class to the factory.
+
+        :param api_id: The identifier string of the API which is used in config.yaml.
+        :param weather_api_class: The weather API class.
+        """
+        self._apis[api_id] = weather_api_class
+
+    def get_weather_api(self, api_id: str, **kwargs) -> WeatherAPI:
+        """
+        Get a weather API instance.
+
+        :param api_id: The identifier string of the API which is used in config.yaml.
+        :param **kwargs: Passed to the weather API class.
+        :return: The weather API instance.
+        """
+        try:
+            weather_api_class = self._apis[api_id]
+        except KeyError:
+            raise ValueError(f"Unknown weather API: {api_id}")
+
+        return weather_api_class(**kwargs)

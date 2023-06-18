@@ -2,15 +2,17 @@
 from __future__ import annotations
 
 import json
-
 from unittest import mock
+
 import pytest
 import requests
 from const import LOC_AUS, LOC_EUW, LOC_USW
 from pandas import DataFrame, to_datetime
 from pvlib.location import Location
 
-from pvcast.weather.weather import WeatherAPI, WeatherAPIError, WeatherAPIErrorTooManyReq, WeatherAPIErrorWrongURL
+from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
+                                    WeatherAPIErrorTooManyReq,
+                                    WeatherAPIErrorWrongURL)
 
 
 # mock for WeatherAPI class
@@ -56,6 +58,11 @@ class TestWeather:
             obj.code = request.param
             return obj
 
+    @pytest.fixture(params=["campbell_norman", "clearsky_scaling"])
+    def irradiance_method(self, request):
+        """Get irradiance methods."""
+        return request.param
+
     def test_get_weather_obj(self, weather_obj):
         """Test the get_weather function."""
         assert isinstance(weather_obj, WeatherAPI)
@@ -72,11 +79,13 @@ class TestWeather:
         with pytest.raises(error_dict[weather_obj_error.code]):
             weather_obj_error._api_request_if_needed()
 
-    def test_weather_cloud_cover_to_irradiance(self, weather_obj: WeatherAPI, weather_df: DataFrame):
+    def test_weather_cloud_cover_to_irradiance(
+        self, weather_obj: WeatherAPI, weather_df: DataFrame, irradiance_method: str
+    ):
         """Test the cloud_cover_to_irradiance function."""
-        irradiance = weather_obj.cloud_cover_to_irradiance(weather_df["cloud_cover"])
+        irradiance = weather_obj.cloud_cover_to_irradiance(weather_df["cloud_cover"], irradiance_method)
         assert isinstance(irradiance, DataFrame)
         assert irradiance.shape[0] == weather_df.shape[0]
         assert irradiance.shape[1] == 3
-        assert (irradiance.columns == ["ghi", "dni", "dhi"]).all()
+        assert set(irradiance.columns) == {"ghi", "dni", "dhi"}
         assert irradiance.index.equals(weather_df.index)
