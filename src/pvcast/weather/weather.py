@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import InitVar, dataclass, field
-from typing import Dict
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -13,7 +12,6 @@ import requests
 from pandas import DataFrame, DatetimeIndex, Series, Timedelta, Timestamp
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
-from pytz import BaseTzInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,18 +89,12 @@ class WeatherAPI(ABC):
         self._api_error_handler(response)
 
         # process and return the data
-        try:
-            processed_data: DataFrame = self._process_data()
-            if not (processed_data.index == self.source_dates).all():
-                raise WeatherAPIError("Source dates do not match processed data.")
+        processed_data: DataFrame = self._process_data()
+        if not (processed_data.index == self.source_dates).all():
+            raise WeatherAPIError("Source dates do not match processed data.")
 
-            # resample to the output frequency and interpolate
-            proc_data = processed_data.resample(self.freq_output).interpolate(method="linear")
-            return proc_data
-
-        except Exception as e:
-            _LOGGER.error(f"Error processing data: {e}")
-            raise e
+        # resample to the output frequency and interpolate
+        return processed_data.resample(self.freq_output).interpolate(method="linear")
 
     def _api_request_if_needed(self, live: bool = False) -> requests.Response:
         """Check if we need to do a request or not when weather data is outdated.
@@ -210,14 +202,13 @@ class WeatherAPI(ABC):
 
         return irrads
 
-    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset=35, **kwargs):
+    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset=35):
         """
         Convert cloud cover to GHI using a linear relationship.
 
         :param cloud_cover: Cloud cover in [%] as a pandas Series.
         :param ghi_clear: Clear sky GHI as a pandas Series.
         :param offset: Determines the maximum GHI for the linear model.
-        :param **kwargs: Passed to the selected method.
         :return: GHI as a pandas Series.
         """
         offset = offset / 100.0
@@ -225,14 +216,13 @@ class WeatherAPI(ABC):
         ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
         return ghi
 
-    def cloud_cover_to_transmittance_linear(self, cloud_cover: Series, offset: float = 0.75, **kwargs):
+    def cloud_cover_to_transmittance_linear(self, cloud_cover: Series, offset: float = 0.75):
         """
         Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
 
         :param cloud_cover: Cloud cover in [%] as a pandas Series.
         :param offset: Determines the maximum transmittance for the linear model.
-        :param **kwargs: Passed to the selected method.
         :return: Atmospheric transmittance as a pandas Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
@@ -295,6 +285,8 @@ class WeatherAPIErrorNoLocation(WeatherAPIError):
 
 @dataclass(frozen=True)
 class WeatherAPIFactory:
+    """Factory class for weather APIs."""
+
     _apis: dict[str, WeatherAPI] = field(default_factory=dict)
 
     def register(self, api_id: str, weather_api_class: WeatherAPI) -> None:
@@ -316,7 +308,7 @@ class WeatherAPIFactory:
         """
         try:
             weather_api_class = self._apis[api_id]
-        except KeyError:
-            raise ValueError(f"Unknown weather API: {api_id}")
+        except KeyError as exc:
+            raise ValueError(f"Unknown weather API: {api_id}") from exc
 
         return weather_api_class(**kwargs)

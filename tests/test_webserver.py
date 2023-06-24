@@ -2,39 +2,39 @@
 from __future__ import annotations
 
 import pytest
-from jsonschema import ValidationError, validate
+import voluptuous as vol
 
-from pvcast.webserver.apis.schemas import fc_out_energy, fc_out_power
+from pvcast.webserver.apis.schemas import energy_sch, power_sch
 
 
 class TestWebServer:
     """Test webserver."""
 
-    @pytest.fixture(params=fc_out_power.keys())
+    @pytest.fixture(params=["15min", "30min", "hour"])
     def forecast_power_data(self, request):
         """Return a forecast power data structure."""
         return {
-            "name": "mypvsystem",
+            "plantname": "mypvsystem1",
             "unit": "W",
             "frequency": request.param,
             "data": [
                 {
-                    "date": "2020-01-01T00:00:00",
+                    "datetime": "2020-01-01T00:00",
                     "value": 24.6,
                 }
             ],
         }
 
-    @pytest.fixture(params=fc_out_energy.keys())
+    @pytest.fixture(params=["15min", "30min", "hour", "day", "week", "month", "year"])
     def forecast_energy_data(self, request):
         """Return a forecast energy data structure."""
         return {
-            "name": "mypvsystem",
+            "plantname": "mypvsystem2",
             "unit": "Wh",
             "frequency": request.param,
             "data": [
                 {
-                    "date": "2020-01-01T00:00:00",
+                    "datetime": "2020-01-01T00:00",
                     "value": 13.1,
                 }
             ],
@@ -43,16 +43,16 @@ class TestWebServer:
     def test_fc_out_power_invalid(self, forecast_power_data):
         """Validate forecast power data schemes."""
         forecast_power_data["unit"] = "invalid"
-        schema = fc_out_power[forecast_power_data["frequency"]]
-        with pytest.raises(ValidationError):
-            validate(instance=forecast_power_data, schema=schema)
+        schema = power_sch
+        with pytest.raises(vol.Invalid):
+            schema(forecast_power_data)
 
     def test_fc_out_power(self, forecast_power_data):
         """Validate forecast power data schemes."""
-        schema = fc_out_power[forecast_power_data["frequency"]]
-        validate(instance=forecast_power_data, schema=schema)
+        schema = power_sch
+        schema(forecast_power_data)
 
     def test_fc_out_energy(self, forecast_energy_data):
         """Validate forecast energy data schemes."""
-        schema = fc_out_energy[forecast_energy_data["frequency"]]
-        validate(instance=forecast_energy_data, schema=schema)
+        schema = energy_sch
+        schema(forecast_energy_data)
