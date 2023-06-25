@@ -11,14 +11,15 @@ base_sch = Schema(
 )
 
 # energy forecast schemas
+# for timeseries frequency options see: https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases
 energy_sch = Schema(
     base_sch.extend(
         {
             Required("unit"): In(["Wh", "kWh"]),
-            Required("frequency"): In(["15min", "30min", "hour", "day", "week", "month", "year"]),
+            Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
             Required("data"): [
                 {
-                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M")),
+                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S.%fZ")),  # RFC 3339
                     Required("value"): All(float, Range(min=0)),
                 }
             ],
@@ -30,8 +31,8 @@ energy_sch = Schema(
 power_sch = Schema(
     base_sch.extend(
         {
-            Required("unit"): In(["W", "kW"]),
-            Required("frequency"): In(["15min", "30min", "hour"]),
+            Required("unit"): In(["1W", "kW"]),
+            Required("frequency"): In(["15Min", "30Min", "1H"]),
             Required("data"): [
                 {
                     Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M")),

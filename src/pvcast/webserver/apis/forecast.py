@@ -18,7 +18,7 @@ import logging
 
 from flask_restx import Namespace, Resource, SchemaModel
 
-from .schemas import energy_sch, power_sch
+from .schemas.api_out import energy_sch, power_sch
 
 _LOGGER = logging.getLogger(__name__)
 

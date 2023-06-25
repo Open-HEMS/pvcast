@@ -82,7 +82,7 @@ class TestPVModelChain:
         pv_plant = pv_sys_mngr.run(name="EastWest", type=ForecastType.HISTORICAL)
         return pv_plant
 
-    @pytest.fixture(params=["A", "M", "W", "D", "H"])
+    @pytest.fixture(params=["A", "M", "1W", "1D", "1H"])
     def freq(self, request):
         return request.param
 
@@ -135,12 +135,12 @@ class TestPVModelChain:
 
     def test_historic_energy(self, pvplant_historical: PVPlantModel, freq):
         energy_result = pvplant_historical.historic.energy(freq=freq)
-        assert energy_result.freq == "H"  # original power data freq does not change
+        assert energy_result.freq == "1H"  # original power data freq does not change
         assert energy_result.ac_energy.index.freq == freq
         print(energy_result.ac_energy.head(30))
 
     def test_clearsky_energy(self, pvplant_clearsky: PVPlantModel, freq):
         energy_result = pvplant_clearsky.clearsky.energy(freq=freq)
-        assert energy_result.freq == "H"
+        assert energy_result.freq == "1H"
         assert energy_result.ac_energy.index.freq == freq
         print(energy_result.ac_energy.head(30))

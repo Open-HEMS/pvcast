@@ -6,11 +6,10 @@ import logging
 from dataclasses import dataclass, field
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
-from pandas import DataFrame, Timedelta, Timestamp
+from pandas import DataFrame, Timedelta
 
-from ..weather.weather import WeatherAPI, WeatherAPIErrorNoData
+from ..weather.weather import WeatherAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +22,10 @@ class WeatherAPIClearOutside(WeatherAPI):
 
     def _url_formatter(self) -> str:
         """Format the url to the API."""
-        encode = lambda x: str(round(x, 2))
+
+        def encode(coord: float) -> str:
+            return str(round(coord, 2))
+
         lat = encode(self.location.latitude)
         lon = encode(self.location.longitude)
         alt = encode(self.location.altitude)
@@ -86,7 +88,7 @@ class WeatherAPIClearOutside(WeatherAPI):
                 raw_data.loc[count_row, col] = float(row.get_text())
 
         # treating index
-        freq_scrap = self.freq_source
+        freq_scrap = pd.Timedelta(self.freq_source)
         start_forecast = self.start_forecast + Timedelta(days=1) * day
         end_forecast = self.start_forecast + Timedelta(days=1) * (day + 1)
         forecast_dates_scrap = pd.date_range(start=start_forecast, end=end_forecast - freq_scrap, freq=freq_scrap)
@@ -103,7 +105,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         # rename columns
         raw_data.rename(
             columns={
-                "Total Clouds (% Sky Obscured)": "cloud_cover",
+                "Total Clouds (% Sky Obscured)": "cloud_coverage",
                 "Wind Speed/Direction (mph)": "wind_speed",
                 "Temperature (°C)": "temperature",
                 "Relative Humidity (%)": "humidity",

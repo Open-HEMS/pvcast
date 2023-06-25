@@ -8,18 +8,16 @@ from dataclasses import InitVar, dataclass, field
 from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
-from typing import List, Union
 
 import pandas as pd
 import pvlib
-from pandas import DataFrame, DatetimeIndex, Series, Timedelta
-from pandas.tseries.frequencies import to_offset
+from pandas import DataFrame, DatetimeIndex, Series
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 from pvlib.modelchain import ModelChain, ModelChainResult
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
-from pytz import BaseTzInfo, timezone
+from pytz import BaseTzInfo
 
 from .const import BASE_CEC_DATA_PATH
 
@@ -40,32 +38,33 @@ class PVPlantResult:
 
     :param name: The name of the PV plant.
     :param type: The type of the result: forecast based on weather data, clearsky, or historic based on PVGIS.
-    :param ac: The sum of AC power outputs of all ModelChain objects in the PV plant.
-    :param dc: If available, the DC power broken down into individual arrays. Each array is a column in the DataFrame.
-    :param freq: Frequency of all data attributes. Can be "H" for hourly, "D" for daily, "M" for monthly, "A" for annual.
+    :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
+    :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the DataFrame.
+    :param freq: Frequency of all data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
     :param weather: The input weather data used for the simulation. For debugging purposes only.
     :param modelresults: The input raw data, list of pvlib ModelChainResult objects. For debugging purposes only.
     """
 
     name: str
     type: ForecastType
-    ac: Series = field(repr=False, default=None)
-    dc: tuple[Series] = field(repr=False, default=None)
+    ac_power: Series = field(repr=False, default=None)
+    dc_power: tuple[Series] = field(repr=False, default=None)
     ac_energy: Series = field(repr=False, default=None)
-    freq: str = field(repr=False, default="H")
+    freq: str = field(repr=False, default="1H")
     weather: DataFrame = field(repr=False, default=None)
     modelresults: list[ModelChainResult] = field(repr=False, default=None)
-    _freqs: tuple[str] = field(repr=False, init=False, default=("A", "M", "W", "D", "H", "30min", "15min"))
+    _freqs: tuple[str] = field(repr=False, init=False, default=("A", "M", "1W", "1D", "1H", "30Min", "15Min"))
 
     def resample(self, freq: str, interp_method: str = "linear") -> PVPlantResult:
         """Resample the PVPlantResult to a new interval.
 
-        :param freq: The frequency of the energy output. Either "D" for daily, "M" for monthly, "15min, "30min",
-                      or "A" for annual.
+        :param freq: The frequency of the energy output. See pandas.resample() for valid options.
         :param interp_method: The interpolation method to use. Any option of pd.interpolate() is valid.
         :return: A new PVPlantResult object with the resampled data.
         """
-        resamplef = lambda x: x.resample(freq).mean().interpolate(interp_method) if x is not None else None
+
+        def res_f(vals: DataFrame) -> DataFrame:
+            return vals.resample(freq).mean().interpolate(interp_method) if vals is not None else None
 
         if freq not in self._freqs:
             raise ValueError(f"Frequency {freq} not supported. Must be one of {self._freqs}.")
@@ -75,21 +74,21 @@ class PVPlantResult:
         else:
             plant_cpy = copy.deepcopy(self)
             plant_cpy.freq = freq
-            plant_cpy.ac = resamplef(self.ac)
-            plant_cpy.dc = tuple(resamplef(dc) for dc in self.dc) if self.dc is not None else None
+            plant_cpy.ac_power = res_f(self.ac)
+            plant_cpy.dc_power = tuple(res_f(dc) for dc in self.dc_power) if self.dc_power is not None else None
             return plant_cpy
 
-    def energy(self, freq: str = "D") -> PVPlantResult:
+    def energy(self, freq: str = "1D") -> PVPlantResult:
         """Calculate the AC energy output of the PV plant.
 
-        :param freq: The frequency of the energy output. Either "D" for daily, "M" for monthly, "15min, "30min",
+        :param freq: The frequency of the energy output. Either "1D" for daily, "M" for monthly, "15min, "30min",
                       or "A" for annual.
         :return: A new PVPlantResult object with resampled data and the energy attribute populated.
         """
 
-        if self.ac is None:
+        if self.ac_power is None:
             raise ValueError("AC power output is not available, cannot calculate energy. Run simulation first.")
-        if self.type is ForecastType.FORECAST and self._freqs.index(freq) > self._freqs.index("D"):
+        if self.type is ForecastType.FORECAST and self._freqs.index(freq) > self._freqs.index("1D"):
             raise ValueError(
                 "For forecast with future weather data energy can only be calculated up to daily averages."
             )
@@ -103,7 +102,7 @@ class PVPlantResult:
             raise ValueError("Cannot infer frequency of the data. Please resample first.")
 
         # resample to hourly frequency to get kWh per hour
-        plant_cpy = self.resample("H")
+        plant_cpy = self.resample("1H")
 
         # calculate energy
         plant_cpy.ac_energy = plant_cpy.ac.resample(freq).sum() / 1000
@@ -315,8 +314,8 @@ class PVPlantModel:
         result = PVPlantResult(
             name=self.name,
             type=ForecastType.HISTORICAL if pvgis else ForecastType.FORECAST,
-            ac=ac_power,
-            dc=None,
+            ac_power=ac_power,
+            dc_power=None,
             modelresults=results,
             weather=weather_df,
         )
@@ -345,7 +344,12 @@ class PVPlantModel:
         # combine the results
         ac_power = self._aggregate(results, "ac")
         self._clearsky = PVPlantResult(
-            name=self.name, type=ForecastType.CLEARSKY, ac=ac_power, dc=None, modelresults=results, weather=weather_df
+            name=self.name,
+            type=ForecastType.CLEARSKY,
+            ac_power=ac_power,
+            dc_power=None,
+            modelresults=results,
+            weather=weather_df,
         )
 
     def run_historical(self) -> None:
@@ -355,7 +359,7 @@ class PVPlantModel:
         tmy_data = self._get_pvgis_data(Path(f"src/pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv"))
 
         # re-index the data so that datetimes are consecutive
-        tmy_data.index = pd.date_range(start="2021-01-01 00:00", end="2021-12-31 23:00", freq="H")
+        tmy_data.index = pd.date_range(start="2021-01-01 00:00", end="2021-12-31 23:00", freq="1H")
 
         # run the forecast for each model chain
         self.run_forecast(tmy_data, pvgis=True)

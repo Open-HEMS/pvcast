@@ -4,18 +4,18 @@ from __future__ import annotations
 import pytest
 import voluptuous as vol
 
-from pvcast.webserver.apis.schemas import energy_sch, power_sch
+from pvcast.webserver.apis.schemas.api_out import energy_sch, power_sch
 
 
 class TestWebServer:
     """Test webserver."""
 
-    @pytest.fixture(params=["15min", "30min", "hour"])
+    @pytest.fixture(params=["15Min", "30Min", "1H"])
     def forecast_power_data(self, request):
         """Return a forecast power data structure."""
         return {
             "plantname": "mypvsystem1",
-            "unit": "W",
+            "unit": "1W",
             "frequency": request.param,
             "data": [
                 {
@@ -25,7 +25,7 @@ class TestWebServer:
             ],
         }
 
-    @pytest.fixture(params=["15min", "30min", "hour", "day", "week", "month", "year"])
+    @pytest.fixture(params=["15Min", "30Min", "1H", "1D", "1W", "M", "Y"])
     def forecast_energy_data(self, request):
         """Return a forecast energy data structure."""
         return {

@@ -12,8 +12,26 @@ import requests
 from pandas import DataFrame, DatetimeIndex, Series, Timedelta, Timestamp
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
+from voluptuous import All, Datetime, In, Range, Required, Schema
 
 _LOGGER = logging.getLogger(__name__)
+
+# schema for weather data
+WEATHER_SCHEMA = Schema(
+    {
+        Required("source"): str,
+        Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
+        Required("data"): [
+            {
+                Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S.%fZ")),  # RFC 3339
+                Required("temperature"): All(float, Range(min=-100, max=100)),
+                Required("humidity"): All(float, Range(min=0, max=100)),
+                Required("wind_speed"): All(float, Range(min=0)),
+                Required("cloud_coverage"): All(float, Range(min=0, max=100)),
+            }
+        ],
+    }
+)
 
 
 @dataclass
@@ -28,8 +46,8 @@ class WeatherAPI(ABC):
     max_forecast_days: Timedelta = field(default=Timedelta(days=7))
 
     # frequency of the source data and the output data
-    freq_source: Timedelta = field(default=Timedelta(hours=1))  # frequency of the source data. This is fixed!
-    freq_output: Timedelta = field(default=Timedelta(hours=1))  # frequency of the output data. Can be changed.
+    freq_source: str = field(default="1H")  # frequency of the source data. This is fixed!
+    freq_output: str = field(default="1H")  # frequency of the output data. Can be changed by user.
 
     # url
     _url_base: str = field(default=None, init=False)  # base url to the API
@@ -42,23 +60,18 @@ class WeatherAPI(ABC):
     # raw response data from the API
     _raw_data: requests.Response = field(default=None, init=False)
 
-    # url formatter function
     def __post_init__(self) -> None:
-        """Post init function."""
-        if self.format_url:
-            self._url = self._url_formatter()
-        else:
-            self._url = self._url_base
+        self._url = self._url_formatter() if self.format_url else self._url_base
 
     @property
     def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
-        return Timestamp.now(tz=self.location.tz).floor("H")
+        return Timestamp.now(tz=self.location.tz).floor("1H")
 
     @property
     def end_forecast(self) -> Timestamp:
         """Get the end date of the forecast."""
-        return self.start_forecast + self.max_forecast_days - self.freq_source
+        return self.start_forecast + self.max_forecast_days - Timedelta(self.freq_source)
 
     @property
     def source_dates(self) -> DatetimeIndex:
@@ -94,7 +107,23 @@ class WeatherAPI(ABC):
             raise WeatherAPIError("Source dates do not match processed data.")
 
         # resample to the output frequency and interpolate
-        return processed_data.resample(self.freq_output).interpolate(method="linear")
+        resampled: DataFrame = processed_data.resample(self.freq_output).interpolate(method="linear")
+        resampled = resampled.tz_convert("UTC")
+        resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        print(f"Resampled: {resampled.head(1)}")
+
+        # convert to dictionary and validate schema
+        try:
+            data_dict = {
+                "source": self.__class__.__name__,
+                "frequency": self.freq_output,
+                "data": resampled.to_dict(orient="records"),
+            }
+            WEATHER_SCHEMA(data_dict)
+        except Exception as exc:
+            raise WeatherAPIError("Weather data does not match schema.") from exc
+
+        return data_dict
 
     def _api_request_if_needed(self, live: bool = False) -> requests.Response:
         """Check if we need to do a request or not when weather data is outdated.
@@ -170,11 +199,11 @@ class WeatherAPI(ABC):
         :return: Irradiance, columns include ghi, dni, dhi.
         """
         solpos = self.location.get_solarposition(cloud_cover.index)
-        cs = self.location.get_clearsky(cloud_cover.index, model="ineichen", solar_position=solpos)
+        clear_sky = self.location.get_clearsky(cloud_cover.index, model="ineichen", solar_position=solpos)
 
         method = method.lower()
         if method == "linear":
-            ghi = self._cloud_cover_to_ghi_linear(cloud_cover, cs["ghi"], **kwargs)
+            ghi = self._cloud_cover_to_ghi_linear(cloud_cover, clear_sky["ghi"], **kwargs)
         else:
             raise ValueError(f"Invalid method argument: {method}")
 
