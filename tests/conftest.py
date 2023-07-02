@@ -56,3 +56,14 @@ def weather_df():
     df["datetime"] = to_datetime(df["datetime"])
     df = df.set_index("datetime")
     return df
+
+
+@pytest.fixture(scope="session")
+def pd_time_aliases():
+    """Fixture for pandas time aliases."""
+    return {
+        "1H": ["H"],
+        "30Min": ["30T"],
+        "15Min": ["15T"],
+        "1W": ["W"],
+    }

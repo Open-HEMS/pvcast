@@ -15,11 +15,11 @@ class TestWebServer:
         """Return a forecast power data structure."""
         return {
             "plantname": "mypvsystem1",
-            "unit": "1W",
+            "unit": "W",
             "frequency": request.param,
             "data": [
                 {
-                    "datetime": "2020-01-01T00:00",
+                    "datetime": "2023-07-01T21:00:00+00:00",
                     "value": 24.6,
                 }
             ],
@@ -34,7 +34,7 @@ class TestWebServer:
             "frequency": request.param,
             "data": [
                 {
-                    "datetime": "2020-01-01T00:00",
+                    "datetime": "2023-07-01T21:00:00+00:00",
                     "value": 13.1,
                 }
             ],

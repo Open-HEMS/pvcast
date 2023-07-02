@@ -10,3 +10,7 @@ TEST_CONF_PATH_SEC = Path(__file__).parent.parent / "tests" / "test_config_sec.y
 TEST_CONF_PATH_NO_SEC = Path(__file__).parent.parent / "tests" / "test_config_no_sec.yaml"
 TEST_CONF_PATH_ERROR = Path(__file__).parent.parent / "tests" / "test_config_error.yaml"
 TEST_SECRETS_PATH = Path(__file__).parent.parent / "tests" / "test_secrets.yaml"
+
+HASS_TEST_URL = "http://localhost:8123"
+HASS_TEST_TOKEN = """eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI5MGZiN2I2OGVlODk0ZDk3ODMyMGQ5MjRlMzExM2YxNyIsImlhdC
+I6MTY4ODI1MTk3OCwiZXhwIjoyMDAzNjExOTc4fQ.EHOvN2SCydnvY6lYGIvN_eAujYXu5SlawlUCMc39D1Y"""
