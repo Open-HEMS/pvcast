@@ -6,6 +6,9 @@
 		"dockerfile": "Dockerfile",
 		"context": ".."
 	},
+	"runArgs": [
+		"--network=host"
+	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
