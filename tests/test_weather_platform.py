@@ -1,4 +1,4 @@
-"""Test the weather module."""
+"""Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
 import pytest
@@ -9,8 +9,8 @@ from pvlib.location import Location
 from pvcast.weather.clearoutside import WeatherAPIClearOutside
 
 
-class TestWeatherClearOutside:
-    """Test the clear outside weather module."""
+class TestWeatherPlatform:
+    """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture()
     def time_aliases(self, pd_time_aliases):
@@ -19,17 +19,7 @@ class TestWeatherClearOutside:
     @pytest.fixture(params=[LOC_EUW, LOC_USW])
     def clear_outside_api(self, request):
         """Fixture for the Clear Outside weather API with no data."""
-        lat = request.param[0]
-        lon = request.param[1]
-        alt = request.param[2]
-        tz = request.param[3]
-
-        return WeatherAPIClearOutside(location=Location(lat, lon, tz, alt))
-
-    # ["H", "30T", "15T"] = ["1H", "30Min", "15Min"]
-    @pytest.fixture(params=["1H", "30Min", "15Min"])
-    def freq(self, request):
-        return request.param
+        return WeatherAPIClearOutside(location=Location(*request.param))
 
     @pytest.fixture(params=[1, 2, 3])
     def max_forecast_day(self, request):
@@ -53,6 +43,7 @@ class TestWeatherClearOutside:
         n_rows = weather.shape[0]
         assert n_rows % (Timedelta(hours=24) / Timedelta("1h")) == 0
 
+    @pytest.mark.parametrize("freq", ["1H", "30Min", "15Min"])
     def test_weather_get_weather_freq(self, clear_outside_api: WeatherAPIClearOutside, freq, time_aliases):
         """Test the get_weather function with a number of higher data frequencies."""
         clear_outside_api.freq_output = freq

@@ -35,13 +35,7 @@ class TestWeather:
     @pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
     def weather_obj(self, request):
         """Get a weather API object."""
-
-        lat = request.param[0]
-        lon = request.param[1]
-        alt = request.param[2]
-        tz = request.param[3]
-
-        return MockWeatherAPI(location=Location(lat, lon, tz, alt))
+        return MockWeatherAPI(location=Location(*request.param))
 
     @pytest.fixture(params=[404, 429, 500])
     def weather_obj_error(self, request):

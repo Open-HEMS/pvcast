@@ -36,7 +36,22 @@ WEATHER_SCHEMA = Schema(
 
 @dataclass
 class WeatherAPI(ABC):
-    """Abstract WeatherAPI class."""
+    """Abstract WeatherAPI class.
+
+    Source datetime strings source_dates should be created in the format "%Y-%m-%dT%H:%M:%S+00:00" (RFC 3339).
+
+    All datetime dependent internal computations are performed with UTC timezone as reference.
+    We assume the start time of the forecast is floor(current time) to the neareast hour 1H. The end time is then:
+    start time + max_forecast_days - freq. For example, if the current time in CET is 19:30, the frequency is 1 hour and
+    we forecast for one day the start time is then 17:00 UTC and the end time is 16:00 UTC tomorrow.
+    The forecast is thus from 17:00 UTC to 16:00 UTC the next day. If the frequency was 30 minutes, the forecast would
+    be from 17:00 UTC to 16:30 UTC the next day.
+
+    The assumption to start the forecast at the floor of the current hour seems to be reasonable based on sources used
+    so far. If for any reason we have to deviate from this assumption or the weather data source does not provide data
+    for the current hour, the implementation of this class should be changed accordingly and a custom source_dates
+    property implemented in the subclass.
+    """
 
     # require lat, lon to have at least 2 decimal places of precision
     location: Location
@@ -66,7 +81,7 @@ class WeatherAPI(ABC):
     @property
     def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
-        return Timestamp.now(tz="UTC").floor("1H")
+        return Timestamp.utcnow().floor("1H")
 
     @property
     def end_forecast(self) -> Timestamp:
