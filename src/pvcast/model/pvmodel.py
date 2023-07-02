@@ -17,7 +17,6 @@ from pvlib.location import Location
 from pvlib.modelchain import ModelChain, ModelChainResult
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
-from pytz import BaseTzInfo
 
 from .const import BASE_CEC_DATA_PATH
 
@@ -71,12 +70,12 @@ class PVPlantResult:
 
         if freq == self.freq:
             return self
-        else:
-            plant_cpy = copy.deepcopy(self)
-            plant_cpy.freq = freq
-            plant_cpy.ac_power = res_f(self.ac)
-            plant_cpy.dc_power = tuple(res_f(dc) for dc in self.dc_power) if self.dc_power is not None else None
-            return plant_cpy
+
+        plant_cpy = copy.deepcopy(self)
+        plant_cpy.freq = freq
+        plant_cpy.ac_power = res_f(self.ac_power)
+        plant_cpy.dc_power = tuple(res_f(dc) for dc in self.dc_power) if self.dc_power is not None else None
+        return plant_cpy
 
     def energy(self, freq: str = "1D") -> PVPlantResult:
         """Calculate the AC energy output of the PV plant.
@@ -105,7 +104,7 @@ class PVPlantResult:
         plant_cpy = self.resample("1H")
 
         # calculate energy
-        plant_cpy.ac_energy = plant_cpy.ac.resample(freq).sum() / 1000
+        plant_cpy.ac_energy = plant_cpy.ac_power.resample(freq).sum() / 1000
         return plant_cpy
 
 
@@ -382,6 +381,9 @@ class PVPlantModel:
             tmy_data = pd.read_csv(path, index_col=0, parse_dates=True, header=0)
             tmy_data.index.name = "time"
 
+            # print current timezone
+            _LOGGER.debug("Timezone of the data: %s", tmy_data.index.tzinfo)
+
             # convert timezone to UTC
             tmy_data = tmy_data.tz_convert("UTC")
 
@@ -400,7 +402,7 @@ class PVPlantModel:
             )
             tmy_data.index.name = "time"
 
-            # convert timezone to UTC
+            # ensure that the data is in UTC timezone
             tmy_data = tmy_data.tz_convert("UTC")
 
             # add preciptable_water if it is not in the data
@@ -447,10 +449,11 @@ class PVSystemManager:
     Interface between the PV system model and the rest of the application. This class is responsible for
     instantiating the PV system model and running the simulation, and returning the results.
 
+    Everything in PVModel is done in UTC timezone.
+
     :param config: A list of PV plant param dicts. Each entry in the list represents one entry under plant:.
     :param lat: PV system location latitude.
     :param lon: PV system location longitude.
-    :param tz: PV system timezone.
     :param alt: PV system altitude.
     :param base_cec_data_path: The base path to the CEC database.
     :param inv_path: The path to the CEC inverter database.
@@ -461,20 +464,20 @@ class PVSystemManager:
     config: list[MappingProxyType[dict]]
     lat: InitVar[float] = field(repr=False)
     lon: InitVar[float] = field(repr=False)
-    tz: InitVar[BaseTzInfo] = field(repr=False)
     alt: InitVar[float] = field(default=0.0, repr=False)
     inv_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_inverters.csv", repr=False)
     mod_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_modules.csv", repr=False)
     _pv_plants: dict[PVPlantModel] = field(init=False, repr=False)
 
-    def __post_init__(self, lat: float, lon: float, tz: BaseTzInfo, alt: float, inv_path: Path, mod_path: Path):
-        self._loc = Location(lat, lon, alt, tz, name=f"PV plant at {lat}, {lon}")
+    def __post_init__(self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path):
+        self._loc = Location(lat, lon, tz="UTC", altitude=alt, name=f"PV plant at {lat}, {lon}")
         inv_param = self._retrieve_sam_wrapper(inv_path)
         mod_param = self._retrieve_sam_wrapper(mod_path)
         self._pv_plants = self._create_pv_plants(inv_param, mod_param)
 
     @property
     def location(self):
+        """Location of the PV system encoded as a PVLib Location object."""
         return self._loc
 
     def get_pv_plant(self, name: str) -> PVPlantModel:
@@ -494,6 +497,7 @@ class PVSystemManager:
         :param path: The path to the SAM database.
         :return: The SAM database as a pandas DataFrame.
         """
+        _LOGGER.debug("Retrieving SAM database from %s.", path)
         if not path.exists():
             raise FileNotFoundError(f"Database {path} does not exist.")
 
@@ -502,31 +506,6 @@ class PVSystemManager:
         pv_df = pv_df.transpose()
         _LOGGER.debug("Retrieved %s entries from %s.", len(pv_df), path)
         return pv_df
-
-    def _retrieve_parameters(self, device: str, inverter: bool) -> dict:
-        """Retrieve module or inverter parameters from the pvlib/SAM databases.
-
-        :param device: The name of the module or inverter.
-        :param inverter: True if the device is an inverter, False if it is a PV module.
-        :return: The parameters of the device.
-        """
-        # retrieve parameter database
-        candidates: DataFrame = self._inv_param if inverter else self._mod_param
-
-        # check if there are duplicates
-        duplicates = candidates[candidates.index.duplicated(keep=False)]
-        if not duplicates.empty:
-            _LOGGER.debug("Dropping %s duplicate entries.", len(duplicates))
-            candidates = candidates.drop_duplicates(keep="first")
-
-        # check if device is in the database
-        try:
-            params = candidates.loc[candidates.index == device].to_dict("records")[0]
-            _LOGGER.debug("Found device %s in the database.", device)
-        except KeyError as exc:
-            raise KeyError(f"Device {device} not found in the database.") from exc
-
-        return params
 
     def _create_pv_plants(self, inv_param: DataFrame, mod_param: DataFrame) -> dict[PVPlantModel]:
         """
@@ -556,7 +535,7 @@ class PVSystemManager:
     def run(
         self,
         name: str,
-        type: ForecastType,
+        fc_type: ForecastType,
         weather_df: DataFrame | None = None,
         datetimes: DatetimeIndex | None = None,
     ) -> PVPlantModel:
@@ -565,30 +544,30 @@ class PVSystemManager:
         :param name: The name of the PV plant.
         :param type: The type of forecast to run.
         :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
-                           If type is ForecastType.CLEARSKY, weather_df requires only timestamps to forecast. Actual weather
-                           data can be provided, but will be ignored.
+                           If type is ForecastType.CLEARSKY, weather_df requires only timestamps to forecast. Actual
+                           weather data can be provided, but will be ignored.
         :param datetimes: The timestamps to forecast. Only required if type is ForecastType.CLEARSKY.
         :return: The PV plant model object, which contains the results of the simulation.
         """
         # check if weather data is provided
-        if type is ForecastType.FORECAST and weather_df is None:
+        if fc_type is ForecastType.FORECAST and weather_df is None:
             raise ValueError(
                 f"Weather data must be provided for PV forecast of type {str(ForecastType.FORECAST.name)}."
             )
-        if type is ForecastType.CLEARSKY and datetimes is None:
+        if fc_type is ForecastType.CLEARSKY and datetimes is None:
             raise ValueError(f"Datetimes must be provided for PV forecast of type {ForecastType.CLEARSKY.name}.")
 
         # get PV plant
         pv_plant = self.get_pv_plant(name)
 
         # run simulation
-        if type is ForecastType.HISTORICAL:
+        if fc_type is ForecastType.HISTORICAL:
             pv_plant.run_historical()
-        elif type is ForecastType.CLEARSKY:
+        elif fc_type is ForecastType.CLEARSKY:
             pv_plant.run_clearsky(datetimes)
-        elif type is ForecastType.FORECAST:
+        elif fc_type is ForecastType.FORECAST:
             pv_plant.run_forecast(weather_df)
         else:
-            raise ValueError(f"Forecast type {type} not supported.")
+            raise ValueError(f"Forecast type {fc_type} not supported.")
 
         return pv_plant

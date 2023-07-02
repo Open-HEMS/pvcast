@@ -66,17 +66,17 @@ class WeatherAPI(ABC):
     @property
     def start_forecast(self) -> Timestamp:
         """Get the start date of the forecast."""
-        return Timestamp.now(tz=self.location.tz).floor("1H")
+        return Timestamp.now(tz="UTC").floor("1H")
 
     @property
     def end_forecast(self) -> Timestamp:
         """Get the end date of the forecast."""
-        return self.start_forecast + self.max_forecast_days - Timedelta(self.freq_source)
+        return self.start_forecast + self.max_forecast_days
 
     @property
     def source_dates(self) -> DatetimeIndex:
         """Get the datetimeindex to store the forecast."""
-        return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz=self.location.tz)
+        return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz="UTC")
 
     @abstractmethod
     def _process_data(self) -> DataFrame:
@@ -87,16 +87,16 @@ class WeatherAPI(ABC):
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
 
-    def get_weather(self, live: bool = False) -> DataFrame:
+    def get_weather(self, live: bool = False) -> dict:
         """
-        Get weather data from API response. This function will always return data return in local timezone.
+        Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
         :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
         """
         # get weather API data, if needed. If not, use cached data.
         _LOGGER.debug("Getting weather data, force live data=%s", live)
-        response = self._api_request_if_needed(live)
+        response: requests.Response = self._api_request_if_needed(live)
 
         # handle errors from the API
         self._api_error_handler(response)
@@ -107,10 +107,9 @@ class WeatherAPI(ABC):
             raise WeatherAPIError("Source dates do not match processed data.")
 
         # resample to the output frequency and interpolate
-        resampled: DataFrame = processed_data.resample(self.freq_output).interpolate(method="linear")
+        resampled: DataFrame = processed_data.resample(self.freq_output).interpolate(method="linear").iloc[:-1]
         resampled = resampled.tz_convert("UTC")
         resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        print(f"Resampled: {resampled.head(1)}")
 
         # convert to dictionary and validate schema
         try:

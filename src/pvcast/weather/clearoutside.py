@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -29,7 +30,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         lat = encode(self.location.latitude)
         lon = encode(self.location.longitude)
         alt = encode(self.location.altitude)
-        return f"{self._url_base}{lat}/{lon}/{alt}"
+        return urljoin(self._url_base, f"{lat}/{lon}/{alt}")
 
     def _process_data(self) -> DataFrame:
         """Process weather data scraped from the clear outside website.

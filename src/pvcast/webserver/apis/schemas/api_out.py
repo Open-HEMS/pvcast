@@ -19,7 +19,8 @@ energy_sch = Schema(
             Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
             Required("data"): [
                 {
-                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S.%fZ")),  # RFC 3339
+                    # HA uses RFC 3339 timestamps in format: "2023-07-01T21:00:00+00:00"
+                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S+00:00")),
                     Required("value"): All(float, Range(min=0)),
                 }
             ],
@@ -31,11 +32,12 @@ energy_sch = Schema(
 power_sch = Schema(
     base_sch.extend(
         {
-            Required("unit"): In(["1W", "kW"]),
+            Required("unit"): In(["W", "kW"]),
             Required("frequency"): In(["15Min", "30Min", "1H"]),
             Required("data"): [
                 {
-                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M")),
+                    # HA uses RFC 3339 timestamps in format: "2023-07-01T21:00:00+00:00"
+                    Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S+00:00")),
                     Required("value"): All(float, Range(min=0)),
                 }
             ],
