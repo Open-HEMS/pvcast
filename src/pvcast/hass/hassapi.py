@@ -60,4 +60,4 @@ class HassAPI:
             raise ValueError(f"Entity {entity_id} not found.")
         if not response.ok:
             raise ConnectionError(f"Error while getting entity {entity_id}: {response.reason}")
-        return response.json()
+        return response

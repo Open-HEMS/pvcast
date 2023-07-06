@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from urllib.parse import urljoin
 
 import pandas as pd
@@ -15,13 +15,18 @@ from ..weather.weather import WeatherAPI
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass()
+@dataclass
 class WeatherAPIClearOutside(WeatherAPI):
     """Weather API class that scrapes the data from Clear Outside."""
 
-    _url_base: str = field(default="https://clearoutside.com/forecast/")
+    _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
+    url: str = field(init=False)
+    max_forecast_days: Timedelta = Timedelta(days=6)
 
-    def _url_formatter(self) -> str:
+    def __post_init__(self, _url_base: str):
+        self.url = self._url_formatter(_url_base)
+
+    def _url_formatter(self, url_base) -> str:
         """Format the url to the API."""
 
         def encode(coord: float) -> str:
@@ -30,7 +35,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         lat = encode(self.location.latitude)
         lon = encode(self.location.longitude)
         alt = encode(self.location.altitude)
-        return urljoin(self._url_base, f"{lat}/{lon}/{alt}")
+        return urljoin(url_base, f"{lat}/{lon}/{alt}")
 
     def _process_data(self) -> DataFrame:
         """Process weather data scraped from the clear outside website.
@@ -43,7 +48,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         response = self._raw_data
 
         # response (source) data bucket
-        source_df = DataFrame(index=self.source_dates)
+        weather_df = DataFrame(index=self.source_dates)
 
         # parse the data
         n_days = int(self.max_forecast_days / Timedelta(days=1))
@@ -60,10 +65,13 @@ class WeatherAPIClearOutside(WeatherAPI):
                 break
 
             # insert the data into the source data bucket
-            source_df.loc[data.index, data.columns] = data
+            weather_df.loc[data.index, data.columns] = data
 
-        # return the source data bucket
-        return source_df
+        # drop rows with NaN
+        rows_with_nan = weather_df[weather_df.isna().any(axis=1)]
+        weather_df.dropna(inplace=True)
+        _LOGGER.debug("Dropped n rows with NaN: %s", len(rows_with_nan))
+        return weather_df
 
     def _find_elements(self, table: list, day: int) -> DataFrame:
         """Find weather data elements in the table.

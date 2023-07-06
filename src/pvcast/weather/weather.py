@@ -9,9 +9,11 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 import requests
-from pandas import DataFrame, DatetimeIndex, Series, Timedelta, Timestamp
+from pandas import (DataFrame, DatetimeIndex, Series, Timedelta, Timestamp,
+                    infer_freq)
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
+from requests import Response
 from voluptuous import All, Datetime, In, Range, Required, Schema
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,11 +25,11 @@ WEATHER_SCHEMA = Schema(
         Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
         Required("data"): [
             {
-                Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S.%fZ")),  # RFC 3339
+                Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S%z")),  # RFC 3339
                 Required("temperature"): All(float, Range(min=-100, max=100)),
-                Required("humidity"): All(float, Range(min=0, max=100)),
+                Required("humidity"): All(int, Range(min=0, max=100)),
                 Required("wind_speed"): All(float, Range(min=0)),
-                Required("cloud_coverage"): All(float, Range(min=0, max=100)),
+                Required("cloud_coverage"): All(int, Range(min=0, max=100)),
             }
         ],
     }
@@ -51,11 +53,17 @@ class WeatherAPI(ABC):
     so far. If for any reason we have to deviate from this assumption or the weather data source does not provide data
     for the current hour, the implementation of this class should be changed accordingly and a custom source_dates
     property implemented in the subclass.
+
+    NOTE: Because of the order in which dataclasses are initialized, a subclass of WeatherAPI can't have
+    non-default attributes. See also: https://stackoverflow.com/questions/51575931
     """
 
     # require lat, lon to have at least 2 decimal places of precision
     location: Location
-    format_url: bool = field(default=True)  # whether to format the url with lat, lon, alt. Mostly for testing.
+    url: str = field(init=True)
+
+    # timeout in seconds for the API request
+    timeout: int = field(default=10)
 
     # maximum number of days to include in the forecast
     max_forecast_days: Timedelta = field(default=Timedelta(days=7))
@@ -64,19 +72,12 @@ class WeatherAPI(ABC):
     freq_source: str = field(default="1H")  # frequency of the source data. This is fixed!
     freq_output: str = field(default="1H")  # frequency of the output data. Can be changed by user.
 
-    # url
-    _url_base: str = field(default=None, init=False)  # base url to the API
-    _url: str = field(default=None, init=False)  # url to the API
-
-    # maximum age of weather data in seconds
+    # maximum age of weather data before requesting new data
     max_age: Timedelta = field(default=Timedelta(hours=1))
     _last_update: Timestamp = field(default=Timestamp(0), init=False)  # last time the weather data was updated
 
     # raw response data from the API
-    _raw_data: requests.Response = field(default=None, init=False)
-
-    def __post_init__(self) -> None:
-        self._url = self._url_formatter() if self.format_url else self._url_base
+    _raw_data: Response = field(default=None, init=False)
 
     @property
     def start_forecast(self) -> Timestamp:
@@ -86,11 +87,14 @@ class WeatherAPI(ABC):
     @property
     def end_forecast(self) -> Timestamp:
         """Get the end date of the forecast."""
-        return self.start_forecast + self.max_forecast_days
+        return self.start_forecast + self.max_forecast_days - Timedelta(self.freq_source)
 
     @property
     def source_dates(self) -> DatetimeIndex:
-        """Get the datetimeindex to store the forecast."""
+        """
+        Get the datetimeindex to store the forecast. These are only used if missing from API, the weather API can also
+        return datetime strings and in that case this index is not needed and even not preferred.
+        """
         return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz="UTC")
 
     @abstractmethod
@@ -111,20 +115,54 @@ class WeatherAPI(ABC):
         """
         # get weather API data, if needed. If not, use cached data.
         _LOGGER.debug("Getting weather data, force live data=%s", live)
-        response: requests.Response = self._api_request_if_needed(live)
+        response: Response = self._api_request_if_needed(live)
 
         # handle errors from the API
         self._api_error_handler(response)
 
         # process and return the data
         processed_data: DataFrame = self._process_data()
-        if not (processed_data.index == self.source_dates).all():
-            raise WeatherAPIError("Source dates do not match processed data.")
+
+        if processed_data.index.freq is None:
+            processed_data.index = self._add_freq(processed_data.index, freq=self.freq_source)
+            _LOGGER.debug("Added frequency to index: %s", processed_data.index.freq)
+        if processed_data.index.freq != self.freq_source:
+            raise WeatherAPIError(f"Data freq ({processed_data.index.freq}) != source freq ({self.freq_source}).")
+
+        # cut off the data that exceeds either max_forecast_days or int(number of days in the source data)
+        n_days_data = (processed_data.index[-1] - processed_data.index[0]).days + 1
+        n_days = int(min(n_days_data, self.max_forecast_days.days))
+        processed_data = processed_data.iloc[: n_days * (Timedelta(hours=24) // Timedelta(self.freq_source))]
+
+        # update max_forecast_days to the actual number of days in the data
+        self.max_forecast_days = Timedelta(days=n_days)
+
+        # check for NaN values
+        if pd.isnull(processed_data).any().any():
+            raise WeatherAPIError("Processed data contains NaN values.")
 
         # resample to the output frequency and interpolate
-        resampled: DataFrame = processed_data.resample(self.freq_output).interpolate(method="linear").iloc[:-1]
-        resampled = resampled.tz_convert("UTC")
-        resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        if self.freq_output != self.freq_source:
+            # create extrapolated data for the last hour
+            extra = processed_data.iloc[-4:].diff().mean() + processed_data.iloc[-1]
+            extra = extra.clip(processed_data.min(), processed_data.max())
+
+            # extrapolate 1 hour into the future so that we have exactly: n_rows % freq_output == 0
+            index = processed_data.index[-1] + Timedelta(self.freq_source)
+            extra = extra.to_frame(index).transpose()
+            processed_data = pd.concat([processed_data, extra], ignore_index=False)
+
+            # resample and interpolate
+            processed_data = processed_data.resample(self.freq_output).interpolate(method="linear").iloc[:-1]
+
+        resampled = processed_data.tz_convert("UTC")
+        resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+        # set data types
+        resampled["temperature"] = resampled["temperature"].astype(float)
+        resampled["humidity"] = resampled["humidity"].astype(int)
+        resampled["wind_speed"] = resampled["wind_speed"].astype(float)
+        resampled["cloud_coverage"] = resampled["cloud_coverage"].astype(int)
 
         # convert to dictionary and validate schema
         try:
@@ -139,8 +177,12 @@ class WeatherAPI(ABC):
 
         return data_dict
 
-    def _api_request_if_needed(self, live: bool = False) -> requests.Response:
+    def _api_request_if_needed(self, live: bool = False) -> Response:
         """Check if we need to do a request or not when weather data is outdated.
+
+        TODO: move to clearoutside, must be made abstract method bc home assistant can't use this function
+        or we can override this function in HA? or we can remove part of this function and put it in an abstract
+        method!
 
         :param live: Force an update by ignoring the max_age.
         """
@@ -151,7 +193,7 @@ class WeatherAPI(ABC):
 
         # do the request
         try:
-            response = requests.get(self._url, timeout=10)
+            response = self._do_request()
         except requests.exceptions.Timeout as exc:
             raise WeatherAPIErrorTimeout() from exc
 
@@ -163,12 +205,18 @@ class WeatherAPI(ABC):
         self._last_update = Timestamp.now(tz="UTC")
         return response
 
-    @abstractmethod
-    def _url_formatter(self) -> str:
-        """Format the url to the API."""
+    def _do_request(self) -> Response:
+        """
+        Make GET request to weather API and return the response.
+
+        Can be overridden by subclasses if needed.
+
+        :return: Response from weather API.
+        """
+        return requests.get(self.url, timeout=self.timeout)
 
     @staticmethod
-    def _api_error_handler(response: requests.Response) -> None:
+    def _api_error_handler(response: Response) -> None:
         """Handle errors from the API.
 
         :param response: The response from the API.
@@ -245,7 +293,7 @@ class WeatherAPI(ABC):
 
         return irrads
 
-    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset=35):
+    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset: float = 35.0):
         """
         Convert cloud cover to GHI using a linear relationship.
 
@@ -269,6 +317,26 @@ class WeatherAPI(ABC):
         :return: Atmospheric transmittance as a pandas Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
+
+    def _add_freq(self, idx: pd.DatetimeIndex, freq=None):
+        """Add a frequency attribute to idx, through inference or directly.
+
+        Returns a copy.  If `freq` is None, it is inferred.
+
+        :param idx: DatetimeIndex to add frequency to.
+        :param freq: Frequency to add to idx.
+        :return: DatetimeIndex with frequency attribute.
+        """
+        idx = idx.copy()
+        if freq is None:
+            if idx.freq is None:
+                freq = pd.infer_freq(idx)
+            else:
+                return idx
+        idx.freq = pd.tseries.frequencies.to_offset(freq)
+        if idx.freq is None:
+            raise AttributeError("no discernible frequency found to `idx`.  Specify" " a frequency string with `freq`.")
+        return idx
 
 
 @dataclass(frozen=True)
@@ -355,3 +423,19 @@ class WeatherAPIFactory:
             raise ValueError(f"Unknown weather API: {api_id}") from exc
 
         return weather_api_class(**kwargs)
+
+    def get_weather_api_list_obj(self) -> list[WeatherAPI]:
+        """
+        Get a list of all registered weather API instances.
+
+        :return: List of weather API identifiers.
+        """
+        return list(self._apis.values())
+
+    def get_weather_api_list_str(self) -> list[str]:
+        """
+        Get a list of all registered weather API identifiers.
+
+        :return: List of weather API identifiers.
+        """
+        return list(self._apis.keys())

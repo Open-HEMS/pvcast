@@ -3,8 +3,9 @@ from __future__ import annotations
 
 import pytest
 from const import HASS_TEST_TOKEN, HASS_TEST_URL
+from requests import Response
 
-from pvcast.hass.hass import HassAPI
+from pvcast.hass.hassapi import HassAPI
 
 
 class TestHassAPI:
@@ -32,7 +33,12 @@ class TestHassAPI:
 
     def test_hass_api_get_entity_state(self, hass_api: HassAPI):
         """Test the get_entity_state method."""
-        entity_data = hass_api.get_entity_state("weather.forecast_thuis_hourly")
+        entity_data: Response = hass_api.get_entity_state("weather.forecast_thuis_hourly")
+        assert entity_data.ok
+        assert entity_data.status_code == 200
+        assert entity_data.headers["Content-Type"] == "application/json"
+        assert entity_data.headers["Content-Encoding"] == "deflate"
+        entity_data = entity_data.json()
         assert entity_data["entity_id"] == "weather.forecast_thuis_hourly"
         assert len(entity_data["attributes"]["forecast"]) % 24 == 0
         assert all(

@@ -18,15 +18,9 @@ from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
 class MockWeatherAPI(WeatherAPI):
     """Mock the WeatherAPI class."""
 
-    code: int = 200  # default http return code
-
     def _process_data(self, response: requests.Response) -> DataFrame:
         """Get weather data from API response."""
         return DataFrame()
-
-    def _url_formatter(self) -> str:
-        """Format the url with lat, lon, alt."""
-        return self._url
 
 
 class TestWeather:
@@ -35,21 +29,16 @@ class TestWeather:
     @pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
     def weather_obj(self, request):
         """Get a weather API object."""
-        return MockWeatherAPI(location=Location(*request.param))
+        return MockWeatherAPI(location=Location(*request.param), url="http://httpbin.org/get")
 
     @pytest.fixture(params=[404, 429, 500])
     def weather_obj_error(self, request):
         """Get a weather API object with an error."""
+
         url_base = "http://httpbin.org/status/"
-
-        def httpbin_url_formatter(self) -> str:
-            return f"{url_base}{request.param}"
-
-        # mock _url_formatter() function
-        with mock.patch.object(MockWeatherAPI, "_url_formatter", new=httpbin_url_formatter):
-            obj = MockWeatherAPI(location=Location(0, 0, "UTC", 0))
-            obj.code = request.param
-            return obj
+        url = f"{url_base}{request.param}"
+        obj = MockWeatherAPI(location=Location(0, 0, "UTC", 0), url=url)
+        return obj
 
     @pytest.fixture(params=["campbell_norman", "clearsky_scaling"])
     def irradiance_method(self, request):
@@ -68,8 +57,8 @@ class TestWeather:
             429: WeatherAPIErrorTooManyReq,
             500: WeatherAPIError,
         }
-
-        with pytest.raises(error_dict[weather_obj_error.code]):
+        code = int(weather_obj_error.url.split("/")[-1])
+        with pytest.raises(error_dict[code]):
             weather_obj_error._api_request_if_needed()
 
     def test_weather_cloud_cover_to_irradiance(
