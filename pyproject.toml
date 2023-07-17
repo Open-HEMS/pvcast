@@ -56,8 +56,10 @@ test = [
     "pytest-runner",
     "pytest==7.3.1",
     "pytest-github-actions-annotate-failures",
+    "pytest-xdist==3.3.1",
     "shellcheck-py==0.9.0.2",
-    "mock==5.0.2"
+    "mock==5.0.2",
+    "responses==0.23.1"
 ]
 
 [project.urls]
@@ -125,7 +127,7 @@ executionEnvironments = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration'"
+addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
 pythonpath = [
   "src"
 ]
