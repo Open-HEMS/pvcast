@@ -11,7 +11,7 @@ base_sch = Schema(
 )
 
 # energy forecast schemas
-# for timeseries frequency options see: https://pandas.pydata.org/docs/user_guide/timeseries.html#offset-aliases
+# for timepd.Series frequency options see: https://pandas.pydata.org/docs/user_guide/timepd.Series.html#offset-aliases
 energy_sch = Schema(
     base_sch.extend(
         {
@@ -19,7 +19,7 @@ energy_sch = Schema(
             Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
             Required("data"): [
                 {
-                    # HA uses RFC 3339 timestamps in format: "2023-07-01T21:00:00+00:00"
+                    # HA uses RFC 3339 pd.Timestamps in format: "2023-07-01T21:00:00+00:00"
                     Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S+00:00")),
                     Required("value"): All(float, Range(min=0)),
                 }
@@ -36,7 +36,7 @@ power_sch = Schema(
             Required("frequency"): In(["15Min", "30Min", "1H"]),
             Required("data"): [
                 {
-                    # HA uses RFC 3339 timestamps in format: "2023-07-01T21:00:00+00:00"
+                    # HA uses RFC 3339 pd.Timestamps in format: "2023-07-01T21:00:00+00:00"
                     Required("datetime"): All(str, Datetime(format="%Y-%m-%dT%H:%M:%S+00:00")),
                     Required("value"): All(float, Range(min=0)),
                 }

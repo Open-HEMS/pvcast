@@ -3,24 +3,36 @@ from __future__ import annotations
 
 from unittest import mock
 
+import pandas as pd
 import pytest
-import requests
 from const import LOC_AUS, LOC_EUW, LOC_USW
-from pandas import DataFrame
 from pvlib.location import Location
 
 from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
                                     WeatherAPIErrorTooManyReq,
-                                    WeatherAPIErrorWrongURL)
+                                    WeatherAPIErrorWrongURL, WeatherAPIFactory)
 
 
 # mock for WeatherAPI class
 class MockWeatherAPI(WeatherAPI):
     """Mock the WeatherAPI class."""
 
-    def _process_data(self, response: requests.Response) -> DataFrame:
+    def __init__(self, location: Location, url: str):
+        """Initialize the mock class."""
+        super().__init__(location, url, freq_source="30T")
+        self.url = url
+
+    def _process_data(self) -> pd.DataFrame:
         """Get weather data from API response."""
-        return DataFrame()
+        index = pd.DatetimeIndex(["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"], tz="UTC")
+        # add temperature, humidity, wind_speed, cloud_coverage
+        data = [
+            [0, 0, 0, 0],
+            [0.5, 0.5, 0.5, 0.5],
+            [1, 1, 1, 1],
+        ]
+        columns = ["temperature", "humidity", "wind_speed", "cloud_coverage"]
+        return pd.DataFrame(data, index=index, columns=columns)
 
 
 class TestWeather:
@@ -62,12 +74,73 @@ class TestWeather:
             weather_obj_error._api_request_if_needed()
 
     def test_weather_cloud_cover_to_irradiance(
-        self, weather_obj: WeatherAPI, weather_df: DataFrame, irradiance_method: str
+        self, weather_obj: WeatherAPI, weather_df: pd.DataFrame, irradiance_method: str
     ):
         """Test the cloud_cover_to_irradiance function."""
         irradiance = weather_obj.cloud_cover_to_irradiance(weather_df["cloud_cover"], irradiance_method)
-        assert isinstance(irradiance, DataFrame)
+        assert isinstance(irradiance, pd.DataFrame)
         assert irradiance.shape[0] == weather_df.shape[0]
         assert irradiance.shape[1] == 3
         assert set(irradiance.columns) == {"ghi", "dni", "dhi"}
         assert irradiance.index.equals(weather_df.index)
+
+    def test_weather_cloud_cover_to_irradiance_error(self, weather_obj: WeatherAPI, weather_df: pd.DataFrame):
+        """Test the cloud_cover_to_irradiance function with errors."""
+        with pytest.raises(ValueError):
+            weather_obj.cloud_cover_to_irradiance(weather_df["cloud_cover"], "wrong_method")
+        with pytest.raises(ValueError):
+            weather_obj.cloud_cover_to_irradiance(weather_df["cloud_cover"], method="wrong_method")
+
+    @pytest.mark.parametrize("freq_opt, freq", [(None, "30T"), ("30T", None), ("30T", "30T")])
+    def test_add_freq(self, weather_obj: WeatherAPI, freq_opt: str | None, freq: str | None):
+        """Test the add_freq function."""
+        index = pd.DatetimeIndex(
+            ["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"], tz="UTC", freq=freq_opt
+        )
+        if freq_opt is None:
+            assert index.freq is None
+        else:
+            assert index.freq.freqstr == freq_opt
+        weather_df = weather_obj._add_freq(index, freq)
+        assert weather_df.freq == "30T"
+
+
+class TestWeatherFactory:
+    """Test the weather factory module."""
+
+    @pytest.fixture
+    def weather_api_factory(self):
+        """Get a weather API factory."""
+        API_FACTORY_TEST = WeatherAPIFactory()
+        API_FACTORY_TEST.register("mock", MockWeatherAPI)
+        return API_FACTORY_TEST
+
+    def test_get_weather_api(self, weather_api_factory):
+        """Test the get_weather_api function."""
+        assert isinstance(weather_api_factory, WeatherAPIFactory)
+        assert isinstance(
+            weather_api_factory.get_weather_api(
+                "mock", location=Location(0, 0, "UTC", 0), url="http://httpbin.org/get"
+            ),
+            MockWeatherAPI,
+        )
+        with pytest.raises(ValueError):
+            weather_api_factory.get_weather_api(
+                "wrong_api", location=Location(0, 0, "UTC", 0), url="http://httpbin.org/get"
+            )
+
+    def test_get_weather_api_list_obj(self, weather_api_factory):
+        """Test the get_weather_api function with a list of objects."""
+        assert isinstance(weather_api_factory, WeatherAPIFactory)
+        api_list = weather_api_factory.get_weather_api_list_obj()
+        assert isinstance(api_list, list)
+        assert len(api_list) == 1
+        assert issubclass(api_list[0], MockWeatherAPI)
+
+    def test_get_weather_api_list_str(self, weather_api_factory):
+        """Test the get_weather_api function with a list of strings."""
+        assert isinstance(weather_api_factory, WeatherAPIFactory)
+        api_list = weather_api_factory.get_weather_api_list_str()
+        assert isinstance(api_list, list)
+        assert len(api_list) == 1
+        assert api_list[0] == "mock"

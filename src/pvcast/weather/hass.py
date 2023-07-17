@@ -6,7 +6,7 @@ import datetime
 import logging
 from dataclasses import dataclass, field
 
-from pandas import DataFrame, infer_freq, to_datetime
+import pandas as pd
 from requests import Response
 
 from ..hass.hassapi import HassAPI
@@ -40,7 +40,7 @@ class WeatherAPIHASS(WeatherAPI):
         """
         return self._hass_api.get_entity_state(self.entity_id)
 
-    def _process_data(self) -> DataFrame:
+    def _process_data(self) -> pd.DataFrame:
         """Process weather data scraped from the clear outside website.
 
         Credits to https://github.com/davidusb-geek/emhass for the parsing code.
@@ -49,20 +49,20 @@ class WeatherAPIHASS(WeatherAPI):
         """
         # raw response data from request
         response = self._raw_data.json()
-
-        # check if entity_id is correct
-        if not response["entity_id"] == self.entity_id:
-            raise ValueError(f"Entity ID is not correct: {response['entity_id']}")
-
-        weather_df = DataFrame(response["attributes"]["forecast"])
-        weather_df["datetime"] = to_datetime(weather_df["datetime"])
+        weather_df = pd.DataFrame(response["attributes"]["forecast"])
+        weather_df["datetime"] = pd.to_datetime(weather_df["datetime"])
         weather_df.set_index("datetime", inplace=True)
 
-        # convert F to C if needed
-        if response["attributes"]["temperature_unit"] == "°F":
-            weather_df["temperature"] = (weather_df["temperature"] - 32) * 5 / 9
-        elif response["attributes"]["temperature_unit"] != "°C":
+        # if we don't recognize the unit there is no point in continuing since all the computations will be wrong
+        if response["attributes"]["temperature_unit"] not in ["°C", "°F", "C", "F"]:
             raise ValueError(f"Temperature unit is not °C or °F: {response['attributes']['temperature_unit']}")
+        if response["attributes"]["wind_speed_unit"] not in ["m/s", "km/h", "mi/h", "ft/s", "kn"]:
+            raise ValueError(
+                f"Wind speed unit is not m/s, km/h, mi/h, ft/s or kn: {response['attributes']['wind_speed_unit']}"
+            )
+        # convert F to C if needed
+        if response["attributes"]["temperature_unit"] == "°F" or "F":
+            weather_df["temperature"] = (weather_df["temperature"] - 32) * 5 / 9
 
         # convert wind_speed_unit from [km/h, mi/h, ft/s, kn] to  m/s if needed
         wind_speed_unit = response["attributes"]["wind_speed_unit"]
@@ -76,4 +76,7 @@ class WeatherAPIHASS(WeatherAPI):
 
         # select columns
         weather_df = weather_df[["temperature", "humidity", "cloud_coverage", "wind_speed"]]
+
+        # add data frequency
+        weather_df.index = self._add_freq(weather_df.index)
         return weather_df

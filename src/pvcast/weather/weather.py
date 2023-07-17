@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 import requests
-from pandas import (DataFrame, DatetimeIndex, Series, Timedelta, Timestamp,
-                    infer_freq)
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
 from requests import Response
@@ -60,50 +58,50 @@ class WeatherAPI(ABC):
 
     # require lat, lon to have at least 2 decimal places of precision
     location: Location
-    url: str = field(init=True)
+    url: str
 
     # timeout in seconds for the API request
     timeout: int = field(default=10)
 
     # maximum number of days to include in the forecast
-    max_forecast_days: Timedelta = field(default=Timedelta(days=7))
+    max_forecast_days: pd.Timedelta = field(default=pd.Timedelta(days=7))
 
     # frequency of the source data and the output data
     freq_source: str = field(default="1H")  # frequency of the source data. This is fixed!
     freq_output: str = field(default="1H")  # frequency of the output data. Can be changed by user.
 
     # maximum age of weather data before requesting new data
-    max_age: Timedelta = field(default=Timedelta(hours=1))
-    _last_update: Timestamp = field(default=Timestamp(0), init=False)  # last time the weather data was updated
+    max_age: pd.Timedelta = field(default=pd.Timedelta(hours=1))
+    _last_update: pd.Timestamp = field(default=pd.Timestamp(0), init=False)  # last time the weather data was updated
 
     # raw response data from the API
     _raw_data: Response = field(default=None, init=False)
 
     @property
-    def start_forecast(self) -> Timestamp:
+    def start_forecast(self) -> pd.Timestamp:
         """Get the start date of the forecast."""
-        return Timestamp.utcnow().floor("1H")
+        return pd.Timestamp.utcnow().floor("1H")
 
     @property
-    def end_forecast(self) -> Timestamp:
+    def end_forecast(self) -> pd.Timestamp:
         """Get the end date of the forecast."""
-        return self.start_forecast + self.max_forecast_days - Timedelta(self.freq_source)
+        return self.start_forecast + self.max_forecast_days - pd.Timedelta(self.freq_source)
 
     @property
-    def source_dates(self) -> DatetimeIndex:
+    def source_dates(self) -> pd.DatetimeIndex:
         """
-        Get the datetimeindex to store the forecast. These are only used if missing from API, the weather API can also
+        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can also
         return datetime strings and in that case this index is not needed and even not preferred.
         """
         return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz="UTC")
 
     @abstractmethod
-    def _process_data(self) -> DataFrame:
+    def _process_data(self) -> pd.DataFrame:
         """Process data from the weather API.
 
-        The index of the returned dataframe should be a DatetimeIndex in local time.
+        The index of the returned pd.DataFrame should be a pd.DatetimeIndex in local time.
 
-        :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
+        :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
         """
 
     def get_weather(self, live: bool = False) -> dict:
@@ -111,7 +109,7 @@ class WeatherAPI(ABC):
         Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
-        :return: The weather data as a dataframe where the index is the datetime and the columns are the variables.
+        :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
         """
         # get weather API data, if needed. If not, use cached data.
         _LOGGER.debug("Getting weather data, force live data=%s", live)
@@ -121,48 +119,43 @@ class WeatherAPI(ABC):
         self._api_error_handler(response)
 
         # process and return the data
-        processed_data: DataFrame = self._process_data()
+        processed_data: pd.DataFrame = self._process_data()
 
         if processed_data.index.freq is None:
-            processed_data.index = self._add_freq(processed_data.index, freq=self.freq_source)
-            _LOGGER.debug("Added frequency to index: %s", processed_data.index.freq)
+            raise WeatherAPIError("Processed data does not have a frequency.")
         if processed_data.index.freq != self.freq_source:
             raise WeatherAPIError(f"Data freq ({processed_data.index.freq}) != source freq ({self.freq_source}).")
 
         # cut off the data that exceeds either max_forecast_days or int(number of days in the source data)
         n_days_data = (processed_data.index[-1] - processed_data.index[0]).days + 1
         n_days = int(min(n_days_data, self.max_forecast_days.days))
-        processed_data = processed_data.iloc[: n_days * (Timedelta(hours=24) // Timedelta(self.freq_source))]
+        processed_data = processed_data.iloc[: n_days * (pd.Timedelta(hours=24) // pd.Timedelta(self.freq_source))]
 
         # update max_forecast_days to the actual number of days in the data
-        self.max_forecast_days = Timedelta(days=n_days)
+        self.max_forecast_days = pd.Timedelta(days=n_days)
 
         # check for NaN values
         if pd.isnull(processed_data).any().any():
             raise WeatherAPIError("Processed data contains NaN values.")
 
+        # set data types
+        data_type_dict = {
+            "temperature": float,
+            "humidity": int,
+            "wind_speed": float,
+            "cloud_coverage": int,
+        }
+        processed_data = processed_data.astype(data_type_dict)
+
         # resample to the output frequency and interpolate
         if self.freq_output != self.freq_source:
-            # create extrapolated data for the last hour
-            extra = processed_data.iloc[-4:].diff().mean() + processed_data.iloc[-1]
-            extra = extra.clip(processed_data.min(), processed_data.max())
-
-            # extrapolate 1 hour into the future so that we have exactly: n_rows % freq_output == 0
-            index = processed_data.index[-1] + Timedelta(self.freq_source)
-            extra = extra.to_frame(index).transpose()
-            processed_data = pd.concat([processed_data, extra], ignore_index=False)
-
-            # resample and interpolate
             processed_data = processed_data.resample(self.freq_output).interpolate(method="linear").iloc[:-1]
 
         resampled = processed_data.tz_convert("UTC")
         resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S%z")
 
-        # set data types
-        resampled["temperature"] = resampled["temperature"].astype(float)
-        resampled["humidity"] = resampled["humidity"].astype(int)
-        resampled["wind_speed"] = resampled["wind_speed"].astype(float)
-        resampled["cloud_coverage"] = resampled["cloud_coverage"].astype(int)
+        # set data types again after resampling
+        resampled = resampled.astype(data_type_dict)
 
         # convert to dictionary and validate schema
         try:
@@ -173,21 +166,16 @@ class WeatherAPI(ABC):
             }
             WEATHER_SCHEMA(data_dict)
         except Exception as exc:
-            raise WeatherAPIError("Weather data does not match schema.") from exc
+            raise WeatherAPIError(f"Error validating weather data: {data_dict}") from exc
 
         return data_dict
 
     def _api_request_if_needed(self, live: bool = False) -> Response:
         """Check if we need to do a request or not when weather data is outdated.
 
-        TODO: move to clearoutside, must be made abstract method bc home assistant can't use this function
-        or we can override this function in HA? or we can remove part of this function and put it in an abstract
-        method!
-
-        :param live: Force an update by ignoring the max_age.
+        :param live: Force an update by ignoring self.max_age.
         """
-
-        if self._raw_data is not None and Timestamp.now(tz="UTC") - self._last_update < self.max_age and not live:
+        if self._raw_data is not None and pd.Timestamp.now(tz="UTC") - self._last_update < self.max_age and not live:
             _LOGGER.debug("Using cached weather data.")
             return self._raw_data
 
@@ -202,13 +190,12 @@ class WeatherAPI(ABC):
 
         # return the response
         self._raw_data = response
-        self._last_update = Timestamp.now(tz="UTC")
+        self._last_update = pd.Timestamp.now(tz="UTC")
         return response
 
     def _do_request(self) -> Response:
         """
         Make GET request to weather API and return the response.
-
         Can be overridden by subclasses if needed.
 
         :return: Response from weather API.
@@ -230,13 +217,13 @@ class WeatherAPI(ABC):
             else:
                 raise WeatherAPIError(response.status_code)
 
-    def cloud_cover_to_irradiance(self, cloud_cover: Series, how: str = "clearsky_scaling", **kwargs):
+    def cloud_cover_to_irradiance(self, cloud_cover: pd.Series, how: str = "clearsky_scaling", **kwargs):
         """
         Convert cloud cover to irradiance. A wrapper method.
 
         NB: Code copied from pvlib.forecast as the pvlib forecast module is deprecated as of pvlib 0.9.1!
 
-        :param cloud_cover: Cloud cover as a pandas Series
+        :param cloud_cover: Cloud cover as a pandas pd.Series
         :param how: Selects the method for conversion. Can be one of clearsky_scaling or campbell_norman.
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
@@ -251,11 +238,11 @@ class WeatherAPI(ABC):
 
         return irrads
 
-    def _cloud_cover_to_irradiance_clearsky_scaling(self, cloud_cover: Series, method="linear", **kwargs):
+    def _cloud_cover_to_irradiance_clearsky_scaling(self, cloud_cover: pd.Series, method="linear", **kwargs):
         """
         Convert cloud cover to irradiance using the clearsky scaling method.
 
-        :param cloud_cover: Cloud cover as a pandas Series
+        :param cloud_cover: Cloud cover as a pandas pd.Series
         :param method: Selects the method for conversion. Can be one of linear.
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
@@ -275,13 +262,13 @@ class WeatherAPI(ABC):
         irrads = pd.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
         return irrads
 
-    def _cloud_cover_to_irradiance_campbell_norman(self, cloud_cover: Series, **kwargs):
+    def _cloud_cover_to_irradiance_campbell_norman(self, cloud_cover: pd.Series, **kwargs):
         """
         Convert cloud cover to irradiance using the Campbell and Norman model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
         :param **kwargs: Passed to the selected method.
-        :return: Irradiance as a pandas DataFrame with columns ghi, dni, dhi.
+        :return: Irradiance as a pandas pd.DataFrame with columns ghi, dni, dhi.
         """
         solar_position = self.location.get_solarposition(cloud_cover.index)
         dni_extra = get_extra_radiation(cloud_cover.index)
@@ -293,39 +280,39 @@ class WeatherAPI(ABC):
 
         return irrads
 
-    def _cloud_cover_to_ghi_linear(self, cloud_cover: Series, ghi_clear: Series, offset: float = 35.0):
+    def _cloud_cover_to_ghi_linear(self, cloud_cover: pd.Series, ghi_clear: pd.Series, offset: float = 35.0):
         """
         Convert cloud cover to GHI using a linear relationship.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas Series.
-        :param ghi_clear: Clear sky GHI as a pandas Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
+        :param ghi_clear: Clear sky GHI as a pandas pd.Series.
         :param offset: Determines the maximum GHI for the linear model.
-        :return: GHI as a pandas Series.
+        :return: GHI as a pandas pd.Series.
         """
         offset = offset / 100.0
         cloud_cover = cloud_cover / 100.0
         ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
         return ghi
 
-    def cloud_cover_to_transmittance_linear(self, cloud_cover: Series, offset: float = 0.75):
+    def cloud_cover_to_transmittance_linear(self, cloud_cover: pd.Series, offset: float = 0.75):
         """
         Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
         :param offset: Determines the maximum transmittance for the linear model.
-        :return: Atmospheric transmittance as a pandas Series.
+        :return: Atmospheric transmittance as a pandas pd.Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
 
-    def _add_freq(self, idx: pd.DatetimeIndex, freq=None):
+    def _add_freq(self, idx: pd.DatetimeIndex, freq=None) -> pd.DatetimeIndex:
         """Add a frequency attribute to idx, through inference or directly.
 
         Returns a copy.  If `freq` is None, it is inferred.
 
-        :param idx: DatetimeIndex to add frequency to.
+        :param idx: pd.DatetimeIndex to add frequency to.
         :param freq: Frequency to add to idx.
-        :return: DatetimeIndex with frequency attribute.
+        :return: pd.DatetimeIndex with frequency attribute.
         """
         idx = idx.copy()
         if freq is None:

@@ -11,7 +11,6 @@ from types import MappingProxyType
 
 import pandas as pd
 import pvlib
-from pandas import DataFrame, DatetimeIndex, Series
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 from pvlib.modelchain import ModelChain, ModelChainResult
@@ -38,7 +37,7 @@ class PVPlantResult:
     :param name: The name of the PV plant.
     :param type: The type of the result: forecast based on weather data, clearsky, or historic based on PVGIS.
     :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
-    :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the DataFrame.
+    :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the pd.DataFrame.
     :param freq: Frequency of all data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
     :param weather: The input weather data used for the simulation. For debugging purposes only.
     :param modelresults: The input raw data, list of pvlib ModelChainResult objects. For debugging purposes only.
@@ -46,11 +45,11 @@ class PVPlantResult:
 
     name: str
     type: ForecastType
-    ac_power: Series = field(repr=False, default=None)
-    dc_power: tuple[Series] = field(repr=False, default=None)
-    ac_energy: Series = field(repr=False, default=None)
+    ac_power: pd.Series = field(repr=False, default=None)
+    dc_power: tuple[pd.Series] = field(repr=False, default=None)
+    ac_energy: pd.Series = field(repr=False, default=None)
     freq: str = field(repr=False, default="1H")
-    weather: DataFrame = field(repr=False, default=None)
+    weather: pd.DataFrame = field(repr=False, default=None)
     modelresults: list[ModelChainResult] = field(repr=False, default=None)
     _freqs: tuple[str] = field(repr=False, init=False, default=("A", "M", "1W", "1D", "1H", "30Min", "15Min"))
 
@@ -62,7 +61,7 @@ class PVPlantResult:
         :return: A new PVPlantResult object with the resampled data.
         """
 
-        def res_f(vals: DataFrame) -> DataFrame:
+        def res_f(vals: pd.DataFrame) -> pd.DataFrame:
             return vals.resample(freq).mean().interpolate(interp_method) if vals is not None else None
 
         if freq not in self._freqs:
@@ -133,8 +132,8 @@ class PVPlantModel:
 
     config: InitVar[dict]
     location: Location = field(repr=False)
-    inv_param: DataFrame = field(repr=False)
-    mod_param: DataFrame = field(repr=False)
+    inv_param: pd.DataFrame = field(repr=False)
+    mod_param: pd.DataFrame = field(repr=False)
     temp_param: dict = field(default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"], repr=False)
     _pv_plant: list[ModelChain] = field(init=False, repr=False)
     name: str = field(init=False)
@@ -299,7 +298,7 @@ class PVPlantModel:
     def run_forecast(self, weather_df: pd.DataFrame, pvgis=False) -> None:
         """Run the forecast for the PV system with the given weather data.
 
-        :param weather_df: The weather forecast DataFrame.
+        :param weather_df: The weather forecast pd.DataFrame.
         :param pvgis: True if the forecast is for historical pvgis data, False if it is for future data.
         """
         # run the forecast for each model chain
@@ -324,7 +323,7 @@ class PVPlantModel:
         else:
             self._forecast = result
 
-    def run_clearsky(self, datetimes: DatetimeIndex) -> None:
+    def run_clearsky(self, datetimes: pd.DatetimeIndex) -> None:
         """Run the forecast for the PV system based on clear sky weather data obtained from the location object."""
         # get clear sky weather data
         weather_df = self.location.get_clearsky(datetimes)
@@ -363,7 +362,7 @@ class PVPlantModel:
         # run the forecast for each model chain
         self.run_forecast(tmy_data, pvgis=True)
 
-    def _get_pvgis_data(self, path: Path = None, save_data=True, force_api=False) -> DataFrame:
+    def _get_pvgis_data(self, path: Path = None, save_data=True, force_api=False) -> pd.DataFrame:
         """
         Retrieve the PVGIS data using the PVGIS API. Returned data should include the following columns:
         [temp_air, relative_humidity, ghi, dni, dhi, wind_speed]. Other columns are ignored.
@@ -372,7 +371,7 @@ class PVPlantModel:
 
         :param path: The path to the PVGIS data file in CSV format. If None, the data is retrieved using the PVGIS API.
         :param save_data: If True, data retrieved from the API is saved to the path so it can be reused later.
-        :return: PVGIS dataframe.
+        :return: PVGIS pd.DataFrame.
         """
         if path is not None and path.exists() and not force_api:
             _LOGGER.debug("Reading PVGIS data from %s.", path)
@@ -421,8 +420,8 @@ class PVPlantModel:
 
         return tmy_data
 
-    def _aggregate(self, results: list[ModelChainResult], key: str) -> Series:
-        """Aggregate the results of the model chains into a single dataframe.
+    def _aggregate(self, results: list[ModelChainResult], key: str) -> pd.Series:
+        """Aggregate the results of the model chains into a single pd.DataFrame.
 
         :param results: List of model chain result objects.
         :param key: The key to aggregate on. Can be "ac", "dc", ..., but currently only "ac" is supported.
@@ -436,10 +435,10 @@ class PVPlantModel:
         data = [getattr(result, key) for result in results]
 
         # combine results
-        df: DataFrame = pd.concat(data, axis=1)
+        df: pd.DataFrame = pd.concat(data, axis=1)
         df = df.sum(axis=1).clip(lower=0)
 
-        # convert to Series and return
+        # convert to pd.Series and return
         return df.squeeze()
 
 
@@ -495,7 +494,7 @@ class PVSystemManager:
         """Retrieve SAM database.
 
         :param path: The path to the SAM database.
-        :return: The SAM database as a pandas DataFrame.
+        :return: The SAM database as a pandas pd.DataFrame.
         """
         _LOGGER.debug("Retrieving SAM database from %s.", path)
         if not path.exists():
@@ -507,7 +506,7 @@ class PVSystemManager:
         _LOGGER.debug("Retrieved %s entries from %s.", len(pv_df), path)
         return pv_df
 
-    def _create_pv_plants(self, inv_param: DataFrame, mod_param: DataFrame) -> dict[PVPlantModel]:
+    def _create_pv_plants(self, inv_param: pd.DataFrame, mod_param: pd.DataFrame) -> dict[PVPlantModel]:
         """
         Create a PVPlantModel object from a user supplied config.
 
@@ -536,17 +535,17 @@ class PVSystemManager:
         self,
         name: str,
         fc_type: ForecastType,
-        weather_df: DataFrame | None = None,
-        datetimes: DatetimeIndex | None = None,
+        weather_df: pd.DataFrame | None = None,
+        datetimes: pd.DatetimeIndex | None = None,
     ) -> PVPlantModel:
         """Run the simulation.
 
         :param name: The name of the PV plant.
         :param type: The type of forecast to run.
         :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
-                           If type is ForecastType.CLEARSKY, weather_df requires only timestamps to forecast. Actual
+                           If type is ForecastType.CLEARSKY, weather_df requires only pd.Timestamps to forecast. Actual
                            weather data can be provided, but will be ignored.
-        :param datetimes: The timestamps to forecast. Only required if type is ForecastType.CLEARSKY.
+        :param datetimes: The pd.Timestamps to forecast. Only required if type is ForecastType.CLEARSKY.
         :return: The PV plant model object, which contains the results of the simulation.
         """
         # check if weather data is provided
