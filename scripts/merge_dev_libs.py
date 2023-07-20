@@ -10,7 +10,8 @@ from pathlib import Path
 
 import pandas as pd
 import pvlib
-from const import INV_PROC_PATH, INV_PVLIB_PATH, INV_SAM_PATH, MOD_PROC_PATH, MOD_PVLIB_PATH, MOD_SAM_PATH
+from const import (INV_PROC_PATH, INV_PVLIB_PATH, INV_SAM_PATH, MOD_PROC_PATH,
+                   MOD_PVLIB_PATH, MOD_SAM_PATH)
 
 _LOGGER = logging.getLogger(__name__)
 

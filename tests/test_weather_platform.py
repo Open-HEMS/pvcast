@@ -1,6 +1,7 @@
 """Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
+import datetime
 import json
 
 import pytest
@@ -213,3 +214,30 @@ class TestWeatherPlatformHASS(TestWeatherPlatform):
             weather_df = weatherapi._process_data()
             assert isinstance(weather_df, DataFrame)
             assert not weather_df.isna().values.any()
+
+    @responses.activate
+    def test_hass_data_wrong_timezone(self, weather_test_data):
+        """Test the process_data function with wrong timezone"""
+        # first build URL and add to responses
+        URL = "http://localhost:8123/api/"
+
+        # set raw data
+        forecast = weather_test_data["attributes"]["forecast"]
+        for datadict in forecast:
+            datadict["datetime"] = datadict["datetime"].replace("+00:00", "+01:00")
+        weather_test_data["attributes"]["forecast"] = forecast
+        responses.add(responses.GET, URL, json=weather_test_data, status=200)
+        resp = requests.get(URL)
+
+        # test the _process_data function
+        weatherapi = WeatherAPIHASS(
+            entity_id="test.entity",
+            url=HASS_TEST_URL,
+            token=HASS_TEST_TOKEN,
+            location=Location(0, 0),
+        )
+        weatherapi._raw_data = resp
+
+        # see if ValueError is raised for wrong timezone
+        with pytest.raises(ValueError, match="Timezone is not UTC."):
+            weatherapi._process_data()
