@@ -3,11 +3,11 @@ requires = ["flit"]
 build-backend = "flit.buildapi"
 
 [project]
-name =  "py-project-toml"
+name =  "pvcast"
 authors = [
-    {name = "Daniel Ciborowski", email = "dciborow@microsoft.com"},
+    {name = "Stefan de Lange", email = "example@unknown.com"},
 ]
-description = "Sample Python Project for creating a new Python Module"
+description = "Open-source python package to make short-term solar power forecasts."
 readme = "README.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -21,6 +21,19 @@ classifiers = [
 ]
 requires-python = ">=3.8.1"
 dynamic = ["version"]
+
+dependencies = [
+    "numpy==1.24.3",
+    "pandas==2.0.2",
+    "pvlib==0.9.5",
+    "pyyaml==6.0",
+    "beautifulsoup4==4.12.2",
+    "voluptuous==0.13.1",
+    "flask==2.3.2",
+    "flask-restx==1.1.0",
+    "waitress==2.1.2",
+    "matplotlib==3.7.1",
+]
 
 [project.optional-dependencies]
 spark = [
@@ -43,7 +56,10 @@ test = [
     "pytest-runner",
     "pytest==7.3.1",
     "pytest-github-actions-annotate-failures",
-    "shellcheck-py==0.9.0.2"
+    "pytest-xdist==3.3.1",
+    "shellcheck-py==0.9.0.2",
+    "mock==5.0.2",
+    "responses==0.23.1"
 ]
 
 [project.urls]
@@ -111,10 +127,14 @@ executionEnvironments = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration'"
+addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
 pythonpath = [
   "src"
 ]
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 testpaths = "tests"
 junit_family = "xunit2"
 markers = [

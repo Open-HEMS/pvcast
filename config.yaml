@@ -1,0 +1,33 @@
+# configuration file for pvcast
+
+# general configuration
+---
+general:
+  weather_sources:
+    - type: internal
+      source: clearoutside
+  location:
+    latitude: !secret lat
+    longitude: !secret lon
+    timezone: !secret time_zone
+    altitude: !secret alt
+  long_lived_token: !secret long_lived_token
+
+# PV system configuration
+plant:
+  - name: EastWest
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: East
+        tilt: 30
+        azimuth: 90
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: West
+        tilt: 30
+        azimuth: 270
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_

@@ -127,3 +127,16 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# data
+src/pvcast/data/raw
+
+# secrets.yaml
+secrets.yaml
+
+# owm
+notebooks/weather_data/openweathermap/data
+notebooks/weather_data/openweathermap/owm_api_key.json
+
+# pvgis data
+src/pvcast/data/pvgis

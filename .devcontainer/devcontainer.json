@@ -6,6 +6,9 @@
 		"dockerfile": "Dockerfile",
 		"context": ".."
 	},
+	"runArgs": [
+		"--network=host"
+	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -40,5 +43,8 @@
 			}
 		}
 	},
-	"onCreateCommand": "pre-commit install-hooks"
+	"onCreateCommand": "pre-commit install-hooks",
+	"features": {
+		"git-lfs": "latest"
+	}
 }
