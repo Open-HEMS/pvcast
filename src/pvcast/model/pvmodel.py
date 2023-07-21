@@ -393,6 +393,10 @@ class PVPlantModel:
                 )
         else:
             _LOGGER.debug("Retrieving PVGIS data from API.")
+            # create parent directory
+            if path is not None:
+                path.parent.mkdir(parents=True, exist_ok=True)
+
             # 4th decimal is accurate to 11.1m
             lat = round(self.location.latitude, 4)
             lon = round(self.location.longitude, 4)
