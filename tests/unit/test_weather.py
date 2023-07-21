@@ -1,10 +1,10 @@
 """Test the weather module."""
 from __future__ import annotations
 
-from unittest import mock
-
 import pandas as pd
 import pytest
+import requests
+import responses
 from const import LOC_AUS, LOC_EUW, LOC_USW
 from pvlib.location import Location
 
@@ -38,19 +38,26 @@ class MockWeatherAPI(WeatherAPI):
 class TestWeather:
     """Test the weather module."""
 
+    error_dict = {
+        404: WeatherAPIErrorWrongURL,
+        429: WeatherAPIErrorTooManyReq,
+        500: WeatherAPIError,
+    }
+
     @pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
     def weather_obj(self, request):
         """Get a weather API object."""
-        return MockWeatherAPI(location=Location(*request.param), url="http://httpbin.org/get")
+        return MockWeatherAPI(location=Location(*request.param), url="http://fakeurl.com/status/")
 
-    @pytest.fixture(params=[404, 429, 500])
-    def weather_obj_error(self, request):
-        """Get a weather API object with an error."""
-
-        url_base = "http://httpbin.org/status/"
-        url = f"{url_base}{request.param}"
-        obj = MockWeatherAPI(location=Location(0, 0, "UTC", 0), url=url)
-        return obj
+    @pytest.fixture
+    def api_error_response(self, request: int):
+        """Get a weather API error response."""
+        url = "http://fakeurl.com/status/"
+        error_code = request.param
+        with responses.RequestsMock() as rsps:
+            rsps.add(responses.GET, url, status=error_code)
+            response = requests.get(url)
+            yield response
 
     @pytest.fixture(params=["campbell_norman", "clearsky_scaling"])
     def irradiance_method(self, request):
@@ -62,16 +69,14 @@ class TestWeather:
         assert isinstance(weather_obj, WeatherAPI)
         assert isinstance(weather_obj.location, Location)
 
-    def test_error_handling(self, weather_obj_error):
+    @pytest.mark.parametrize("api_error_response", [404, 429, 500], indirect=True)
+    def test_error_handling(self, api_error_response: responses.Response, weather_obj: WeatherAPI):
         """Test the get_weather error handling function."""
-        error_dict = {
-            404: WeatherAPIErrorWrongURL,
-            429: WeatherAPIErrorTooManyReq,
-            500: WeatherAPIError,
-        }
-        code = int(weather_obj_error.url.split("/")[-1])
-        with pytest.raises(error_dict[code]):
-            weather_obj_error._api_request_if_needed()
+        weather_obj._raw_data = api_error_response
+        weather_obj._last_update = pd.Timestamp.now(tz="UTC")
+        error_code = api_error_response.status_code
+        with pytest.raises(self.error_dict[error_code]):
+            weather_obj.get_weather()
 
     def test_weather_cloud_cover_to_irradiance(
         self, weather_obj: WeatherAPI, weather_df: pd.DataFrame, irradiance_method: str
@@ -120,13 +125,13 @@ class TestWeatherFactory:
         assert isinstance(weather_api_factory, WeatherAPIFactory)
         assert isinstance(
             weather_api_factory.get_weather_api(
-                "mock", location=Location(0, 0, "UTC", 0), url="http://httpbin.org/get"
+                "mock", location=Location(0, 0, "UTC", 0), url="http://notarealurl.com"
             ),
             MockWeatherAPI,
         )
         with pytest.raises(ValueError):
             weather_api_factory.get_weather_api(
-                "wrong_api", location=Location(0, 0, "UTC", 0), url="http://httpbin.org/get"
+                "wrong_api", location=Location(0, 0, "UTC", 0), url="http://notarealurl.com"
             )
 
     def test_get_weather_api_list_obj(self, weather_api_factory):
