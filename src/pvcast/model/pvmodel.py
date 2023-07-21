@@ -501,8 +501,12 @@ class PVSystemManager:
             raise FileNotFoundError(f"Database {path} does not exist.")
 
         # retrieve database
+        _LOGGER.debug("Retrieving SAM database from: %s.", str(path))
         pv_df = pvlib.pvsystem.retrieve_sam(name=None, path=str(path))
         pv_df = pv_df.transpose()
+        if pv_df.empty:
+            raise ValueError(f"Database {path} is empty.")
+
         _LOGGER.debug("Retrieved %s entries from %s.", len(pv_df), path)
         return pv_df
 
