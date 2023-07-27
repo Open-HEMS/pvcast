@@ -11,7 +11,7 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 """
 
 from __future__ import annotations
-
+import json
 import pytest
 from pandas import DataFrame, to_datetime
 
@@ -67,3 +67,15 @@ def pd_time_aliases():
         "15Min": ["15T"],
         "1W": ["W"],
     }
+
+
+@pytest.fixture
+def ha_weather_data(scope="session"):
+    """Load the weather test data."""
+    with open("tests/ha_weather_data.json") as json_file:
+        weather_data: dict = json.load(json_file)
+        # set to 1 to easily test if the data is correctly converted
+        for forecast in weather_data["attributes"]["forecast"]:
+            forecast["wind_speed"] = 1.0
+            forecast["temperature"] = 1.0
+        return weather_data
