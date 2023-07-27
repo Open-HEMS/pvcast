@@ -73,22 +73,22 @@ class TestHassAPI:
         """Fixture for the Home Assistant API."""
         return HassAPI(hass_url=HASS_TEST_URL, token=HASS_TEST_TOKEN)
 
-    def test_hass_api_url(self, hass_api: HassAPI):
+    def test_url(self, hass_api: HassAPI):
         """Test the url property."""
         assert hass_api.url == self.url
 
-    def test_hass_api_online(self, hass_api: HassAPI, mocked_ha_response):
+    def test_hass_online(self, hass_api: HassAPI, mocked_ha_response):
         """Test the online property."""
         assert hass_api.online
 
-    def test_hass_api_headers(self, hass_api: HassAPI):
+    def test_api_headers(self, hass_api: HassAPI):
         """Test the headers property."""
         assert hass_api.headers == {
             "Authorization": "Bearer " + HASS_TEST_TOKEN,
             "Content-Type": "application/json",
         }
 
-    def test_hass_api_get_entity_state(self, hass_api: HassAPI, mocked_ha_weather_data):
+    def test_get_entity_state(self, hass_api: HassAPI, mocked_ha_weather_data):
         """Test the get_entity_state method."""
         entity_data: requests.Response = hass_api.get_entity_state(self.weather_entity_id)
         assert entity_data.ok
@@ -113,17 +113,22 @@ class TestHassAPI:
             ]
         )
 
-    def test_hass_api_get_entity_state_not_found(self, hass_api: HassAPI, mocked_ha_entity_not_found):
+    def test_get_entity_state_wrong_entity_id(self, hass_api: HassAPI):
+        """Test the get_entity_state method with a wrong entity_id."""
+        with pytest.raises(ValueError):
+            hass_api.get_entity_state("wrongentity_id")
+
+    def test_get_entity_state_not_found(self, hass_api: HassAPI, mocked_ha_entity_not_found):
         """Test the get_entity_state method when the entity is not found."""
         with pytest.raises(ValueError):
             hass_api.get_entity_state("not.found")
 
-    def test_hass_api_get_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_response_err):
+    def test_get_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_response_err):
         """Test the get_entity_state method when the connection fails."""
         with pytest.raises(requests.ConnectionError):
             hass_api.get_entity_state(self.weather_entity_id)
 
-    def test_hass_api_post_entity_state(self, hass_api: HassAPI, mocked_ha_post):
+    def test_post_entity_state(self, hass_api: HassAPI, mocked_ha_post):
         """Test the post_state method."""
         entity_data: requests.Response = hass_api.post_entity_state(
             self.weather_entity_id, {"state": "25", "attributes": {"unit_of_measurement": "°C"}}
@@ -138,7 +143,7 @@ class TestHassAPI:
         assert "last_changed" in entity_data.keys()
         assert "last_updated" in entity_data.keys()
 
-    def test_hass_api_post_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_post_err):
+    def test_post_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_post_err):
         """Test the post_state method when the connection fails."""
         with pytest.raises(requests.ConnectionError):
             hass_api.post_entity_state(

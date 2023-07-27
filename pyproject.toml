@@ -82,6 +82,7 @@ fast = true
 
 [tool.coverage.run]
 branch = true
+omit = ["src/pvcast/__main__.py"]
 
 [tool.coverage.report]
 fail_under = 100
