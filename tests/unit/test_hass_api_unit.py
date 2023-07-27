@@ -1,13 +1,14 @@
 """Test Home Assistant API class."""
 from __future__ import annotations
 
+from urllib.parse import urljoin
+
 import pytest
 import requests
 import responses
 from const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 from pvcast.hass.hassapi import HassAPI
-from urllib.parse import urljoin
 
 
 class TestHassAPI:

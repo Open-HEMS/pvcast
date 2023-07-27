@@ -1,7 +1,6 @@
 """Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
-
 import pytest
 import requests
 import responses

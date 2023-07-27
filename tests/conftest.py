@@ -11,7 +11,9 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 """
 
 from __future__ import annotations
+
 import json
+
 import pytest
 from pandas import DataFrame, to_datetime
 

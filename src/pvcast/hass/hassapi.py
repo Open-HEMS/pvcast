@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin
 
-from requests import Response, get, post
 import requests
+from requests import Response, get, post
 
 _LOGGER = logging.getLogger(__name__)
 

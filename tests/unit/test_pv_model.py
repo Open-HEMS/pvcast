@@ -7,7 +7,8 @@ import pytest
 from pandas import infer_freq
 from pvlib.location import Location
 
-from pvcast.model.pvmodel import ForecastType, PVPlantModel, PVSystemManager, PVPlantResult
+from pvcast.model.pvmodel import (ForecastType, PVPlantModel, PVPlantResult,
+                                  PVSystemManager)
 
 
 class TestPVModelChain:
