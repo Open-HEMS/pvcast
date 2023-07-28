@@ -83,8 +83,8 @@ def pd_time_aliases():
     }
 
 
-@pytest.fixture
-def ha_weather_data(scope="session"):
+@pytest.fixture(scope="session")
+def ha_weather_data():
     """Load the weather test data."""
     with open("tests/ha_weather_data.json") as json_file:
         weather_data: dict = json.load(json_file)
@@ -93,3 +93,10 @@ def ha_weather_data(scope="session"):
             forecast["wind_speed"] = 1.0
             forecast["temperature"] = 1.0
         return weather_data
+
+
+@pytest.fixture(scope="session")
+def clearoutside_html_page():
+    """Load the clearoutside html page."""
+    with open("tests/clearoutside.txt") as html_file:
+        return html_file.read()
