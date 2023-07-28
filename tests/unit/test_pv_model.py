@@ -7,8 +7,7 @@ import pytest
 from pandas import infer_freq
 from pvlib.location import Location
 
-from pvcast.model.pvmodel import (ForecastType, PVPlantModel, PVPlantResult,
-                                  PVSystemManager)
+from pvcast.model.pvmodel import ForecastType, PVPlantModel, PVPlantResult, PVSystemManager
 
 
 class TestPVModelChain:
@@ -109,7 +108,14 @@ class TestPVModelChain:
     def freq(self, request):
         return request.param
 
-    @pytest.fixture(params=[ForecastType.CLEARSKY, ForecastType.HISTORICAL, ForecastType.LIVE], scope="class")
+    @pytest.fixture(
+        params=[
+            ForecastType.CLEARSKY,
+            pytest.param(ForecastType.HISTORICAL, marks=pytest.mark.remote_data),
+            ForecastType.LIVE,
+        ],
+        scope="class",
+    )
     def fc_type(self, request):
         return request.param
 
