@@ -60,11 +60,7 @@ class ConfigReader:
             raise FileNotFoundError(f"Configuration file {self.config_file_path} not found.")
 
         # load secrets file and add loader for secrets
-        try:
-            self._load_secrets_file()
-        except FileNotFoundError:
-            _LOGGER.warning("No secrets file found at given path. Continuing without secrets!")
-            self._secrets = {}
+        self._load_secrets_file()
         yaml.add_constructor("!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader)
 
         # load the main configuration file

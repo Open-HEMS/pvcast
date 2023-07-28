@@ -75,6 +75,11 @@ class TestConfigReader:
         with pytest.raises(FileNotFoundError):
             ConfigReader(Path("wrongfile.yaml")).config
 
+    def test_configreader_wrong_secrets_file(self):
+        """Test the configreader with a wrong secrets file."""
+        with pytest.raises(FileNotFoundError):
+            ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml")).config
+
     def test_invalid_timezone(self, configreader_wrong_timezone):
         """Test the configreader with an invalid timezone."""
         with pytest.raises(UnknownTimeZoneError):

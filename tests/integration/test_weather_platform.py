@@ -1,9 +1,6 @@
 """Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
-import datetime
-import json
-
 import pytest
 import requests
 import responses
@@ -22,29 +19,6 @@ class TestWeatherPlatform:
     weatherapis = API_FACTORY.get_weather_api_list_obj()
     valid_temp_units = ["°C", "°F", "C", "F"]
     valid_speed_units = ["m/s", "km/h", "mi/h", "ft/s", "kn"]
-
-    @pytest.fixture
-    def weather_test_data(self):
-        """Load the weather test data."""
-        with open("tests/test_weather_data.json") as json_file:
-            weather_data = json.load(json_file)
-            # set to 1 to easily test if the data is correctly converted
-            for forecast in weather_data["attributes"]["forecast"]:
-                forecast["wind_speed"] = 1.0
-                forecast["temperature"] = 1.0
-            return weather_data
-
-    @pytest.fixture
-    def temperature_unit(self, weather_test_data, request):
-        """Load the weather test data."""
-        weather_test_data["attributes"]["temperature_unit"] = request.param
-        return weather_test_data
-
-    @pytest.fixture
-    def wind_speed_unit(self, temperature_unit, request):
-        """Load the weather test data."""
-        temperature_unit["attributes"]["wind_speed_unit"] = request.param
-        return temperature_unit
 
     @pytest.fixture()
     def time_aliases(self, pd_time_aliases):
@@ -154,10 +128,22 @@ class TestWeatherPlatformHASS(TestWeatherPlatform):
     """A few extra tests for the HASS weather platform specific functionality."""
 
     @pytest.fixture
+    def temperature_unit(self, weather_test_data, request):
+        """Load the weather test data."""
+        weather_test_data["attributes"]["temperature_unit"] = request.param
+        return weather_test_data
+
+    @pytest.fixture
+    def wind_speed_unit(self, temperature_unit, request):
+        """Load the weather test data."""
+        temperature_unit["attributes"]["wind_speed_unit"] = request.param
+        return temperature_unit
+
+    @pytest.fixture
     def weather_response(self, wind_speed_unit):
         """Mock a weather API response."""
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, "http://localhost:8123/api/", json=wind_speed_unit, status=200)
+            rsps.add(responses.GET, HASS_TEST_URL + "/api/", json=wind_speed_unit, status=200)
             yield rsps
 
     @pytest.fixture()

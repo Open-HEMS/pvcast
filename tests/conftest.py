@@ -12,6 +12,8 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from pandas import DataFrame, to_datetime
 
@@ -48,7 +50,19 @@ def weather_df():
         'humidity': [
             28.0, 23.0, 30.0, 36.0, 44.0, 49.0, 49.0, 48.0, 51.0, 52.0, 56.0, 61.0,
             64.0, 65.0, 64.0, 61.0, 55.0, 52.0, 45.0, 39.0, 34.0, 34.0, 36.0, 36.0, 36.0
-        ]
+        ],
+        'dni': [
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0,
+            51.0, 55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0
+        ],
+        'dhi': [
+            0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0, 51.0,
+            55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0, 33.0
+        ],
+        'ghi': [
+            0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0, 51.0,
+            55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0, 33.0
+        ],
     }
     # fmt: on
 
@@ -67,3 +81,15 @@ def pd_time_aliases():
         "15Min": ["15T"],
         "1W": ["W"],
     }
+
+
+@pytest.fixture
+def ha_weather_data(scope="session"):
+    """Load the weather test data."""
+    with open("tests/ha_weather_data.json") as json_file:
+        weather_data: dict = json.load(json_file)
+        # set to 1 to easily test if the data is correctly converted
+        for forecast in weather_data["attributes"]["forecast"]:
+            forecast["wind_speed"] = 1.0
+            forecast["temperature"] = 1.0
+        return weather_data
