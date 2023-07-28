@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import MappingProxyType
 
+import numpy as np
 import pandas as pd
 import pytest
-from pandas import infer_freq
 from pvlib.location import Location
 
-from pvcast.model.pvmodel import ForecastType, PVPlantModel, PVPlantResult, PVSystemManager
+from pvcast.model.pvmodel import (ForecastType, PVPlantModel, PVPlantResult,
+                                  PVSystemManager)
 
 
 class TestPVModelChain:
@@ -17,7 +19,6 @@ class TestPVModelChain:
     start_date = pd.Timestamp("2015-06-01")
     end_date = pd.Timestamp("2015-07-01")
     freq = pd.to_timedelta("1h")
-    datetimes = pd.date_range(start_date, end_date - freq, freq=freq, tz=time_z)
 
     string_system = [
         MappingProxyType(
@@ -104,6 +105,10 @@ class TestPVModelChain:
     def pv_sys_mngr(self, basic_config):
         return PVSystemManager(basic_config, *self.location, self.altitude)
 
+    @pytest.fixture(scope="class")
+    def pv_sys_mngr_wrong_inv_path(self, basic_config):
+        return PVSystemManager(basic_config, *self.location, self.altitude, inv_path=Path("wrong_path"))
+
     @pytest.fixture(params=["A", "M", "1W", "1D", "1H", "30Min", "15Min"], scope="class")
     def freq(self, request):
         return request.param
@@ -140,24 +145,18 @@ class TestPVModelChain:
             assert pv_sys.name == "South"
 
     def test_resample(self, pv_sys_mngr, fc_type, freq, weather_df):
-        if fc_type == ForecastType.LIVE:
-            pvplant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, weather_df=weather_df)
-        else:
-            pvplant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, datetimes=self.datetimes)
+        pvplant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, weather_df=weather_df)
         resampled_result = getattr(pvplant, fc_type.value.lower()).resample(freq)
         assert resampled_result.freq == freq
         assert resampled_result.ac_power.index.freq == freq
 
-    def test_resample_wrong_freq(self, pv_sys_mngr: PVSystemManager):
-        pvplant_clearsky = pv_sys_mngr.run(name="EastWest", fc_type=ForecastType.CLEARSKY, datetimes=self.datetimes)
+    def test_resample_wrong_freq(self, pv_sys_mngr: PVSystemManager, weather_df):
+        pvplant_clearsky = pv_sys_mngr.run(name="EastWest", fc_type=ForecastType.CLEARSKY, weather_df=weather_df)
         with pytest.raises(ValueError):
             pvplant_clearsky.clearsky.resample("wrong_freq")
 
     def test_energy_calculation(self, pv_sys_mngr, fc_type, freq, weather_df):
-        if fc_type == ForecastType.LIVE:
-            pv_plant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, weather_df=weather_df)
-        else:
-            pv_plant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, datetimes=self.datetimes)
+        pv_plant = pv_sys_mngr.run(name="EastWest", fc_type=fc_type, weather_df=weather_df)
         if freq in ["30Min", "15Min"]:
             with pytest.raises(ValueError):
                 energy_result = getattr(pv_plant, fc_type.value.lower()).energy(freq=freq)
@@ -176,6 +175,12 @@ class TestPVModelChain:
         with pytest.raises(ValueError):
             pv_plant_result.energy(freq=freq)
 
+    def test_energy_calculation_too_high_freq(self, pv_sys_mngr: PVSystemManager, weather_df):
+        pvplant_clearsky = pv_sys_mngr.run(name="EastWest", fc_type=ForecastType.CLEARSKY, weather_df=weather_df)
+        resampled_result = pvplant_clearsky.clearsky.resample("1D")
+        with pytest.raises(ValueError):
+            resampled_result.energy(freq="1H")
+
     @pytest.mark.parametrize("freq_opt, freq", [(None, "30T"), ("30T", None), ("30T", "30T")])
     def test_add_freq(self, freq_opt: str | None, freq: str | None):
         """Test the add_freq function."""
@@ -187,3 +192,40 @@ class TestPVModelChain:
         )
         result = pv_plant_result._add_freq(index, freq)
         assert result.freq == "30T"
+
+    def test_add_freq_wrong_index(self, fc_type):
+        """Test the add_freq function with wrong index."""
+        index = pd.DatetimeIndex(["2020-01-01 00:00:00", "2020-01-01 00:10:00", "2020-01-01 01:00:00"], tz="UTC")
+        with pytest.raises(AttributeError):
+            pv_plant_result = PVPlantResult(name="test", ac_power=pd.Series([1, 2, 3], index=index), type=fc_type)
+
+    def test_init_pv_system_wrong_files(self, basic_config):
+        """Test the init_pv_system function with wrong inverter param path."""
+        with pytest.raises(FileNotFoundError):
+            PVSystemManager(basic_config, *self.location, self.altitude, inv_path=Path("wrong_path"))
+
+    def test_pv_system_run_no_weather_df(self, basic_config, fc_type):
+        """Test the init_pv_system run function without providing weather_df."""
+
+        # skip for historical forecast
+        if fc_type == ForecastType.HISTORICAL:
+            pytest.skip("Skip for historical forecast as they do not use weather_df.")
+
+        pv_sys_mngr = PVSystemManager(basic_config, *self.location, self.altitude)
+        with pytest.raises(ValueError):
+            pv_sys_mngr.run(name="EastWest", fc_type=ForecastType.LIVE)
+
+    def test_pv_system_run_inc_precipitable_water(self, basic_config, fc_type, weather_df):
+        """Test the init_pv_system run function with precipitable water."""
+        # skip for historical forecast
+        if fc_type == ForecastType.HISTORICAL:
+            pytest.skip("Skip for historical forecast as they do not use weather_df.")
+        weather_df["precipitable_water"] = np.random.uniform(0.1, 1.0, len(weather_df))
+        pv_sys_mngr = PVSystemManager(basic_config, *self.location, self.altitude)
+        pv_sys_mngr.run(name="EastWest", fc_type=fc_type, weather_df=weather_df)
+
+    def test_pv_system_run_wrong_fc_type(self, basic_config, weather_df):
+        """Test the init_pv_system run function with wrong fc_type."""
+        pv_sys_mngr = PVSystemManager(basic_config, *self.location, self.altitude)
+        with pytest.raises(ValueError):
+            pv_sys_mngr.run(name="EastWest", fc_type="wrong_fc_type", weather_df=weather_df)

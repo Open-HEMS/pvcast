@@ -167,6 +167,7 @@ class PVPlantModel:
         self.name = config["name"]
         lat = str(round(self.location.latitude, 4)).replace(".", "_")
         lon = str(round(self.location.longitude, 4)).replace(".", "_")
+        # set a default path for the pvgis data if not provided
         if self.pvgis_data_path is None:
             self.pvgis_data_path = Path(f"src/pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
 
@@ -296,16 +297,13 @@ class PVPlantModel:
         # retrieve parameter database
         candidates = self.inv_param if inverter else self.mod_param
 
-        # check if there are duplicates
-        duplicates = candidates[candidates.index.duplicated(keep=False)]
-        if not duplicates.empty:
-            _LOGGER.debug("Dropping %s duplicate entries.", len(duplicates))
-            candidates = candidates.drop_duplicates(keep="first")
+        # check if there are duplicates in the index and remove them
+        candidates = candidates[~candidates.index.duplicated(keep="first")]
 
         # check if device is in the database
         try:
-            params = candidates.loc[candidates.index == device].to_dict("records")[0]
-            _LOGGER.debug("Found device %s in the database.", device)
+            params = candidates.loc[device].to_dict()
+            _LOGGER.debug("Found params %s for device %s in the database.", params, device)
         except KeyError as exc:
             raise KeyError(f"Device {device} not found in the database.") from exc
 
@@ -349,10 +347,13 @@ class PVPlantModel:
         else:
             self._live = result
 
-    def run_clearsky(self, datetimes: pd.DatetimeIndex) -> None:
-        """Run the forecast for the PV system based on clear sky weather data obtained from the location object."""
+    def run_clearsky(self, weather_df: pd.DataFrame) -> None:
+        """Run the forecast for the PV system based on clear sky weather data obtained from the location object.
+
+        :param weather_df: Weather pd.DataFrame. Weather columns, if present, will be ignored, only the index is used.
+        """
         # get clear sky weather data
-        weather_df = self.location.get_clearsky(datetimes)
+        weather_df = self.location.get_clearsky(weather_df.index)
 
         # run the forecast for each model chain
         plant_copy = copy.deepcopy(self._pv_plant)
@@ -440,10 +441,6 @@ class PVPlantModel:
         :param key: The key to aggregate on. Can be "ac", "dc", ..., but currently only "ac" is supported.
         :return: The aggregated results.
         """
-        # check if key is valid
-        if key not in ["ac"]:
-            raise NotImplementedError(f"Aggregation on {key} is not supported.")
-
         # extract results.key
         data = [getattr(result, key) for result in results]
 
@@ -519,13 +516,9 @@ class PVSystemManager:
             raise FileNotFoundError(f"Database {path} does not exist.")
 
         # retrieve database
-        _LOGGER.debug("Retrieving SAM database from: %s.", str(path))
         pv_df = pvlib.pvsystem.retrieve_sam(name=None, path=str(path))
         pv_df = pv_df.transpose()
-        if pv_df.empty:
-            raise ValueError(f"Database {path} is empty.")
-
-        _LOGGER.debug("Retrieved %s entries from %s.", len(pv_df), path)
+        _LOGGER.debug("Retrieved %s SAM database entries from %s.", len(pv_df), path)
         return pv_df
 
     def _create_pv_plants(self, inv_param: pd.DataFrame, mod_param: pd.DataFrame) -> dict[PVPlantModel]:
@@ -558,7 +551,6 @@ class PVSystemManager:
         name: str,
         fc_type: ForecastType,
         weather_df: pd.DataFrame | None = None,
-        datetimes: pd.DatetimeIndex | None = None,
     ) -> PVPlantModel:
         """Run the simulation.
 
@@ -567,22 +559,18 @@ class PVSystemManager:
         :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
                            If type is ForecastType.CLEARSKY, weather_df requires only pd.Timestamps to forecast. Actual
                            weather data can be provided, but will be ignored.
-        :param datetimes: The pd.Timestamps to forecast. Only required if type is ForecastType.CLEARSKY.
         :return: The PV plant model object, which contains the results of the simulation.
         """
         # check if weather data is provided
-        if fc_type is ForecastType.LIVE and weather_df is None:
-            raise ValueError(f"Weather data must be provided for PV forecast of type {str(ForecastType.LIVE.name)}.")
-        if fc_type is ForecastType.CLEARSKY and datetimes is None:
-            raise ValueError(f"Datetimes must be provided for PV forecast of type {ForecastType.CLEARSKY.name}.")
+        if (fc_type is ForecastType.LIVE or ForecastType.CLEARSKY) and weather_df is None:
+            raise ValueError(f"Weather data must be provided for PV forecast of type: {fc_type}.")
 
         # add preciptable_water to weather_df if it is not in the weather data already
-        if weather_df is not None:
-            weather_df.rename(columns={"temperature": "temp_air", "humidity": "relative_humidity"}, inplace=True)
-            if "precipitable_water" not in weather_df.columns:
-                weather_df["precipitable_water"] = pvlib.atmosphere.gueymard94_pw(
-                    weather_df["temp_air"], weather_df["relative_humidity"]
-                )
+        weather_df.rename(columns={"temperature": "temp_air", "humidity": "relative_humidity"}, inplace=True)
+        if "precipitable_water" not in weather_df.columns:
+            weather_df["precipitable_water"] = pvlib.atmosphere.gueymard94_pw(
+                weather_df["temp_air"], weather_df["relative_humidity"]
+            )
 
         # get PV plant
         pv_plant = self.get_pv_plant(name)
@@ -591,7 +579,7 @@ class PVSystemManager:
         if fc_type is ForecastType.HISTORICAL:
             pv_plant.run_historical()
         elif fc_type is ForecastType.CLEARSKY:
-            pv_plant.run_clearsky(datetimes)
+            pv_plant.run_clearsky(weather_df)
         elif fc_type is ForecastType.LIVE:
             pv_plant.run_live(weather_df)
         else:
