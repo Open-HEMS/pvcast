@@ -16,6 +16,9 @@ import json
 
 import pytest
 from pandas import DataFrame, to_datetime
+from pvlib.location import Location
+
+from const import LOC_EUW, LOC_USW, LOC_AUS
 
 
 @pytest.fixture()
@@ -83,7 +86,7 @@ def pd_time_aliases():
     }
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def ha_weather_data():
     """Load the weather test data."""
     with open("tests/ha_weather_data.json") as json_file:
@@ -100,3 +103,9 @@ def clearoutside_html_page():
     """Load the clearoutside html page."""
     with open("tests/clearoutside.txt") as html_file:
         return html_file.read()
+
+
+@pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
+def location(request):
+    """Fixture that creates a location."""
+    return Location(*request.param)

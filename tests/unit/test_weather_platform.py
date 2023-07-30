@@ -26,11 +26,6 @@ class TestWeatherPlatform:
     def time_aliases(self, pd_time_aliases):
         return pd_time_aliases
 
-    @pytest.fixture(params=[LOC_EUW, LOC_USW])
-    def location(self, request):
-        """Fixture that creates a location."""
-        return Location(*request.param)
-
     @pytest.fixture
     def hass_api_setup(self, location, ha_weather_data):
         """Setup the Home Assistant API."""

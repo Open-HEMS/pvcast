@@ -3,11 +3,14 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
+from pvlib.location import Location
+import pandas as pd
 import pytest
 import requests
 import responses
 from const import HASS_TEST_TOKEN, HASS_TEST_URL
 
+from pvcast.weather.hass import WeatherAPIHASS
 from pvcast.hass.hassapi import HassAPI
 
 
