@@ -1,21 +1,16 @@
 """Test the weather module."""
 from __future__ import annotations
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
 import requests
 import responses
-
 from pvlib.location import Location
 
-from pvcast.weather.weather import (
-    WeatherAPI,
-    WeatherAPIError,
-    WeatherAPIErrorTooManyReq,
-    WeatherAPIErrorWrongURL,
-    WeatherAPIFactory,
-)
+from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
+                                    WeatherAPIErrorTooManyReq,
+                                    WeatherAPIErrorWrongURL, WeatherAPIFactory)
 
 
 # mock for WeatherAPI class
