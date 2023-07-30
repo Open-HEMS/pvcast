@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 
 import pytest
+from const import LOC_AUS, LOC_EUW, LOC_USW
 from pandas import DataFrame, to_datetime
 from pvlib.location import Location
-
-from const import LOC_EUW, LOC_USW, LOC_AUS
 
 
 @pytest.fixture()
