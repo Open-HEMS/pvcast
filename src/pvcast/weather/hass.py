@@ -19,7 +19,6 @@ _LOGGER = logging.getLogger(__name__)
 class WeatherAPIHASS(WeatherAPI):
     """Weather API class that retrieves weather data from Home Assistant entity."""
 
-    include_current: bool = False
     entity_id: str = field(default=None)
     token: str = field(default=None)
     _hass_api: HassAPI = field(init=False)
@@ -41,11 +40,11 @@ class WeatherAPIHASS(WeatherAPI):
         return self._hass_api.get_entity_state(self.entity_id)
 
     def _process_data(self) -> pd.DataFrame:
-        """Process weather data scraped from the clear outside website.
-
-        Credits to https://github.com/davidusb-geek/emhass for the parsing code.
+        """Process weather data from the Home Assistant API.
 
         This function takes no arguments, but response.content must be retrieved from self._raw_data.
+
+        :return: Processed weather data.
         """
         # raw response data from request
         response = self._raw_data.json()
@@ -53,22 +52,16 @@ class WeatherAPIHASS(WeatherAPI):
         weather_df["datetime"] = pd.to_datetime(weather_df["datetime"])
         weather_df.set_index("datetime", inplace=True)
 
-        # if we don't recognize the unit there is no point in continuing since all the computations will be wrong
-        if response["attributes"]["temperature_unit"] not in ["°C", "°F", "C", "F"]:
-            raise ValueError(f"Temperature unit is not °C or °F: {response['attributes']['temperature_unit']}")
-        if response["attributes"]["wind_speed_unit"] not in ["m/s", "km/h", "mi/h", "ft/s", "kn"]:
-            raise ValueError(
-                f"Wind speed unit is not m/s, km/h, mi/h, ft/s or kn: {response['attributes']['wind_speed_unit']}"
-            )
-        # convert F to C if needed
-        if response["attributes"]["temperature_unit"] == "°F" or "F":
-            weather_df["temperature"] = (weather_df["temperature"] - 32) * 5 / 9
+        # convert units if needed
+        units = {
+            "temperature": "°C",
+            "wind_speed": "m/s",
+        }
 
-        # convert wind_speed_unit from [km/h, mi/h, ft/s, kn] to  m/s if needed
-        wind_speed_unit = response["attributes"]["wind_speed_unit"]
-        conv_dict = {"km/h": 0.277777778, "mi/h": 0.44704, "ft/s": 0.3048, "kn": 0.51444}
-        if wind_speed_unit != "m/s":
-            weather_df["wind_speed"] = weather_df["wind_speed"] * conv_dict[wind_speed_unit]
+        for key, unit in units.items():
+            weather_df[key] = self.convert_unit(
+                weather_df[key], from_unit=response["attributes"][f"{key}_unit"], to_unit=unit
+            )
 
         # check timezone is UTC
         if not weather_df.index.tz == datetime.timezone.utc:

@@ -2,15 +2,20 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 import pytest
 import requests
 import responses
-from const import LOC_AUS, LOC_EUW, LOC_USW
+
 from pvlib.location import Location
 
-from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
-                                    WeatherAPIErrorTooManyReq,
-                                    WeatherAPIErrorWrongURL, WeatherAPIFactory)
+from pvcast.weather.weather import (
+    WeatherAPI,
+    WeatherAPIError,
+    WeatherAPIErrorTooManyReq,
+    WeatherAPIErrorWrongURL,
+    WeatherAPIFactory,
+)
 
 
 # mock for WeatherAPI class
@@ -44,10 +49,64 @@ class TestWeather:
         500: WeatherAPIError,
     }
 
-    @pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
-    def weather_obj(self, request):
+    # Define test data
+    unit_conv_data = pd.Series(
+        [-10.0, 0.0, 25.0, 100.0, 37.0], name="temperature", index=[0, 1, 2, 3, 4], dtype=np.float64
+    )
+
+    # fahrenheit to celsius conversion
+    f_to_c_out = pd.Series(
+        [-23.3333, -17.7778, -3.8889, 37.7778, 2.7778],
+        name="temperature",
+        index=[0, 1, 2, 3, 4],
+        dtype=np.float64,
+    )
+
+    # define valid test cases for temperature conversion
+    # fmt: off
+    valid_temperature_test_cases = [
+        ("°F", "°C", f_to_c_out),
+        ("°F", "C", f_to_c_out),
+        ("F", "°C", f_to_c_out),
+        ("F", "C", f_to_c_out),
+        ("C", "C", unit_conv_data),
+    ]
+    # fmt: on
+
+    # define invalid test cases for temperature conversion
+    invalid_temperature_test_cases = [
+        ("C", "invalid_unit"),
+        ("invalid_unit", "C"),
+        ("invalid_unit", "invalid_unit"),
+        ("invalid_unit", "F"),
+    ]
+
+    # define valid test cases for speed conversion
+    # fmt: off
+    valid_speed_test_cases = [
+        ("m/s", "km/h", pd.Series([-36.0, 0.0, 90.0, 360.0, 133.2], index=[0, 1, 2, 3, 4], dtype=np.float64)),
+        ("km/h", "m/s", pd.Series([-2.78, 0.0, 6.94, 27.78, 10.28], index=[0, 1, 2, 3, 4], dtype=np.float64)),
+        ("mi/h", "m/s", pd.Series([-4.47, 0.0, 11.18, 44.70, 16.54], index=[0, 1, 2, 3, 4], dtype=np.float64)),
+    ]
+    # fmt: on
+
+    # define invalid test cases for speed conversion
+    invalid_speed_test_cases = [
+        ("m/s", "invalid_unit"),
+        ("invalid_unit", "km/h"),
+        ("invalid_unit", "invalid_unit"),
+        ("invalid_unit", "mi/h"),
+    ]
+
+    @pytest.fixture
+    def weather_obj(self, location):
         """Get a weather API object."""
-        return MockWeatherAPI(location=Location(*request.param), url="http://fakeurl.com/status/")
+        return MockWeatherAPI(location=location, url="http://fakeurl.com/status/")
+
+    @pytest.fixture
+    def weather_obj_fixed_loc(self):
+        """Get a weather API object."""
+        return MockWeatherAPI(url="http://fakeurl.com/status/", location=Location(52.35818, 4.88124, tz="UTC"))
 
     @pytest.fixture
     def api_error_response(self, request: int):
@@ -108,6 +167,22 @@ class TestWeather:
             assert index.freq.freqstr == freq_opt
         weather_df = weather_obj._add_freq(index, freq)
         assert weather_df.freq == "30T"
+
+    @pytest.mark.parametrize("from_unit, to_unit, expected", valid_temperature_test_cases + valid_speed_test_cases)
+    def test_valid_conversion(self, weather_obj_fixed_loc: WeatherAPI, from_unit, to_unit, expected):
+        result = weather_obj_fixed_loc.convert_unit(self.unit_conv_data, from_unit, to_unit)
+        pd.testing.assert_series_equal(
+            result, expected, check_dtype=False, atol=0.01, check_exact=False, check_names=False
+        )
+
+    @pytest.mark.parametrize("from_unit, to_unit", invalid_temperature_test_cases + invalid_speed_test_cases)
+    def test_invalid_conversion(self, weather_obj_fixed_loc: WeatherAPI, from_unit, to_unit):
+        with pytest.raises(ValueError):
+            weather_obj_fixed_loc.convert_unit(self.unit_conv_data, from_unit, to_unit)
+
+    def test_invalid_data_type(self, weather_obj_fixed_loc: WeatherAPI):
+        with pytest.raises(TypeError):
+            weather_obj_fixed_loc.convert_unit([0, 25, 100, 37], "C", "F")
 
 
 class TestWeatherFactory:
