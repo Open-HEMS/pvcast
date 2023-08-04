@@ -4,11 +4,9 @@ from __future__ import annotations
 from urllib.parse import urljoin
 
 import pytest
-import requests
 import responses
-from const import HASS_TEST_TOKEN, HASS_TEST_URL, LOC_EUW, LOC_USW
+from const import HASS_TEST_TOKEN, HASS_TEST_URL
 from pandas import DataFrame, Timedelta, infer_freq, to_datetime
-from pvlib.location import Location
 
 from pvcast.weather import API_FACTORY
 from pvcast.weather.hass import WeatherAPIHASS

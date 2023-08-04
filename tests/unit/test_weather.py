@@ -8,9 +8,13 @@ import requests
 import responses
 from pvlib.location import Location
 
-from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
-                                    WeatherAPIErrorTooManyReq,
-                                    WeatherAPIErrorWrongURL, WeatherAPIFactory)
+from pvcast.weather.weather import (
+    WeatherAPI,
+    WeatherAPIError,
+    WeatherAPIErrorTooManyReq,
+    WeatherAPIErrorWrongURL,
+    WeatherAPIFactory,
+)
 
 
 # mock for WeatherAPI class
@@ -24,7 +28,9 @@ class MockWeatherAPI(WeatherAPI):
 
     def _process_data(self) -> pd.DataFrame:
         """Get weather data from API response."""
-        index = pd.DatetimeIndex(["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"], tz="UTC")
+        index = pd.DatetimeIndex(
+            ["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"], tz="UTC", freq="30T"
+        )
         # add temperature, humidity, wind_speed, cloud_coverage
         data = [
             [0, 0, 0, 0],
@@ -93,41 +99,60 @@ class TestWeather:
         ("invalid_unit", "mi/h"),
     ]
 
-    @pytest.fixture
-    def weather_obj(self, location):
-        """Get a weather API object."""
-        return MockWeatherAPI(location=location, url="http://fakeurl.com/status/")
+    test_url = "http://fakeurl.com/status/"
 
     @pytest.fixture
-    def weather_obj_fixed_loc(self):
-        """Get a weather API object."""
-        return MockWeatherAPI(url="http://fakeurl.com/status/", location=Location(52.35818, 4.88124, tz="UTC"))
+    def api_response(self, ha_weather_data):
+        """Get a weather API response."""
+        with responses.RequestsMock() as rsps:
+            rsps.add(responses.GET, self.test_url, json=ha_weather_data)
+            response = requests.get(self.test_url)
+            yield response
 
     @pytest.fixture
     def api_error_response(self, request: int):
         """Get a weather API error response."""
-        url = "http://fakeurl.com/status/"
         error_code = request.param
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, url, status=error_code)
-            response = requests.get(url)
+            rsps.add(responses.GET, self.test_url, status=error_code)
+            response = requests.get(self.test_url)
             yield response
+
+    @pytest.fixture
+    def weather_obj(self, location, api_response):
+        """Get a weather API object."""
+        api = MockWeatherAPI(location=location, url=self.test_url)
+        api._last_update = pd.Timestamp.now(tz="UTC")
+        api._raw_data = api_response
+        return api
+
+    @pytest.fixture
+    def weather_obj_fixed_loc(self, api_response):
+        """Get a weather API object."""
+        api = MockWeatherAPI(url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC"))
+        api._last_update = pd.Timestamp.now(tz="UTC")
+        api._raw_data = api_response
+        return api
 
     @pytest.fixture(params=["campbell_norman", "clearsky_scaling"])
     def irradiance_method(self, request):
         """Get irradiance methods."""
         return request.param
 
-    def test_get_weather_obj(self, weather_obj):
+    def test_weather_obj_init(self, weather_obj):
         """Test the get_weather function."""
         assert isinstance(weather_obj, WeatherAPI)
         assert isinstance(weather_obj.location, Location)
 
+    def test_get_weather_no_update(self, weather_obj_fixed_loc):
+        """Test the get_weather function."""
+        weather_obj_fixed_loc.get_weather()
+        assert pd.Timestamp.now(tz="UTC") - weather_obj_fixed_loc._last_update < pd.Timedelta(seconds=1)
+
     @pytest.mark.parametrize("api_error_response", [404, 429, 500], indirect=True)
-    def test_error_handling(self, api_error_response: responses.Response, weather_obj: WeatherAPI):
+    def test_http_error_handling(self, api_error_response: responses.Response, weather_obj: WeatherAPI):
         """Test the get_weather error handling function."""
         weather_obj._raw_data = api_error_response
-        weather_obj._last_update = pd.Timestamp.now(tz="UTC")
         error_code = api_error_response.status_code
         with pytest.raises(self.error_dict[error_code]):
             weather_obj.get_weather()
@@ -183,6 +208,8 @@ class TestWeather:
 class TestWeatherFactory:
     """Test the weather factory module."""
 
+    test_url = "http://fakeurl.com/status/"
+
     @pytest.fixture
     def weather_api_factory(self):
         """Get a weather API factory."""
@@ -194,15 +221,11 @@ class TestWeatherFactory:
         """Test the get_weather_api function."""
         assert isinstance(weather_api_factory, WeatherAPIFactory)
         assert isinstance(
-            weather_api_factory.get_weather_api(
-                "mock", location=Location(0, 0, "UTC", 0), url="http://notarealurl.com"
-            ),
+            weather_api_factory.get_weather_api("mock", location=Location(0, 0, "UTC", 0), url=self.test_url),
             MockWeatherAPI,
         )
         with pytest.raises(ValueError):
-            weather_api_factory.get_weather_api(
-                "wrong_api", location=Location(0, 0, "UTC", 0), url="http://notarealurl.com"
-            )
+            weather_api_factory.get_weather_api("wrong_api", location=Location(0, 0, "UTC", 0), url=self.test_url)
 
     def test_get_weather_api_list_obj(self, weather_api_factory):
         """Test the get_weather_api function with a list of objects."""

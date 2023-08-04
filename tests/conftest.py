@@ -22,7 +22,7 @@ from pvlib.location import Location
 
 @pytest.fixture()
 def weather_df():
-    """Fixture for a basic weather dataframe."""
+    """Fixture for a basic pvlib input weather dataframe."""
     # fmt: off
     data = {
         'datetime': [
