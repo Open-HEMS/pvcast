@@ -104,7 +104,9 @@ class WeatherAPI(ABC):
 
     # maximum age of weather data before requesting new data
     max_age: pd.Timedelta = field(default=pd.Timedelta(hours=1))
-    _last_update: pd.Timestamp = field(default=pd.Timestamp(0), init=False)  # last time the weather data was updated
+    _last_update: pd.Timestamp = field(
+        default=pd.Timestamp(0, tz="UTC"), init=False
+    )  # last time the weather data was updated
 
     # raw response data from the API
     _raw_data: Response = field(default=None, init=False)
@@ -122,8 +124,8 @@ class WeatherAPI(ABC):
     @property
     def source_dates(self) -> pd.DatetimeIndex:
         """
-        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can also
-        return datetime strings and in that case this index is not needed and even not preferred.
+        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
+        also return datetime strings and in that case this index is not needed and even not preferred.
         """
         return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz="UTC")
 
@@ -142,11 +144,11 @@ class WeatherAPI(ABC):
         from_unit = from_unit.replace("°", "")
         to_unit = to_unit.replace("°", "")
 
-        if from_unit not in CONV_DICT.keys():
+        if from_unit not in CONV_DICT:
             raise ValueError(f"Conversion from unit [{from_unit}] not supported.")
         if from_unit == to_unit:
             return data
-        if to_unit not in CONV_DICT[from_unit].keys():
+        if to_unit not in CONV_DICT[from_unit]:
             raise ValueError(f"Conversion from [{from_unit}] to [{to_unit}] not supported.")
 
         # do unit conversion
@@ -179,7 +181,7 @@ class WeatherAPI(ABC):
         processed_data: pd.DataFrame = self._process_data()
 
         if processed_data.index.freq is None:
-            raise WeatherAPIError("Processed data does not have a frequency.")
+            raise WeatherAPIError("Processed data does not have a known frequency.")
         if processed_data.index.freq != self.freq_source:
             raise WeatherAPIError(f"Data freq ({processed_data.index.freq}) != source freq ({self.freq_source}).")
 
@@ -187,9 +189,6 @@ class WeatherAPI(ABC):
         n_days_data = (processed_data.index[-1] - processed_data.index[0]).days + 1
         n_days = int(min(n_days_data, self.max_forecast_days.days))
         processed_data = processed_data.iloc[: n_days * (pd.Timedelta(hours=24) // pd.Timedelta(self.freq_source))]
-
-        # update max_forecast_days to the actual number of days in the data
-        self.max_forecast_days = pd.Timedelta(days=n_days)
 
         # check for NaN values
         if pd.isnull(processed_data).any().any():
@@ -232,9 +231,18 @@ class WeatherAPI(ABC):
 
         :param live: Force an update by ignoring self.max_age.
         """
-        if self._raw_data is not None and pd.Timestamp.now(tz="UTC") - self._last_update < self.max_age and not live:
+        delta_t = pd.Timestamp.now(tz="UTC") - self._last_update
+        if self._raw_data is not None and delta_t < self.max_age and not live:
             _LOGGER.debug("Using cached weather data.")
             return self._raw_data
+
+        _LOGGER.debug(
+            "Getting weather data from API. [dT = %ssec, max_age = %ssec, live = %s, raw_data = %s]",
+            round(delta_t.total_seconds(), 1),
+            round(self.max_age.total_seconds(), 1),
+            live,
+            self._raw_data is not None,
+        )
 
         # do the request
         try:
@@ -379,7 +387,7 @@ class WeatherAPI(ABC):
                 return idx
         idx.freq = pd.tseries.frequencies.to_offset(freq)
         if idx.freq is None:
-            raise AttributeError("no discernible frequency found to `idx`.  Specify" " a frequency string with `freq`.")
+            raise AttributeError("no discernible frequency found to `idx`.  Specify a frequency string with `freq`.")
         return idx
 
 

@@ -18,14 +18,13 @@ _LOGGER = logging.getLogger(__name__)
 class WeatherAPIClearOutside(WeatherAPI):
     """Weather API class that scrapes the data from Clear Outside."""
 
-    _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
     url: str = field(init=False)
-    max_forecast_days = pd.Timedelta(days=6)
-    columns: list = field(default_factory=list)
+    _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
+    _columns: list = field(default_factory=list)
 
     def __post_init__(self, _url_base: str):
         self.url = self._url_formatter(_url_base)
-        self.columns = ["cloud_coverage", "wind_speed", "temperature", "humidity"]
+        self._columns = ["cloud_coverage", "wind_speed", "temperature", "humidity"]
 
     def _url_formatter(self, url_base) -> str:
         """Format the url to the API."""
@@ -49,21 +48,20 @@ class WeatherAPIClearOutside(WeatherAPI):
         response = self._raw_data
 
         # response (source) data bucket
-        weather_df = pd.DataFrame(index=self.source_dates, columns=self.columns)
+        weather_df = pd.DataFrame(index=self.source_dates, columns=self._columns)
 
         # parse the data
         n_days = int(self.max_forecast_days / pd.Timedelta(days=1))
         for day_int in range(n_days):
-            table = BeautifulSoup(response.content, "html.parser").find_all(id=f"day_{day_int}")[0]
-            if table is None:
-                _LOGGER.warning("No table found for day %s.", day_int)
+            result = BeautifulSoup(response.content, "html.parser").find_all(id=f"day_{day_int}")
+            if len(result) != 1:
+                _LOGGER.warning("No data for day %s.", day_int)
                 break
 
+            table = result[0]
+
             # find the elements in the table
-            data = self._find_elements(table, day_int)
-            if data.isna().values.all(axis=0).all():
-                _LOGGER.warning("All data NaN for day %s.", day_int)
-                break
+            data = self._find_elements(table)
 
             # insert the data into the source data bucket
             weather_df.iloc[day_int * 24 : (day_int + 1) * 24] = data
@@ -79,11 +77,10 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         return weather_df
 
-    def _find_elements(self, table: list, day: int) -> pd.DataFrame:
+    def _find_elements(self, table: list) -> pd.DataFrame:
         """Find weather data elements in the table.
 
         :param table: The table to search.
-        :param day: The day of the table.
         :return: Weather data pd.DataFrame for one day (24 hours).
         """
 
