@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
+import pandas as pd
 import pytest
 import responses
 from const import HASS_TEST_TOKEN, HASS_TEST_URL
-from pandas import DataFrame, Timedelta, infer_freq, to_datetime
 
 from pvcast.weather import API_FACTORY
 from pvcast.weather.hass import WeatherAPIHASS
@@ -64,15 +64,15 @@ class TestWeatherPlatform:
         """Fixture that creates a weather API interface."""
         return request.getfixturevalue(f"{request.param}_api_setup")
 
-    @pytest.fixture(params=[1, 2, 3])
+    @pytest.fixture(params=[1, 2, 5, 10])
     def max_forecast_day(self, request):
-        return Timedelta(days=request.param)
+        return pd.Timedelta(days=request.param)
 
     def convert_to_df(self, weather):
-        """Convert the weather data to a DataFrame."""
-        weather = DataFrame.from_dict(weather["data"])
+        """Convert the weather data to a pd.DataFrame."""
+        weather = pd.DataFrame.from_dict(weather["data"])
         weather.set_index("datetime", inplace=True)
-        weather.index = to_datetime(weather.index)
+        weather.index = pd.to_datetime(weather.index)
         return weather
 
     def test_weather_get_weather(self, weatherapi: WeatherAPI):
@@ -80,8 +80,8 @@ class TestWeatherPlatform:
         weather = weatherapi.get_weather()
         assert isinstance(weather, dict)
         weather = self.convert_to_df(weather)
-        assert isinstance(weather, DataFrame)
-        # assert infer_freq(weather.index) == "H"
+        assert isinstance(weather, pd.DataFrame)
+        # assert pd.infer_freq(weather.index) == "H"
         assert not weather.isna().values.any()
         assert weather.shape[0] >= 24
 
@@ -92,8 +92,8 @@ class TestWeatherPlatform:
         weather = weatherapi.get_weather()
         assert isinstance(weather, dict)
         weather = self.convert_to_df(weather)
-        assert isinstance(weather, DataFrame)
-        assert infer_freq(weather.index) in time_aliases[freq]
+        assert isinstance(weather, pd.DataFrame)
+        assert pd.infer_freq(weather.index) in time_aliases[freq]
         assert not weather.isna().values.any()
         assert weather.shape[0] >= 24
 
@@ -105,11 +105,11 @@ class TestWeatherPlatform:
         weather = weatherapi.get_weather()
         assert isinstance(weather, dict)
         weather = self.convert_to_df(weather)
-        assert isinstance(weather, DataFrame)
-        assert infer_freq(weather.index) in time_aliases[freq]
+        assert isinstance(weather, pd.DataFrame)
+        assert pd.infer_freq(weather.index) in time_aliases[freq]
         assert not weather.isna().values.any()
         assert weather.shape[0] >= 24
-        assert weather.shape[0] <= max_forecast_day / Timedelta(freq)
+        assert weather.shape[0] <= max_forecast_day / pd.Timedelta(freq)
 
     def test_weather_data_cache(self, weatherapi: WeatherAPI):
         """Test the get_weather function."""
@@ -117,14 +117,14 @@ class TestWeatherPlatform:
         weather1 = weatherapi.get_weather()
         assert isinstance(weather1, dict)
         weather1 = self.convert_to_df(weather1)
-        assert isinstance(weather1, DataFrame)
+        assert isinstance(weather1, pd.DataFrame)
         last_update1 = weatherapi._last_update
 
         # get second weather data object, should see that it is cached data
         weather2 = weatherapi.get_weather()
         assert isinstance(weather2, dict)
         weather2 = self.convert_to_df(weather2)
-        assert isinstance(weather2, DataFrame)
+        assert isinstance(weather2, pd.DataFrame)
         last_update2 = weatherapi._last_update
         assert last_update1 == last_update2
 
@@ -135,13 +135,13 @@ class TestWeatherPlatform:
         weather1 = weatherapi.get_weather()
         assert isinstance(weather1, dict)
         weather1 = self.convert_to_df(weather1)
-        assert isinstance(weather1, DataFrame)
+        assert isinstance(weather1, pd.DataFrame)
         last_update1 = weatherapi._last_update
 
         # get second weather data object, should see that it is live data
         weather2 = weatherapi.get_weather(live=True)
         assert isinstance(weather2, dict)
         weather2 = self.convert_to_df(weather2)
-        assert isinstance(weather2, DataFrame)
+        assert isinstance(weather2, pd.DataFrame)
         last_update2 = weatherapi._last_update
         assert last_update1 != last_update2

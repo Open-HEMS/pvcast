@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import json
 
+import pandas as pd
 import pytest
 from const import LOC_AUS, LOC_EUW, LOC_USW
-from pandas import DataFrame, to_datetime
 from pvlib.location import Location
 
 
@@ -68,8 +68,8 @@ def weather_df():
     }
     # fmt: on
 
-    df = DataFrame(data)
-    df["datetime"] = to_datetime(df["datetime"])
+    df = pd.DataFrame(data)
+    df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.set_index("datetime")
     return df
 
