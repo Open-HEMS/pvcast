@@ -17,24 +17,25 @@ from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
 class MockWeatherAPI(WeatherAPI):
     """Mock the WeatherAPI class."""
 
-    def __init__(self, location: Location, url: str):
+    def __init__(self, location: Location, url: str, data: pd.DataFrame = None):
         """Initialize the mock class."""
         super().__init__(location, url, freq_source="30T")
         self.url = url
+        self.data = data
 
     def _process_data(self) -> pd.DataFrame:
         """Get weather data from API response."""
-        index = pd.DatetimeIndex(
-            ["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"], tz="UTC", freq="30T"
-        )
-        # add temperature, humidity, wind_speed, cloud_coverage
-        data = [
-            [0, 0, 0, 0],
-            [0.5, 0.5, 0.5, 0.5],
-            [1, 1, 1, 1],
-        ]
-        columns = ["temperature", "humidity", "wind_speed", "cloud_coverage"]
-        return pd.DataFrame(data, index=index, columns=columns)
+        if self.data is None:
+            resp: requests.Response = self._raw_data
+            data = pd.DataFrame.from_dict(resp.json(), orient="index")
+
+            # convert index to DateTimeIndex
+            data.index = pd.to_datetime(data.index, utc=True)
+            data.index.freq = self.freq_source
+            print(f"_process_data: {data}")
+        else:
+            data = self.data
+        return data
 
 
 class TestWeather:
@@ -97,18 +98,59 @@ class TestWeather:
 
     test_url = "http://fakeurl.com/status/"
 
+    # define test data
+    mock_data = pd.DataFrame(
+        {
+            "temperature": [0, 0.5, 1],
+            "humidity": [0, 0.5, 1],
+            "wind_speed": [0, 0.5, 1],
+            "cloud_coverage": [0, 0.5, 1],
+        },
+        index=["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
+    )
+
+    # test data with NaN values
+    mock_data_NaN = pd.DataFrame(
+        {
+            "temperature": [pd.NA, 0.5, pd.NA],
+            "humidity": [0, 0.5, 1],
+            "wind_speed": [0, 0.5, 1],
+            "cloud_coverage": [0, 0.5, 1],
+        },
+        index=["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
+    )
+
+    # mock data that will not pass the schema validation
+    mock_data_invalid = pd.DataFrame(
+        {
+            "temperature": [0, 0.5, 1],
+            "humidity": [0, 0.5, 1],
+            "wind_speed": [0, 0.5, 1],
+            "cloud_coverage": [0, 0.5, 1],
+            "invalid_column": [0, 0.5, 1],
+        },
+        index=["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
+    )
+
     @pytest.fixture
-    def api_response(self, ha_weather_data):
+    def api_response(self, request):
         """Get a weather API response."""
+        # if request is not parametrized, use a default response
+        if not hasattr(request, "param"):
+            data = self.mock_data
+        else:
+            data: pd.DataFrame = request.param
+
+        data = data.to_dict(orient="index")
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, self.test_url, json=ha_weather_data)
+            rsps.add(responses.GET, self.test_url, json=data)
             response = requests.get(self.test_url)
             yield response
 
     @pytest.fixture
-    def api_error_response(self, request: int):
+    def api_error_response(self, request):
         """Get a weather API error response."""
-        error_code = request.param
+        error_code = int(request.param["error_code"])
         with responses.RequestsMock() as rsps:
             rsps.add(responses.GET, self.test_url, status=error_code)
             response = requests.get(self.test_url)
@@ -123,6 +165,14 @@ class TestWeather:
         return api
 
     @pytest.fixture
+    def weather_obj_error(self, location, api_error_response):
+        """Get a weather API object."""
+        api = MockWeatherAPI(location=location, url=self.test_url)
+        api._last_update = pd.Timestamp.now(tz="UTC")
+        api._raw_data = api_error_response
+        return api
+
+    @pytest.fixture
     def weather_obj_fixed_loc(self, api_response):
         """Get a weather API object."""
         api = MockWeatherAPI(url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC"))
@@ -130,29 +180,62 @@ class TestWeather:
         api._raw_data = api_response
         return api
 
-    @pytest.fixture(params=["campbell_norman", "clearsky_scaling"])
-    def irradiance_method(self, request):
-        """Get irradiance methods."""
-        return request.param
-
     def test_weather_obj_init(self, weather_obj):
         """Test the get_weather function."""
         assert isinstance(weather_obj, WeatherAPI)
         assert isinstance(weather_obj.location, Location)
 
-    def test_get_weather_no_update(self, weather_obj_fixed_loc):
+    def test_get_weather_no_update(self, weather_obj_fixed_loc: WeatherAPI):
         """Test the get_weather function."""
         weather_obj_fixed_loc.get_weather()
         assert pd.Timestamp.now(tz="UTC") - weather_obj_fixed_loc._last_update < pd.Timedelta(seconds=1)
 
-    @pytest.mark.parametrize("api_error_response", [404, 429, 500], indirect=True)
-    def test_http_error_handling(self, api_error_response: responses.Response, weather_obj: WeatherAPI):
-        """Test the get_weather error handling function."""
-        weather_obj._raw_data = api_error_response
-        error_code = api_error_response.status_code
-        with pytest.raises(self.error_dict[error_code]):
-            weather_obj.get_weather()
+    @pytest.mark.parametrize("api_response", [mock_data_NaN], indirect=True)
+    def test_get_weather_NaN(self, weather_obj_fixed_loc: WeatherAPI):
+        """Test the get_weather function when NaN values are present."""
+        with pytest.raises(WeatherAPIError, match="Processed data contains NaN values."):
+            weather_obj_fixed_loc.get_weather()
 
+    def test_get_weather_unknown_freq(self, api_response):
+        """Test the get_weather function when the frequency is unknown."""
+        api = MockWeatherAPI(url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC"))
+        api._last_update = pd.Timestamp.now(tz="UTC")
+        api.data = self.mock_data.copy()
+        # this should raise an error because the frequency cannot be inferred (dt = 30 min --> 15 min)
+        api.data.index = pd.DatetimeIndex(["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 00:45:00"])
+        with pytest.raises(WeatherAPIError, match="Processed data does not have a known frequency."):
+            api.get_weather()
+
+    def test_get_weather_conflicting_freq(self, api_response):
+        """Test the get_weather function when the frequency is unknown."""
+        api = MockWeatherAPI(url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC"))
+        api._last_update = pd.Timestamp.now(tz="UTC")
+        api.data = self.mock_data.copy()
+        # self.freq_source = 30min, but the index has a frequency of 1h
+        api.data.index = pd.DatetimeIndex(
+            ["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"], freq="1h"
+        )
+        with pytest.raises(WeatherAPIError, match="!= source freq"):
+            api.get_weather()
+
+    @pytest.mark.parametrize("api_response", [mock_data_invalid], indirect=True)
+    def test_get_weather_schema_error(self, weather_obj_fixed_loc: WeatherAPI):
+        """Test the get_weather function when NaN values are present."""
+        with pytest.raises(WeatherAPIError, match="Error validating weather data:"):
+            weather_obj_fixed_loc.get_weather()
+
+    @pytest.mark.parametrize(
+        "api_error_response",
+        [{"error_code": code, "data": data} for (code, data) in zip(error_dict.keys(), [mock_data] * len(error_dict))],
+        indirect=True,
+    )
+    def test_http_error_handling(self, weather_obj_error: WeatherAPI):
+        """Test the get_weather error handling function."""
+        error_code = weather_obj_error._raw_data.status_code
+        with pytest.raises(self.error_dict[error_code]):
+            weather_obj_error.get_weather()
+
+    @pytest.mark.parametrize("irradiance_method", ["campbell_norman", "clearsky_scaling"])
     def test_weather_cloud_cover_to_irradiance(
         self, weather_obj: WeatherAPI, weather_df: pd.DataFrame, irradiance_method: str
     ):

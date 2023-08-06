@@ -168,7 +168,7 @@ class WeatherAPI(ABC):
         Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
-        :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
+        :return: The weather data as a dict.
         """
         # get weather API data, if needed. If not, use cached data.
         _LOGGER.debug("Getting weather data, force live data=%s", live)
