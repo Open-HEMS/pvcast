@@ -8,13 +8,9 @@ import requests
 import responses
 from pvlib.location import Location
 
-from pvcast.weather.weather import (
-    WeatherAPI,
-    WeatherAPIError,
-    WeatherAPIErrorTooManyReq,
-    WeatherAPIErrorWrongURL,
-    WeatherAPIFactory,
-)
+from pvcast.weather.weather import (WeatherAPI, WeatherAPIError,
+                                    WeatherAPIErrorTooManyReq,
+                                    WeatherAPIErrorWrongURL, WeatherAPIFactory)
 
 
 # mock for WeatherAPI class
