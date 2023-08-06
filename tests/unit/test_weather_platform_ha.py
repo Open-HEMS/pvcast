@@ -3,12 +3,11 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
-import numpy as np
+import pandas as pd
 import pytest
 import requests
 import responses
 from const import HASS_TEST_TOKEN, HASS_TEST_URL
-from pandas import DataFrame
 from pvlib.location import Location
 
 from pvcast.weather.hass import WeatherAPIHASS
@@ -19,7 +18,6 @@ class TestWeatherPlatformHASS:
 
     hass_url = urljoin(HASS_TEST_URL, "/api/")
     valid_temp_units = ["°C", "°F", "C", "F"]
-    conv_F_to_C = lambda x: (x - 32) * 5 / 9
     valid_speed_units = ["m/s", "km/h", "mi/h", "ft/s", "kn"]
     conv_dict_speed = {"km/h": 0.277777778, "mi/h": 0.44704, "ft/s": 0.3048, "kn": 0.51444}
     token = HASS_TEST_TOKEN
@@ -83,7 +81,7 @@ class TestWeatherPlatformHASS:
                 mock_ha_api._process_data()
         else:
             weather_df = mock_ha_api._process_data()
-            assert isinstance(weather_df, DataFrame)
+            assert isinstance(weather_df, pd.DataFrame)
             assert not weather_df.isna().values.any()
 
     @responses.activate
