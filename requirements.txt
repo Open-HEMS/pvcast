@@ -1,7 +1,7 @@
 numpy==1.24.3
 pandas==2.0.2
 pvlib==0.9.5
-pyyaml==6.0
+pyyaml==6.0.1
 beautifulsoup4==4.12.2
 voluptuous==0.13.1
 flask==2.3.2
