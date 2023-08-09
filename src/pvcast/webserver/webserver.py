@@ -56,23 +56,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
-from flask import Flask, jsonify
-from flask_restx import Api
+from flask import Flask
 from pvlib.location import Location
 from waitress import serve
 
 from ..config.configreader import ConfigReader
 from ..weather import API_FACTORY
-from ..weather.clearoutside import WeatherAPIClearOutside
 from ..weather.weather import WeatherAPI
-from .apis import api
+from .api import api
 
 app = Flask(__name__)
 api.init_app(app)
 
 # webserver configuration
-port = 5000
-web_ui_url = "0.0.0.0"
+PORT = 5000
+WEB_UI_URL = "0.0.0.0"
 
 
 def config_to_weather_apis(config: dict) -> List[WeatherAPI]:
@@ -105,13 +103,11 @@ def run(config_path: Path, secrets_path: Path):
     """
 
     # read the configuration
-    global config_reader
     config_reader = ConfigReader(config_path, secrets_path)
 
     # add the weather api
-    global weather_api
     weather_apis = config_to_weather_apis(config_reader.config)
 
     # start server
-    app.logger.info("Launching pvcast webserver at: http://" + web_ui_url + ":" + str(port))
-    serve(app, host=web_ui_url, port=port, threads=2)
+    app.logger.info("Launching pvcast webserver at: http://%s:%s", WEB_UI_URL, str(PORT))
+    serve(app, host=WEB_UI_URL, port=PORT, threads=2)
