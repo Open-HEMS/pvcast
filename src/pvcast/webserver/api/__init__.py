@@ -1,3 +1,4 @@
+"""Initialize the API object and add the namespaces."""
 from __future__ import annotations
 
 from flask_restx import Api
