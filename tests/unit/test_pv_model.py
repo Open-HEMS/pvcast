@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 from pvlib.location import Location
 
-from pvcast.model.pvmodel import (ForecastType, PVPlantModel, PVPlantResult,
-                                  PVSystemManager)
+from pvcast.model.model import (ForecastType, PVPlantModel, PVPlantResult,
+                                PVSystemManager)
 
 
 class TestPVModelChain:
