@@ -136,7 +136,7 @@ class PowerEstimate(ABC):
     pv_plant: PVPlantModel = field(repr=False, default=None)
     _result: ForecastResult = field(repr=False, default=None)
 
-    def run(self, weather_df: pd.DataFrame = None):
+    def run(self, weather_df: pd.DataFrame = None) -> ForecastResult:
         """Run power estimate and store results in self._result.
 
         :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
@@ -149,7 +149,7 @@ class PowerEstimate(ABC):
 
         # run the forecast for each model chain
         results = []
-        for model_chain in copy.deepcopy(self.pv_plant):
+        for model_chain in copy.deepcopy(self.pv_plant.models):
             # set the model chain attributes
             for attr, val in self.model_chain_attrs.items():
                 setattr(model_chain, attr, val)
@@ -158,7 +158,7 @@ class PowerEstimate(ABC):
 
         # aggregate the results
         ac_power = self.pv_plant.aggregate(results, "ac")
-        self._result = ForecastResult(
+        result = ForecastResult(
             name=self.pv_plant.name,
             type=self.type,
             ac_power=ac_power,
@@ -166,6 +166,8 @@ class PowerEstimate(ABC):
             modelresults=results,
             weather=weather_df,
         )
+        self._result = result
+        return result
 
     @abstractmethod
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:

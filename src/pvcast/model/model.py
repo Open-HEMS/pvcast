@@ -49,14 +49,14 @@ class PVPlantModel:
     mod_param: pd.DataFrame = field(repr=False)
     temp_param: dict = field(default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"], repr=False)
     name: str = field(init=False)
-    _pv_plant: list[ModelChain] = field(init=False, repr=False)
+    _pv_models: list[ModelChain] = field(init=False, repr=False)
     _clearsky: Clearsky = field(init=False, repr=False)
     _historical: Historical = field(init=False, repr=False)
     _forecast: Forecast = field(init=False, repr=False)
 
     def __post_init__(self, config: dict):
         pv_systems = self._create_pv_systems(config)
-        self._pv_plant = self._build_model_chain(pv_systems, self.location, config["name"])
+        self._pv_models = self._build_model_chain(pv_systems, self.location, config["name"])
         self.name = config["name"]
 
         # create the forecast objects
@@ -78,6 +78,11 @@ class PVPlantModel:
     def forecast(self):
         """The live weather forecast result."""
         return self._forecast
+
+    @property
+    def models(self):
+        """The PV system model chains."""
+        return self._pv_models
 
     def _create_pv_systems(self, config: dict) -> list[PVSystem]:
         """
