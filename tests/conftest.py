@@ -13,11 +13,14 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 from __future__ import annotations
 
 import json
+from types import MappingProxyType
 
 import pandas as pd
 import pytest
-from const import LOC_AUS, LOC_EUW, LOC_USW
+from .const import LOC_AUS, LOC_EUW, LOC_USW
 from pvlib.location import Location
+
+from src.pvcast.model.model import PVSystemManager
 
 
 @pytest.fixture()
@@ -108,3 +111,99 @@ def clearoutside_html_page():
 def location(request):
     """Fixture that creates a location."""
     return Location(*request.param)
+
+
+@pytest.fixture
+def altitude():
+    """Fixture that creates an altitude."""
+    return 10.0
+
+
+@pytest.fixture(scope="session")
+def valid_freqs():
+    """Fixture for valid frequency strings."""
+    return ("A", "M", "1W", "1D", "1H", "30Min", "15Min")
+
+
+string_system = [
+    MappingProxyType(
+        {
+            "name": "EastWest",
+            "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
+            "microinverter": "false",
+            "arrays": [
+                {
+                    "name": "East",
+                    "tilt": 30,
+                    "azimuth": 90,
+                    "modules_per_string": 4,
+                    "strings": 1,
+                    "module": "Trina_Solar_TSM_330DD14A_II_",
+                },
+                {
+                    "name": "West",
+                    "tilt": 30,
+                    "azimuth": 270,
+                    "modules_per_string": 8,
+                    "strings": 1,
+                    "module": "Trina_Solar_TSM_330DD14A_II_",
+                },
+            ],
+        }
+    ),
+    MappingProxyType(
+        {
+            "name": "South",
+            "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
+            "microinverter": "false",
+            "arrays": [
+                {
+                    "name": "South",
+                    "tilt": 30,
+                    "azimuth": 180,
+                    "modules_per_string": 8,
+                    "strings": 1,
+                    "module": "Trina_Solar_TSM_330DD14A_II_",
+                }
+            ],
+        }
+    ),
+]
+
+micro_system = [
+    MappingProxyType(
+        {
+            "name": "EastWest",
+            "inverter": "Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_",
+            "microinverter": "true",
+            "arrays": [
+                {
+                    "name": "zone_1_schuin",
+                    "tilt": 30,
+                    "azimuth": 90,
+                    "modules_per_string": 5,
+                    "strings": 1,
+                    "module": "JA_Solar_JAM72S01_385_PR",
+                },
+                {
+                    "name": "zone_2_plat",
+                    "tilt": 15,
+                    "azimuth": 160,
+                    "modules_per_string": 8,
+                    "strings": 1,
+                    "module": "JA_Solar_JAM72S01_385_PR",
+                },
+            ],
+        }
+    )
+]
+
+
+@pytest.fixture(params=[string_system, micro_system])
+def basic_config(request):
+    return request.param
+
+
+@pytest.fixture
+def pv_sys_mngr(basic_config, location, altitude):
+    return PVSystemManager(basic_config, lat=location.latitude, lon=location.longitude, alt=altitude)
