@@ -6,9 +6,10 @@ from urllib.parse import urljoin
 import pytest
 import requests
 import responses
-from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 from pvcast.hass.hassapi import HassAPI
+
+from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestHassAPI:

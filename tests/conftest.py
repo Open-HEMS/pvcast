@@ -17,10 +17,11 @@ from types import MappingProxyType
 
 import pandas as pd
 import pytest
-from .const import LOC_AUS, LOC_EUW, LOC_USW
 from pvlib.location import Location
 
 from src.pvcast.model.model import PVSystemManager
+
+from .const import LOC_AUS, LOC_EUW, LOC_USW
 
 
 @pytest.fixture()
