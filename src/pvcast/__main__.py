@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from .webserver import webserver
+from .config.configreader import ConfigReader
+from .webserver.webserver import WebServer
 
 
 def init_logger():
@@ -24,10 +25,14 @@ def main():
     # initialize logger
     init_logger()
 
-    # run webserver
+    # create config reader
     config_path = Path("config.yaml")
     secrets_path = Path("secrets.yaml")
-    webserver.run(config_path, secrets_path)
+    config_reader = ConfigReader(config_path, secrets_path)
+
+    # create webserver
+    webserver = WebServer(config_reader=config_reader)
+    webserver.run()
 
 
 if __name__ == "__main__":
