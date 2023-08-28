@@ -1,3 +1,4 @@
+"""Weather API module."""
 from __future__ import annotations
 
 from .clearoutside import WeatherAPIClearOutside
