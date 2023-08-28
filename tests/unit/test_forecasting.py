@@ -6,8 +6,8 @@ from types import MappingProxyType
 import pytest
 from pvlib.location import Location
 
-from pvcast.model.model import PVSystemManager, PVPlantModel
 from pvcast.model.forecasting import ForecastResult
+from pvcast.model.model import PVPlantModel, PVSystemManager
 
 
 class TestPVModelChain:

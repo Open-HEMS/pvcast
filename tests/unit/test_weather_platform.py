@@ -6,11 +6,12 @@ from urllib.parse import urljoin
 import pandas as pd
 import pytest
 import responses
-from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 from pvcast.weather import API_FACTORY
 from pvcast.weather.hass import WeatherAPIHASS
 from pvcast.weather.weather import WeatherAPI
+
+from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestWeatherPlatform:

@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from pvlib.location import Location
 
-from pvcast.model.model import PVSystemManager, PVPlantModel
 from pvcast.model.forecasting import ForecastType
+from pvcast.model.model import PVSystemManager
 
 
 class TestPVModelChain:
