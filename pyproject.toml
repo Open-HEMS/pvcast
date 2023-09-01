@@ -72,7 +72,7 @@ name = "python_package"
 exclude_dirs = ["build", "dist", "tests", "scripts"]
 number = 4
 recursive = true
-targets = "src"
+targets = "pvcast"
 
 [tool.black]
 line-length = 120
@@ -80,7 +80,7 @@ fast = true
 
 [tool.coverage.run]
 branch = true
-omit = ["src/pvcast/__main__.py"]
+omit = ["pvcast/__main__.py"]
 
 [tool.coverage.report]
 fail_under = 100
@@ -103,7 +103,7 @@ exclude = [
 ignore = ["E722", "B001", "W503", "E203"]
 
 [tool.pyright]
-include = ["src"]
+include = ["pvcast"]
 exclude = ["**/node_modules", "**/__pycache__"]
 venv = "env37"
 
@@ -113,10 +113,10 @@ reportMissingTypeStubs = false
 pythonVersion = "3.7"
 pythonPlatform = "Linux"
 
-executionEnvironments = [{ root = "src" }]
+executionEnvironments = [{ root = "pvcast" }]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report xml:coverage.xml --cov src --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
+addopts = "--cov-report xml:coverage.xml --cov pvcast --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
 pythonpath = ["src"]
 log_cli = true
 log_cli_level = "DEBUG"
