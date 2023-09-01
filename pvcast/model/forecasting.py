@@ -248,7 +248,7 @@ class Historical(PowerEstimate):
     def __post_init__(self):
         lat = str(round(self.location.latitude, 4)).replace(".", "_")
         lon = str(round(self.location.longitude, 4)).replace(".", "_")
-        self._pvgis_data_path = Path(f"src/pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
+        self._pvgis_data_path = Path(f"pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
 
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
         tmy_data = self.get_pvgis_data()

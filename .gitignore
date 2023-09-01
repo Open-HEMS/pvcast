@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # data
-src/pvcast/data/raw
+pvcast/data/raw
 
 # secrets.yaml
 secrets.yaml
@@ -139,4 +139,4 @@ notebooks/weather_data/openweathermap/data
 notebooks/weather_data/openweathermap/owm_api_key.json
 
 # pvgis data
-src/pvcast/data/pvgis
+pvcast/data/pvgis
