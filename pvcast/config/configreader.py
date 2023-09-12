@@ -14,13 +14,44 @@ from voluptuous import Coerce, Optional, Required, Schema
 _LOGGER = logging.getLogger(__name__)
 
 
-@dataclass()
+@dataclass
 class ConfigReader:
     """Reads PV plant configuration from a YAML file."""
 
     _secrets: dict = field(init=False, repr=False)
+    _config: dict = field(init=False, repr=False)
     config_file_path: Path = field(repr=True)
-    secrets_file_path: Path = field(repr=True, default=None)
+    secrets_file_path: Path | None = field(repr=True, default=None)
+
+    def __post_init__(self) -> None:
+        """Initialize the class."""
+        if not self.config_file_path.exists():
+            raise FileNotFoundError(f"Configuration file {self.config_file_path} not found.")
+
+        # load secrets file and add loader for secrets
+        if self.secrets_file_path is not None:
+            self._load_secrets_file()
+            yaml.add_constructor("!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader)
+            _LOGGER.info("Loaded secrets file %s", self.secrets_file_path)
+
+        # load the main configuration file
+        with self.config_file_path.open(encoding="utf-8") as config_file:
+            try:
+                config = yaml.safe_load(config_file)
+            except yaml.YAMLError as exc:
+                _LOGGER.error(
+                    "Error parsing configuration file %s. Did you include secrets.yaml?", self.config_file_path
+                )
+                raise yaml.YAMLError(f"Error parsing configuration file {self.config_file_path}") from exc
+            self._validate_config(config)
+
+        # check if the timezone is valid
+        try:
+            config["general"]["location"]["timezone"] = pytz.timezone(config["general"]["location"]["timezone"])
+        except UnknownTimeZoneError as exc:
+            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['location']['timezone']}") from exc
+
+        self._config = config
 
     def _yaml_secrets_loader(self, loader: yaml.SafeLoader, node: yaml.Node) -> str:
         """Load secrets from the secrets file.
@@ -32,7 +63,7 @@ class ConfigReader:
         value = loader.construct_scalar(node)
         secret = self._secrets.get(value)
         if secret is None:
-            raise ValueError(f"Secret {value} not found in secrets.yaml")
+            raise ValueError(f"Secret {value} not found in {self.secrets_file_path}!")
         return secret
 
     def _load_secrets_file(self) -> None:
@@ -56,25 +87,7 @@ class ConfigReader:
 
         :return: The configuration as a dictionary.
         """
-        if not self.config_file_path.exists():
-            raise FileNotFoundError(f"Configuration file {self.config_file_path} not found.")
-
-        # load secrets file and add loader for secrets
-        self._load_secrets_file()
-        yaml.add_constructor("!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader)
-
-        # load the main configuration file
-        with self.config_file_path.open(encoding="utf-8") as config_file:
-            config = yaml.safe_load(config_file)
-            self._validate_config(config)
-
-        # check if the timezone is valid
-        try:
-            config["general"]["location"]["timezone"] = pytz.timezone(config["general"]["location"]["timezone"])
-        except UnknownTimeZoneError as exc:
-            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['location']['timezone']}") from exc
-
-        return config
+        return self._config
 
     @property
     def _config_schema(self) -> dict:

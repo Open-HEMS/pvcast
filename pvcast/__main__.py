@@ -5,8 +5,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+import uvicorn
+
 from .config.configreader import ConfigReader
-from .webserver.webserver import WebServer
+from .webserver.const import PORT, WEBSERVER_URL
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def init_logger():
@@ -30,9 +34,11 @@ def main():
     secrets_path = Path("secrets.yaml")
     config_reader = ConfigReader(config_path, secrets_path)
 
-    # create webserver
-    webserver = WebServer(config_reader=config_reader)
-    webserver.run()
+    # get config as dict
+    _LOGGER.info("Loaded configuration file from path %s: \n%s", config_path, config_reader.config)
+
+    # start uvicorn server
+    uvicorn.run("pvcast.webserver.app:app", host=WEBSERVER_URL, port=PORT, reload=True, workers=3)
 
 
 if __name__ == "__main__":
