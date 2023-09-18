@@ -31,7 +31,7 @@ dependencies = [
     "flask==2.3.2",
     "flask-restx==1.1.0",
     "waitress==2.1.2",
-    "matplotlib==3.7.1",
+    "matplotlib==3.8.0",
 ]
 
 [project.optional-dependencies]
