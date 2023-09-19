@@ -3,8 +3,9 @@
 # general configuration
 ---
 general:
-  weather_sources:
-    - type: internal
+  weather:
+    max_forecast_days: 7
+    weather_source:
       source: clearoutside
   location:
     latitude: !secret lat
@@ -12,6 +13,7 @@ general:
     timezone: !secret time_zone
     altitude: !secret alt
   long_lived_token: !secret long_lived_token
+
 
 # PV system configuration
 plant:

@@ -3,12 +3,10 @@
 
 ---
 general:
-  weather_sources:
-    - type: internal
+  weather:
+    max_forecast_days: 7
+    weather_source:
       source: clearoutside
-    - type: internal
-      source: openweathermap
-      api_key: sometokenhere
   location:
     latitude: 52.35845515630293
     longitude: 4.88115070391368
