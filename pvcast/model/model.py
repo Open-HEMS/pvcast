@@ -91,7 +91,7 @@ class PVPlantModel:
         In case of a PV system with microinverters, each microinverter is represented by one PVSystem object.
         """
         _LOGGER.debug("Creating PV system model for system %s", config["name"])
-        micro: bool = bool(config["microinverter"].lower() == "true")
+        micro: bool = config["microinverter"]
         inverter: str = config["inverter"]
         arrays: list = config["arrays"]
         name: str = config["name"]
@@ -264,6 +264,7 @@ class PVSystemManager:
         inv_param = self._retrieve_sam_wrapper(inv_path)
         mod_param = self._retrieve_sam_wrapper(mod_path)
         self._pv_plants = self._create_pv_plants(inv_param, mod_param)
+        _LOGGER.info("Created PV system manager with %s PV plants.", len(self._pv_plants))
 
     @property
     def location(self):
