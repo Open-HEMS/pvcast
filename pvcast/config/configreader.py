@@ -98,14 +98,14 @@ class ConfigReader:
         return Schema(
             {
                 Required("general"): {
-                    "weather_sources": [
-                        {
-                            Required("type"): str,
+                    Required("weather"): {
+                        Optional("max_forecast_days"): int,
+                        Required("weather_source"): {
                             Required("source"): str,
                             Optional("api_key"): str,
-                        }
-                    ],
-                    "location": {
+                        },
+                    },
+                    Required("location"): {
                         Required("latitude"): float,
                         Required("longitude"): float,
                         Required("altitude"): Coerce(float),
@@ -117,7 +117,7 @@ class ConfigReader:
                     {
                         Required("name"): str,
                         Required("inverter"): str,
-                        Required("microinverter"): bool,
+                        Required("microinverter"): Coerce(bool),
                         Required("arrays"): [
                             {
                                 Required("name"): str,

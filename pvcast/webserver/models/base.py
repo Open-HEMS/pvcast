@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, Optional
 
 from pydantic import BaseModel
 from typing_extensions import Annotated
@@ -57,3 +56,10 @@ class BaseEnergyModel(BaseDataModel):
     """Base energy model."""
 
     unit: Annotated[str, "Electrical unit of the returned data"] = "Wh"
+
+
+class StartEndRequest(BaseModel):
+    """Start end request body model."""
+
+    start: Annotated[str, "Start time of the returned data."]
+    end: Annotated[str, "End time of the returned data."]

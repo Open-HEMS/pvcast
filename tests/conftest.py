@@ -131,7 +131,7 @@ string_system = [
         {
             "name": "EastWest",
             "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
-            "microinverter": "false",
+            "microinverter": False,
             "arrays": [
                 {
                     "name": "East",
@@ -156,7 +156,7 @@ string_system = [
         {
             "name": "South",
             "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
-            "microinverter": "false",
+            "microinverter": False,
             "arrays": [
                 {
                     "name": "South",
@@ -176,7 +176,7 @@ micro_system = [
         {
             "name": "EastWest",
             "inverter": "Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_",
-            "microinverter": "true",
+            "microinverter": True,
             "arrays": [
                 {
                     "name": "zone_1_schuin",

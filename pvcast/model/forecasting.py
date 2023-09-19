@@ -143,6 +143,9 @@ class PowerEstimate(ABC):
                     If type is ForecastType.CLEARSKY, weather_df requires only pd.Timestamps to forecast. Actual
                     weather data can be provided, but will be ignored.
         """
+        # if isinstance(weather_df, pd.DatetimeIndex), convert to pd.DataFrame with index = weather_df
+        if isinstance(weather_df, pd.DatetimeIndex):
+            weather_df = pd.DataFrame(index=weather_df)
 
         # prepare weather data / datetimes
         weather_df: pd.DataFrame = self._prepare_weather(weather_df)
