@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 from ...model.forecasting import ForecastResult
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
-from ..models.base import Interval, StartEndRequest
+from ..models.base import PowerInterval, StartEndRequest, PVPlantNames
 from ..models.clearsky import ClearskyPowerModel
 from ..routers.dependencies import get_pv_system_mngr, get_weather_api
 
@@ -19,13 +19,13 @@ router = APIRouter()
 _LOGGER = logging.getLogger("uvicorn")
 
 
-@router.post("/power/{name}/{interval}")
+@router.post("/power/{plant_name}/{interval}")
 def post(
-    name: str,
+    plant_name: PVPlantNames,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
     weather_api: Annotated[WeatherAPI, Depends(get_weather_api)],
     start_end: StartEndRequest = None,
-    interval: Interval = "1H",
+    interval: PowerInterval = PowerInterval.H1,
 ) -> ClearskyPowerModel:
     """Get the estimated PV power output in Watts at the given interval <interval> for the given PV system <name>.
 
@@ -35,26 +35,25 @@ def post(
     If no request body is provided, the first timestamp will be the current time and the last timestamp will be\
     the current time + interval.
 
-    :param name: Name of the PV system
+    :param plant_name: Name of the PV system
     :param interval: Interval of the returned data
     :return: Estimated PV power output in Watts at the given interval <interval> for the given PV system <name>
     """
     location = pv_system_mngr.location
-    _LOGGER.info("Getting clearsky power for %s", location)
+    _LOGGER.info("Getting clearsky power for '%s'", plant_name)
     try:
-        pvplant = pv_system_mngr.get_pv_plant(name)
+        pvplant = pv_system_mngr.get_pv_plant(plant_name)
     except KeyError:
-        _LOGGER.error("No PV system found with name %s", name)
+        _LOGGER.error("No PV system found with plant_name %s", plant_name)
         return {}
-    _LOGGER.info("Got pvplant: %s", pvplant)
 
     if start_end is None:
         datetimes = weather_api.source_dates
     else:
-        datetimes = pd.date_range(start=start_end.start, end=start_end.end, freq=interval)
+        datetimes = pd.date_range(start=start_end.start, end=start_end.end, freq=interval, tz="UTC")
 
     # compute the clearsky power output for the given PV system and datetimes
-    clearsky_output: ForecastResult = pv_system_mngr.get_pv_plant(name).clearsky.run(weather_df=datetimes)
+    clearsky_output: ForecastResult = pvplant.clearsky.run(weather_df=datetimes)
 
     # convert ac power timestamps to string
     ac_power: pd.Series = clearsky_output.ac_power.copy().round(0).astype(int)
@@ -62,7 +61,7 @@ def post(
 
     # build the response dict
     response_dict = {
-        "plantname": name,
+        "plant_name": plant_name,
         "interval": interval,
         "start": ac_power.index[0],
         "end": ac_power.index[-1],
