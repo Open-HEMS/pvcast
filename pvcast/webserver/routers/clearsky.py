@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 from ...model.forecasting import ForecastResult
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
-from ..models.base import PowerInterval, StartEndRequest, PVPlantNames
+from ..models.base import PowerInterval, PVPlantNames, StartEndRequest
 from ..models.clearsky import ClearskyPowerModel
 from ..routers.dependencies import get_pv_system_mngr, get_weather_api
 

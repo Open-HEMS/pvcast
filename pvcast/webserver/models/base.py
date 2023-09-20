@@ -1,9 +1,8 @@
 """Webserver data models base module."""
 from __future__ import annotations
 
-from enum import Enum
-
 import datetime
+from enum import Enum
 
 from pydantic import BaseModel, validator
 from typing_extensions import Annotated
