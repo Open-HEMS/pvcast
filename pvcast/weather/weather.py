@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-
 from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import requests

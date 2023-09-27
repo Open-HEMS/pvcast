@@ -1,10 +1,11 @@
 """Helper functions for the webserver."""
-from collections import OrderedDict
 import json
+from collections import OrderedDict
 from typing import Any
+
+import numpy as np
 import pandas as pd
 from pandas.core.indexes.multi import MultiIndex
-import numpy as np
 
 
 def _np_encoder(obj: Any) -> np.generic:
