@@ -10,38 +10,35 @@ from typing_extensions import Annotated
 from ..routers.dependencies import get_pv_system_mngr
 
 data_example = {
-    "interval": "15Min",
-    "start": "2023-01-01T00:00:00+00:00",
-    "end": "2023-01-01T00:03:00+00:00",
+    "clearskymodel": "Ineichen",
+    "start": "2023-09-19T15:00:00+0000",
+    "end": "2023-09-20T15:00:00+0000",
     "timezone": "UTC",
+    "interval": "1H",
     "result": {
-        "EastWest": {
-            "watts": {
-                "2023-01-01T00:00:00+00:00": 0,
-                "2023-01-01T00:01:00+00:00": 100,
-                "2023-01-01T00:02:00+00:00": 200,
-                "2023-01-01T00:03:00+00:00": 300,
-            },
-            "watt_hours": {
-                "2023-01-01T00:00:00+00:00": 0,
-                "2023-01-01T00:01:00+00:00": 25,
-                "2023-01-01T00:02:00+00:00": 50,
-                "2023-01-01T00:03:00+00:00": 75,
-            },
+        "watt": {
+            "EastWest": {
+                "2023-09-19T15:00:00+0000": 1428,
+                "2023-09-19T16:00:00+0000": 1012,
+                "2023-09-19T17:00:00+0000": 279,
+                "2023-09-19T18:00:00+0000": 0,
+            }
         },
-        "NorthSouth": {
-            "watts": {
-                "2023-01-01T00:00:00+00:00": 0,
-                "2023-01-01T00:01:00+00:00": 100,
-                "2023-01-01T00:02:00+00:00": 200,
-                "2023-01-01T00:03:00+00:00": 300,
-            },
-            "watt_hours": {
-                "2023-01-01T00:00:00+00:00": 0,
-                "2023-01-01T00:01:00+00:00": 25,
-                "2023-01-01T00:02:00+00:00": 50,
-                "2023-01-01T00:03:00+00:00": 75,
-            },
+        "watt_hours": {
+            "EastWest": {
+                "2023-09-19T15:00:00+0000": 1428,
+                "2023-09-19T16:00:00+0000": 1012,
+                "2023-09-19T17:00:00+0000": 279,
+                "2023-09-19T18:00:00+0000": 0,
+            }
+        },
+        "watt_hours_cumsum": {
+            "EastWest": {
+                "2023-09-19T15:00:00+0000": 1428,
+                "2023-09-19T16:00:00+0000": 2440,
+                "2023-09-19T17:00:00+0000": 2719,
+                "2023-09-19T18:00:00+0000": 2719,
+            }
         },
     },
 }
@@ -60,8 +57,9 @@ class Interval(str, Enum):
 class PowerData(BaseModel):
     """Power data model."""
 
-    watts: dict[str, int]
-    watt_hours: dict[str, int]
+    watt: dict[str, dict[str, int]]
+    watt_hours: dict[str, dict[str, int]]
+    watt_hours_cumsum: dict[str, dict[str, int]]
 
 
 class BaseDataModel(BaseModel):
@@ -71,7 +69,7 @@ class BaseDataModel(BaseModel):
     end: Annotated[str | None, "End time of the returned data."]
     timezone: Annotated[str | None, "Timezone of the returned data"] = "UTC"
     interval: Annotated[Interval, "Interval of the returned data"]
-    result: Annotated[dict[str, PowerData], "Result of the returned data"] = data_example["result"]
+    result: Annotated[PowerData, "Result of the returned data"] = data_example["result"]
 
 
 class StartEndRequest(BaseModel):
