@@ -14,7 +14,6 @@ import pandas as pd
 from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
-from pvlib.modelchain import ModelChainResult
 
 from .const import VALID_FREQS
 
@@ -42,8 +41,6 @@ class ForecastResult:
     :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
     :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the DataFrame.
     :param freq: Frequency of original data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
-    :param weather: The input weather data used for the simulation. For debugging purposes only.
-    :param modelresults: The input raw data, list of pvlib ModelChainResult objects. For debugging purposes only.
     """
 
     name: str
@@ -51,8 +48,6 @@ class ForecastResult:
     ac_power: pd.Series = field(repr=False, default=None)
     dc_power: tuple[pd.Series] = field(repr=False, default=None)
     freq: str = field(repr=False, default="1H")
-    weather: pd.DataFrame = field(repr=False, default=None)
-    modelresults: list[ModelChainResult] = field(repr=False, default=None)
 
     def __post_init__(self):
         """Post-initialization function."""
@@ -81,7 +76,7 @@ class ForecastResult:
         plant_cpy.freq = freq
 
         # resample all pd.Series attributes
-        plant_cpy.ac_power = res_f(plant_cpy.ac_power)
+        plant_cpy.ac_power = res_f(plant_cpy.ac_power).astype("int64")
         return plant_cpy
 
     def _add_freq(self, idx: pd.DatetimeIndex, freq=None) -> pd.DatetimeIndex:
@@ -107,24 +102,51 @@ class ForecastResult:
     def energy(self, freq: str = "1D") -> pd.Series:
         """Calculate the AC energy output of the PV plant.
 
+        We assume that within the interval, the power output is constant. Therefore we will not use numerical
+        integration to calculate the energy, but simply multiply the power output with the interval length
+        (and sum it up if freq > 1H)
+
         :param freq: The frequency of the energy output. See pandas.resample() for valid options.
         :return: A pd.Series with the energy output of the PV plant.
         """
         if self.ac_power is None:
             raise ValueError("AC power output is not available, cannot calculate energy. Run simulation first.")
-        if VALID_FREQS.index(freq) > VALID_FREQS.index("1H"):
+
+        # check if freq is ambiguous (monthly, yearly)
+        ambiguous = False
+        if freq in ("M", "A"):
+            ambiguous = True
+
+        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta(self.ac_power.index.freq):
             raise ValueError(
-                "For forecast with future weather data energy can only be calculated up to hourly interval."
-            )
-        if VALID_FREQS.index(freq) > VALID_FREQS.index(self.freq):
-            raise ValueError(
-                f"Cannot calculate energy for a frequency higher than the fundamental data frequency ({self.freq})."
+                f"Cannot calculate energy for a frequency higher than the fundamental data frequency \
+                ({self.ac_power.index.freq})."
             )
 
-        # resample to hourly frequency and then sum to get Wh
-        plant_cpy = self.resample("1H")
-        ac_energy = plant_cpy.ac_power.resample(freq).sum()
-        return ac_energy
+        # if freq > 1H, we calculate the energy for each hour and sum it up
+        # we must verify that: freq(ac_power) <= 1H
+        if pd.Timedelta(self.ac_power.index.freq) > pd.Timedelta("1H"):
+            raise ValueError(
+                f"AC power interval ({self.ac_power.index.freq}) must be <= 1H in order to calculate valid energy data."
+            )
+
+        # ac_power [W, freq] -> ac_energy [Wh] conversion factor
+        conv_factor = 1
+        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta("1H"):
+            conv_factor = pd.Timedelta(freq).total_seconds() / 3600
+
+        ac_energy = self.ac_power * conv_factor
+
+        # now that AC energy has unit Wh, we can resample to the desired frequency and sum
+        return ac_energy.resample(freq).sum().round(0).astype("int64")
+
+    @property
+    def ac_energy(self) -> pd.Series:
+        """Calculate the AC energy output of the PV plant.
+
+        :return: A pd.Series with the energy output of the PV plant.
+        """
+        return self.energy(freq=self.ac_power.index.freq)
 
 
 @dataclass
@@ -166,8 +188,6 @@ class PowerEstimate(ABC):
             type=self.type,
             ac_power=ac_power,
             dc_power=None,
-            modelresults=results,
-            weather=weather_df,
         )
         self._result = result
         return result

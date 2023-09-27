@@ -6,6 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+from datetime import datetime
 import numpy as np
 import pandas as pd
 import requests
@@ -127,7 +128,18 @@ class WeatherAPI(ABC):
         Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
         also return datetime strings and in that case this index is not needed and even not preferred.
         """
-        return pd.date_range(self.start_forecast, self.end_forecast, freq=self.freq_source, tz="UTC")
+        return self.get_source_dates(self.start_forecast, self.end_forecast, self.freq_source)
+
+    @staticmethod
+    def get_source_dates(start: pd.Timestamp | datetime, end: pd.Timestamp | datetime, freq: str) -> pd.DatetimeIndex:
+        """
+        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
+        also return datetime strings and in that case this index is not needed and even not preferred.
+        """
+        start = pd.Timestamp(start)
+        end = pd.Timestamp(end)
+        # floor start, end to freq and return DatetimeIndex
+        return pd.date_range(start.floor(freq), end.floor(freq), freq=freq, tz="UTC")
 
     @staticmethod
     def convert_unit(data: pd.Series, from_unit: str, to_unit: str) -> pd.Series:

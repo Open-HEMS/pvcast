@@ -33,3 +33,14 @@ plant:
         modules_per_string: 8
         strings: 1
         module: Trina_Solar_TSM_330DD14A_II_
+  - name: South
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: South
+        tilt: 30
+        azimuth: 180
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+
