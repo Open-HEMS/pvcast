@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-from .base import BaseDataModel, BaseEnergyModel, BasePowerModel
+from .base import BaseDataModel
 
 
 class ClearskyCompModel(str, Enum):
@@ -18,11 +18,3 @@ class ClearskyModel(BaseDataModel):
     """Clearsky base model."""
 
     clearskymodel: ClearskyCompModel | None = ClearskyCompModel.INEICHEN
-
-
-class ClearskyPowerModel(ClearskyModel, BasePowerModel):
-    """Clearsky power model."""
-
-
-class ClearskyEnergyModel(ClearskyModel, BaseEnergyModel):
-    """Clearsky energy model."""

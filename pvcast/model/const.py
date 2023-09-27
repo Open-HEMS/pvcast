@@ -5,4 +5,4 @@ from pathlib import Path
 BASE_DIR = Path("pvcast")
 BASE_CEC_DATA_PATH = BASE_DIR / "data/proc"
 
-VALID_FREQS = ("A", "M", "1W", "1D", "1H", "30Min", "15Min")
+VALID_FREQS = ("A", "M", "1W", "1D", "1H", "30Min", "15Min", "5Min", "1Min")

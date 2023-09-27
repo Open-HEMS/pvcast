@@ -10,21 +10,44 @@ from typing_extensions import Annotated
 from ..routers.dependencies import get_pv_system_mngr
 
 data_example = {
-    "plant_name": "My PV System",
     "interval": "15Min",
     "start": "2023-01-01T00:00:00+00:00",
     "end": "2023-01-01T00:03:00+00:00",
     "timezone": "UTC",
     "result": {
-        "2023-01-01T00:00:00+00:00": 0,
-        "2023-01-01T00:01:00+00:00": 100,
-        "2023-01-01T00:02:00+00:00": 200,
-        "2023-01-01T00:03:00+00:00": 300,
+        "EastWest": {
+            "watts": {
+                "2023-01-01T00:00:00+00:00": 0,
+                "2023-01-01T00:01:00+00:00": 100,
+                "2023-01-01T00:02:00+00:00": 200,
+                "2023-01-01T00:03:00+00:00": 300,
+            },
+            "watt_hours": {
+                "2023-01-01T00:00:00+00:00": 0,
+                "2023-01-01T00:01:00+00:00": 25,
+                "2023-01-01T00:02:00+00:00": 50,
+                "2023-01-01T00:03:00+00:00": 75,
+            },
+        },
+        "NorthSouth": {
+            "watts": {
+                "2023-01-01T00:00:00+00:00": 0,
+                "2023-01-01T00:01:00+00:00": 100,
+                "2023-01-01T00:02:00+00:00": 200,
+                "2023-01-01T00:03:00+00:00": 300,
+            },
+            "watt_hours": {
+                "2023-01-01T00:00:00+00:00": 0,
+                "2023-01-01T00:01:00+00:00": 25,
+                "2023-01-01T00:02:00+00:00": 50,
+                "2023-01-01T00:03:00+00:00": 75,
+            },
+        },
     },
 }
 
 
-class PowerInterval(str, Enum):
+class Interval(str, Enum):
     """Power interval enum."""
 
     MIN1 = "1Min"
@@ -34,38 +57,21 @@ class PowerInterval(str, Enum):
     H1 = "1H"
 
 
-class EnergyInterval(str, Enum):
-    """Energy interval enum."""
+class PowerData(BaseModel):
+    """Power data model."""
 
-    H1 = "1H"
-    D1 = "1D"
-    W1 = "1W"
-    M1 = "1M"
-    Y1 = "1Y"
+    watts: dict[str, int]
+    watt_hours: dict[str, int]
 
 
 class BaseDataModel(BaseModel):
     """Base data model."""
 
-    plant_name: Annotated[str, "Name of the PV system"]
     start: Annotated[str | None, "Start time of the returned data."]
     end: Annotated[str | None, "End time of the returned data."]
     timezone: Annotated[str | None, "Timezone of the returned data"] = "UTC"
-    result: Annotated[dict[str, int], "Result of the returned data"] = data_example["result"]
-
-
-class BasePowerModel(BaseDataModel):
-    """Base power model."""
-
-    unit: Annotated[str, "Electrical unit of the returned data"] = "W"
-    interval: Annotated[PowerInterval, "Interval of the returned data"]
-
-
-class BaseEnergyModel(BaseDataModel):
-    """Base energy model."""
-
-    unit: Annotated[str, "Electrical unit of the returned data"] = "Wh"
-    interval: Annotated[EnergyInterval, "Interval of the returned data"]
+    interval: Annotated[Interval, "Interval of the returned data"]
+    result: Annotated[dict[str, PowerData], "Result of the returned data"] = data_example["result"]
 
 
 class StartEndRequest(BaseModel):
