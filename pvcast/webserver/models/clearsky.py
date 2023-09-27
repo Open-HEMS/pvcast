@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from enum import Enum
 
+from pydantic import BaseModel
+
 from .base import BaseDataModel
 
 
@@ -14,7 +16,11 @@ class ClearskyCompModel(str, Enum):
     SIMPLIFIED_SOLIS = "SimplifiedSolis"
 
 
-class ClearskyModel(BaseDataModel):
-    """Clearsky base model."""
+class ClearskyComp(BaseModel):
+    """Clearsky computation model."""
 
-    clearskymodel: ClearskyCompModel | None = ClearskyCompModel.INEICHEN
+    clearskymodel: ClearskyCompModel = ClearskyCompModel.INEICHEN
+
+
+class ClearskyModel(BaseDataModel, ClearskyComp):
+    """Clearsky model."""

@@ -139,7 +139,7 @@ class WeatherAPI(ABC):
         start = pd.Timestamp(start)
         end = pd.Timestamp(end)
         # floor start, end to freq and return DatetimeIndex
-        return pd.date_range(start.floor(freq), end.floor(freq), freq=freq, tz="UTC")
+        return pd.date_range(start.floor("1H"), end.floor("1H"), freq=freq, tz="UTC")
 
     @staticmethod
     def convert_unit(data: pd.Series, from_unit: str, to_unit: str) -> pd.Series:

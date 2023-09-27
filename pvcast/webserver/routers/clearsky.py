@@ -13,6 +13,7 @@ from ...weather.weather import WeatherAPI
 from ..models.base import Interval, PVPlantNames, StartEndRequest
 from ..models.clearsky import ClearskyModel
 from ..routers.dependencies import get_pv_system_mngr, get_weather_api
+from .helpers import multi_idx_to_nested_dict
 
 router = APIRouter()
 
@@ -53,32 +54,61 @@ def post(
         datetimes = weather_api.get_source_dates(start_end.start, start_end.end, interval)
 
     # loop over all PV plants and find the one with the given name
-    pv_plant_names = pv_system_mngr.pv_plants.keys() if plant_name.name.lower() == "all" else [plant_name.name]
+    all_arg = plant_name.name.lower() == "all"
+    pv_plant_names = list(pv_system_mngr.pv_plants.keys()) if all_arg else [plant_name.name]
 
-    # result dict
-    result = {pv_plant: {"watts": {}, "watt_hours": {}} for pv_plant in pv_plant_names}
+    # build multi-index columns
+    cols = [("watt", pv_plant) for pv_plant in pv_plant_names]
+    cols += [("watt_hours", pv_plant) for pv_plant in pv_plant_names]
+    cols += [("watt_hours_cumsum", pv_plant) for pv_plant in pv_plant_names]
+    cols += [("watt_hours", "Total")] if all_arg else []
+    cols += [("watt_hours_cumsum", "Total")] if all_arg else []
+    cols += [("watt", "Total")] if all_arg else []
+    multi_index = pd.MultiIndex.from_tuples(cols, names=["type", "plant"])
+
+    # build the result dataframe
+    result_df = pd.DataFrame(columns=multi_index)
+
+    # loop over all PV plants and compute the clearsky power output
     for pv_plant in pv_plant_names:
         _LOGGER.info("Estimating clearsky performance for plant: %s", pv_plant)
 
         # compute the clearsky power output for the given PV system and datetimes
         try:
             pvplant = pv_system_mngr.get_pv_plant(pv_plant)
-            clearsky_output: ForecastResult = pvplant.clearsky.run(weather_df=datetimes)
-
-            # convert ac power timestamps to string
-            ac_power: pd.Series = clearsky_output.ac_power.copy()
-            ac_energy: pd.Series = clearsky_output.ac_energy.copy()
-            ac_power.index = ac_power.index.strftime("%Y-%m-%dT%H:%M:%S%z")
-            ac_energy.index = ac_energy.index.strftime("%Y-%m-%dT%H:%M:%S%z")
-
-            # build the response dict
-            result[pv_plant]["watts"] = ac_power.round(0).astype(int).to_dict()
-            result[pv_plant]["watt_hours"] = ac_energy.round(0).astype(int).to_dict()
-
         except KeyError:
             _LOGGER.error("No PV system found with plant_name %s", plant_name)
-            result[pv_plant]["watts"] = {}
-            result[pv_plant]["watt_hours"] = {}
+            continue
+
+        # run forecasting algorithm
+        clearsky_output: ForecastResult = pvplant.clearsky.run(weather_df=datetimes)
+
+        # convert ac power timestamps to string
+        ac_power: pd.Series = clearsky_output.ac_power
+        ac_energy: pd.Series = clearsky_output.ac_energy
+        ac_power.index = ac_power.index.strftime("%Y-%m-%dT%H:%M:%S%z")
+        ac_energy.index = ac_energy.index.strftime("%Y-%m-%dT%H:%M:%S%z")
+
+        # build the output dataframe with multi-index
+        result_df[("watt", pv_plant)] = ac_power
+        result_df[("watt_hours", pv_plant)] = ac_energy
+        result_df[("watt_hours_cumsum", pv_plant)] = ac_energy.cumsum()
+
+    # if all_arg, sum the power and energy columns
+    if all_arg:
+        result_df[("watt", "Total")] = result_df["watt"].sum(axis=1)
+        result_df[("watt_hours", "Total")] = result_df["watt_hours"].sum(axis=1)
+        result_df[("watt_hours_cumsum", "Total")] = result_df["watt_hours_cumsum"].sum(axis=1)
+
+    # check if there are any NaN values in the result
+    if result_df.isnull().values.any():
+        raise ValueError(f"NaN values in the result dataframe: \n{result_df}")
+
+    # round all columns and set all values to int64
+    result_df = result_df.round(0).astype(int)
+
+    # convert multi index to nested dict
+    result_df = dict(multi_idx_to_nested_dict(result_df.T))
 
     # build the response dict
     response_dict = {
@@ -86,7 +116,7 @@ def post(
         "start": ac_power.index[0],
         "end": ac_power.index[-1],
         "timezone": location.tz,
-        "result": result,
+        "result": result_df,
     }
 
     return ClearskyModel(**response_dict)
