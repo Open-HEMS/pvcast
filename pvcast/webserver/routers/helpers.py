@@ -1,16 +1,15 @@
 """Helper functions for the webserver."""
 import json
+import logging
 from collections import OrderedDict
 from typing import Any
-import logging
 
 import numpy as np
 import pandas as pd
 from pandas.core.indexes.multi import MultiIndex
 
-from ...model.forecasting import PowerEstimate
+from ...model.forecasting import ForecastResult, PowerEstimate
 from ...model.model import PVSystemManager
-from ...model.forecasting import ForecastResult
 
 _LOGGER = logging.getLogger("uvicorn")
 

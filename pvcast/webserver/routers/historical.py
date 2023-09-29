@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import logging
 
+import pandas as pd
 from fastapi import APIRouter, Depends
 from typing_extensions import Annotated
-import pandas as pd
 
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
