@@ -15,7 +15,7 @@ from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 
-from .const import VALID_FREQS, HISTORICAL_YEAR_MAPPING
+from .const import HISTORICAL_YEAR_MAPPING, VALID_FREQS
 
 if TYPE_CHECKING:
     from .model import PVPlantModel
