@@ -16,9 +16,9 @@ class TestPVModelChain:
     def test_pv_sys_mngr_init(self, basic_config, pv_sys_mngr: PVSystemManager):
         assert pv_sys_mngr.config == basic_config
         assert isinstance(pv_sys_mngr.location, Location)
-        assert type(pv_sys_mngr.location.latitude) == float
-        assert type(pv_sys_mngr.location.longitude) == float
-        assert type(pv_sys_mngr.location.altitude) == float
+        assert isinstance(pv_sys_mngr.location.latitude, float)
+        assert isinstance(pv_sys_mngr.location.longitude, float)
+        assert isinstance(pv_sys_mngr.location.altitude, float)
         assert pv_sys_mngr.location.tz == "UTC"
         assert set(pv_sys_mngr.plant_names) == {cfg["name"] for cfg in basic_config}
 

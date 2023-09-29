@@ -15,7 +15,7 @@ from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 
-from .const import VALID_FREQS
+from .const import VALID_FREQS, HISTORICAL_YEAR_MAPPING
 
 if TYPE_CHECKING:
     from .model import PVPlantModel
@@ -113,9 +113,7 @@ class ForecastResult:
             raise ValueError("AC power output is not available, cannot calculate energy. Run simulation first.")
 
         # check if freq is ambiguous (monthly, yearly)
-        ambiguous = False
-        if freq in ("M", "A"):
-            ambiguous = True
+        ambiguous = freq in ("M", "A")
 
         if not ambiguous and pd.Timedelta(freq) < pd.Timedelta(self.ac_power.index.freq):
             raise ValueError(
@@ -188,6 +186,7 @@ class PowerEstimate(ABC):
             type=self.type,
             ac_power=ac_power,
             dc_power=None,
+            freq=ac_power.index.freq,
         )
         self._result = result
         return result
@@ -275,8 +274,23 @@ class Historical(PowerEstimate):
 
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
         tmy_data = self.get_pvgis_data()
-        tmy_data.index = pd.date_range(start="2021-01-01 00:00", end="2021-12-31 23:00", freq="1H")
-        return tmy_data
+        tmy_data.index = pd.date_range(
+            start=f"{HISTORICAL_YEAR_MAPPING}-01-01 00:00",
+            end=f"{HISTORICAL_YEAR_MAPPING}-12-31 23:00",
+            freq="1H",
+            tz="UTC",
+        )
+
+        # if there are no specifically requested dates, return the entire TMY dataset
+        if weather_df is None:
+            return tmy_data
+
+        # get start and end dates we want to obtain TMY data for
+        start_date = weather_df.index[0].replace(year=HISTORICAL_YEAR_MAPPING)
+        end_date = weather_df.index[-1].replace(year=HISTORICAL_YEAR_MAPPING)
+
+        # get the corresponding TMY data
+        return tmy_data.loc[start_date:end_date]
 
     @property
     def model_chain_attrs(self) -> dict:
