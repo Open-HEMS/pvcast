@@ -12,7 +12,6 @@ general:
     longitude: !secret lon
     timezone: !secret time_zone
     altitude: !secret alt
-  long_lived_token: !secret long_lived_token
 
 plant:
   - name: EastWest
