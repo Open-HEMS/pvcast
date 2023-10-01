@@ -9,7 +9,7 @@ from pathlib import Path
 import pytz
 import yaml
 from pytz import UnknownTimeZoneError
-from voluptuous import Coerce, Optional, Required, Schema, Any, Url
+from voluptuous import Any, Coerce, Optional, Required, Schema, Url
 
 _LOGGER = logging.getLogger(__name__)
 
