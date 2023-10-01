@@ -96,7 +96,7 @@ class ForecastResult:
                 return idx
         idx.freq = pd.tseries.frequencies.to_offset(freq)
         if idx.freq is None:
-            raise AttributeError("no discernible frequency found to `idx`.  Specify a frequency string with `freq`.")
+            raise AttributeError("No discernible frequency found to `idx`. Specify a frequency string with `freq`.")
         return idx
 
     def energy(self, freq: str = "1D") -> pd.Series:
