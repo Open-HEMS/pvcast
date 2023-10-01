@@ -15,7 +15,7 @@ from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
 from .const import BASE_CEC_DATA_PATH
-from .forecasting import Clearsky, Forecast, Historical
+from .forecasting import Clearsky, Live, Historical
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class PVPlantModel:
     _pv_models: list[ModelChain] = field(init=False, repr=False)
     _clearsky: Clearsky = field(init=False, repr=False)
     _historical: Historical = field(init=False, repr=False)
-    _forecast: Forecast = field(init=False, repr=False)
+    _live: Live = field(init=False, repr=False)
 
     def __post_init__(self, config: dict):
         pv_systems = self._create_pv_systems(config)
@@ -62,7 +62,7 @@ class PVPlantModel:
         # create the forecast objects
         self._clearsky = Clearsky(location=self.location, pv_plant=self)
         self._historical = Historical(location=self.location, pv_plant=self)
-        self._forecast = Forecast(location=self.location, pv_plant=self)
+        self._live = Live(location=self.location, pv_plant=self)
 
     @property
     def clearsky(self):
@@ -75,9 +75,9 @@ class PVPlantModel:
         return self._historical
 
     @property
-    def forecast(self):
+    def live(self):
         """The live weather forecast result."""
-        return self._forecast
+        return self._live
 
     @property
     def models(self):

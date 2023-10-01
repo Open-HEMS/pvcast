@@ -13,7 +13,7 @@ import requests
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
 from requests import Response
-from voluptuous import All, Datetime, In, Range, Required, Schema
+from voluptuous import All, Datetime, In, Range, Required, Schema, Optional
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +29,9 @@ WEATHER_SCHEMA = Schema(
                 Required("humidity"): All(int, Range(min=0, max=100)),
                 Required("wind_speed"): All(float, Range(min=0)),
                 Required("cloud_coverage"): All(int, Range(min=0, max=100)),
+                Optional("ghi"): All(float, Range(min=0)),
+                Optional("dni"): All(float, Range(min=0)),
+                Optional("dhi"): All(float, Range(min=0)),
             }
         ],
     }
@@ -175,11 +178,12 @@ class WeatherAPI(ABC):
         :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
         """
 
-    def get_weather(self, live: bool = False) -> dict:
+    def get_weather(self, live: bool = False, calc_irrads: bool = False) -> dict:
         """
         Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
+        :param calc_irrads: Whether to calculate irradiance from cloud cover and add it to the weather data.
         :return: The weather data as a dict.
         """
         # get weather API data, if needed. If not, use cached data.
@@ -224,6 +228,13 @@ class WeatherAPI(ABC):
 
         # set data types again after resampling
         resampled = resampled.astype(data_type_dict)
+
+        # calculate irradiance from cloud cover
+        if calc_irrads:
+            irrads = self.cloud_cover_to_irradiance(resampled["cloud_coverage"])
+            resampled["ghi"] = irrads["ghi"]
+            resampled["dni"] = irrads["dni"]
+            resampled["dhi"] = irrads["dhi"]
 
         # convert to dictionary and validate schema
         try:
