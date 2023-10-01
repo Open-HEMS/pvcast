@@ -1,0 +1,49 @@
+# configuration file for pvcast
+# solar-edge inverter configuration
+
+---
+general:
+  weather:
+    max_forecast_days: 7
+    weather_source:
+      source: clearoutside
+  location:
+    latitude: !secret lat
+    longitude: !secret lon
+    timezone: !secret my_missing_time_zone
+    altitude: !secret alt
+  long_lived_token: !secret long_lived_token
+
+plant:
+  - name: EastWest
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: East
+        tilt: 30
+        azimuth: 90
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: West
+        tilt: 30
+        azimuth: 270
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+  - name: NorthSouth
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: North
+        tilt: 30
+        azimuth: 0
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: South
+        tilt: 30
+        azimuth: 180
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_

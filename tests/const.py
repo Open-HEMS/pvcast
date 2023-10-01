@@ -9,6 +9,7 @@ LOC_AUS = (-31.9741, 115.8517, "Australia/Perth", 0.0)
 TEST_CONF_PATH_SEC = Path(__file__).parent / "unit" / "test_config_sec.yaml"
 TEST_CONF_PATH_NO_SEC = Path(__file__).parent / "unit" / "test_config_no_sec.yaml"
 TEST_CONF_PATH_ERROR = Path(__file__).parent / "unit" / "test_config_error.yaml"
+TEST_CONF_PATH_MISSING_SEC = Path(__file__).parent / "unit" / "test_config_missing_sec.yaml"
 TEST_SECRETS_PATH = Path(__file__).parent / "unit" / "test_secrets.yaml"
 
 HASS_TEST_URL = "http://localhost:8123"

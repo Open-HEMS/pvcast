@@ -43,7 +43,9 @@ class ConfigReader:
                     "Error parsing configuration file %s. Did you include secrets.yaml?", self.config_file_path
                 )
                 raise yaml.YAMLError(f"Error parsing configuration file {self.config_file_path}") from exc
-            self._validate_config(config)
+
+            # validate the configuration
+            Schema(self._config_schema)(config)
 
         # check if the timezone is valid
         try:
@@ -63,7 +65,8 @@ class ConfigReader:
         value = loader.construct_scalar(node)
         secret = self._secrets.get(value)
         if secret is None:
-            raise ValueError(f"Secret {value} not found in {self.secrets_file_path}!")
+            _LOGGER.error("Secret %s not found in %s!", value, self.secrets_file_path)
+            raise yaml.YAMLError(f"Secret {value} not found in {self.secrets_file_path}!")
         return secret
 
     def _load_secrets_file(self) -> None:
@@ -71,10 +74,6 @@ class ConfigReader:
 
         :param secrets_file_path: The path to the secrets file.
         """
-        if self.secrets_file_path is None:
-            self._secrets = {}
-            _LOGGER.warning("No secrets file path given. Continuing without secrets!")
-            return
         if not self.secrets_file_path.exists():
             raise FileNotFoundError(f"Secrets file {self.secrets_file_path} not found.")
 
@@ -132,10 +131,3 @@ class ConfigReader:
                 ],
             }
         )
-
-    def _validate_config(self, config: dict) -> None:
-        """Validate the YAML configuration.
-
-        :param config: The configuration to validate.
-        """
-        Schema(self._config_schema)(config)

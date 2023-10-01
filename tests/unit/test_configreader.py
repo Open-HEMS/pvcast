@@ -9,8 +9,13 @@ from yaml import YAMLError
 
 from pvcast.config.configreader import ConfigReader
 
-from ..const import (TEST_CONF_PATH_ERROR, TEST_CONF_PATH_NO_SEC,
-                     TEST_CONF_PATH_SEC, TEST_SECRETS_PATH)
+from ..const import (
+    TEST_CONF_PATH_ERROR,
+    TEST_CONF_PATH_NO_SEC,
+    TEST_CONF_PATH_SEC,
+    TEST_SECRETS_PATH,
+    TEST_CONF_PATH_MISSING_SEC,
+)
 
 
 class TestConfigReader:
@@ -25,6 +30,11 @@ class TestConfigReader:
     def configreader_no_secfile_no_sectags(self):
         """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
         return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
+
+    def test_configreader_secrets_no_secrets_file(self):
+        """Test the configreader with a secrets file but no secrets file path."""
+        with pytest.raises(YAMLError):
+            _ = ConfigReader(TEST_CONF_PATH_SEC).config
 
     def test_configreader_no_secrets(self, configreader_no_secfile_no_sectags):
         """Test the configreader without a secrets file and no !secret tags in config."""
@@ -43,13 +53,10 @@ class TestConfigReader:
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
-    def test_configreader_no_secrets_sectags(self):
-        """
-        Test the configreader without a secrets file and !secret tags in config.
-        This should raise a ValueError exception.
-        """
+    def test_configreader_missing_secrets(self):
+        """Test the configreader with a secrets file and !secret tags for which no entry in secrets.yaml exists."""
         with pytest.raises(YAMLError):
-            _ = ConfigReader(config_file_path=TEST_CONF_PATH_SEC)
+            ConfigReader(TEST_CONF_PATH_MISSING_SEC, TEST_SECRETS_PATH)
 
     def test_configreader_no_config_file(self):
         """Test the configreader without a config file."""
