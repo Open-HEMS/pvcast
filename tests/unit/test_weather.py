@@ -32,7 +32,6 @@ class MockWeatherAPI(WeatherAPI):
             # convert index to DateTimeIndex
             data.index = pd.to_datetime(data.index, utc=True)
             data.index.freq = self.freq_source
-            print(f"_process_data: {data}")
         else:
             data = self.data
         return data

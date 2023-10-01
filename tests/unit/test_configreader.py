@@ -40,7 +40,6 @@ class TestConfigReader:
         """Test the configreader without a secrets file and no !secret tags in config."""
         assert isinstance(configreader_no_secfile_no_sectags, ConfigReader)
         config = configreader_no_secfile_no_sectags.config
-        print(config)
         assert isinstance(config, dict)
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
