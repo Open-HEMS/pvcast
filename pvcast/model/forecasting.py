@@ -27,7 +27,7 @@ _LOGGER = logging.getLogger(__name__)
 class ForecastType(str, Enum):
     """Enum for the type of PVPlantResults."""
 
-    FORECAST = "forecast"
+    LIVE = "live"
     CLEARSKY = "clearsky"
     HISTORICAL = "historic"
 
@@ -37,7 +37,7 @@ class ForecastResult:
     """Object to store the aggregated results of the PVPlantModel simulation.
 
     :param name: The name of the PV plant.
-    :param type: The type of the result: forecast based on weather data, clearsky, or historic based on PVGIS.
+    :param type: The type of the result: forecast based on live weather data, clearsky, or historic based on PVGIS TMY.
     :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
     :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the DataFrame.
     :param freq: Frequency of original data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
@@ -151,7 +151,7 @@ class ForecastResult:
 class PowerEstimate(ABC):
     """Abstract base class to do PV power estimation."""
 
-    type: ForecastType = field(default=ForecastType.FORECAST)
+    type: ForecastType = field(default=ForecastType.LIVE)
     location: Location = field(repr=False, default=None)
     pv_plant: PVPlantModel = field(repr=False, default=None)
     _result: ForecastResult = field(repr=False, default=None)
@@ -159,9 +159,8 @@ class PowerEstimate(ABC):
     def run(self, weather_df: pd.DataFrame = None) -> ForecastResult:
         """Run power estimate and store results in self._result.
 
-        :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
-                    If type is ForecastType.CLEARSKY, weather_df requires only pd.Timestamps to forecast. Actual
-                    weather data can be provided, but will be ignored.
+        :param weather_df: The weather data or datetimes to forecast for.
+        :return: A ForecastResult object containing the results of the power estimate.
         """
         # if isinstance(weather_df, pd.DatetimeIndex), convert to pd.DataFrame with index = weather_df
         if isinstance(weather_df, pd.DatetimeIndex):
@@ -193,14 +192,8 @@ class PowerEstimate(ABC):
 
     @abstractmethod
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
-        """Prepare weather data for the forecast. The default implementation simply returns the input weather_df.
-
-        :param weather_df: The weather data to use for the simulation. Not required if type is ForecastType.HISTORICAL.
-                    If type is ForecastType.CLEARSKY, weather_df requires only pd.Timestamps to forecast. Actual
-                    weather data can be provided, but will be ignored.
-        :return: The prepared weather data.
-        """
-        return weather_df
+        """Prepare weather data for the forecast."""
+        raise NotImplementedError
 
     def _add_percepitable_water(
         self, weather_df: pd.DataFrame, temp_col: str = "temp_air", rh_col: str = "relative_humidity"
@@ -230,10 +223,10 @@ class PowerEstimate(ABC):
 
 
 @dataclass
-class Forecast(PowerEstimate):
-    """Class for PV power forecasts based on weather data."""
+class Live(PowerEstimate):
+    """Class for PV power forecasts based on live weather data."""
 
-    type: ForecastType = field(default=ForecastType.FORECAST)
+    type: ForecastType = field(default=ForecastType.LIVE)
 
     @property
     def model_chain_attrs(self) -> dict:
