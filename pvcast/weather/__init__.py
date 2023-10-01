@@ -7,4 +7,4 @@ from .weather import WeatherAPIFactory
 
 API_FACTORY = WeatherAPIFactory()
 API_FACTORY.register("clearoutside", WeatherAPIClearOutside)
-API_FACTORY.register("hass", WeatherAPIHASS)
+API_FACTORY.register("homeassistant", WeatherAPIHASS)

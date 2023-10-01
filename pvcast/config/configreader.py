@@ -9,7 +9,7 @@ from pathlib import Path
 import pytz
 import yaml
 from pytz import UnknownTimeZoneError
-from voluptuous import Coerce, Optional, Required, Schema
+from voluptuous import Coerce, Optional, Required, Schema, Any, Url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -94,15 +94,25 @@ class ConfigReader:
 
         :return: Config schema dictionary.
         """
+        homessistant = Schema(
+            {
+                Required("source"): "homeassistant",
+                Required("entity_id"): str,
+                Required("url"): Url,
+                Required("token"): str,
+            }
+        )
+        clearoutside = Schema(
+            {
+                Required("source"): "clearoutside",
+            }
+        )
         return Schema(
             {
                 Required("general"): {
                     Required("weather"): {
                         Optional("max_forecast_days"): int,
-                        Required("weather_source"): {
-                            Required("source"): str,
-                            Optional("api_key"): str,
-                        },
+                        Required("weather_source"): Any(homessistant, clearoutside),
                     },
                     Required("location"): {
                         Required("latitude"): float,
@@ -110,7 +120,6 @@ class ConfigReader:
                         Required("altitude"): Coerce(float),
                         Required("timezone"): str,
                     },
-                    Required("long_lived_token"): str,
                 },
                 Required("plant"): [
                     {

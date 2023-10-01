@@ -12,7 +12,6 @@ general:
     longitude: 4.88115070391368
     altitude: 0
     timezone: Wrong/Timezone
-  long_lived_token: mylonglivedtoken
 
 plant:
   - name: EastWest

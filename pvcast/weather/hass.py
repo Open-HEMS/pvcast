@@ -20,6 +20,7 @@ class WeatherAPIHASS(WeatherAPI):
     """Weather API class that retrieves weather data from Home Assistant entity."""
 
     entity_id: str = field(default=None)
+    url: str = field(default=None)
     token: str = field(default=None)
     _hass_api: HassAPI = field(init=False)
 

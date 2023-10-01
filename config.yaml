@@ -6,13 +6,16 @@ general:
   weather:
     max_forecast_days: 7
     weather_source:
-      source: clearoutside
+      source: homeassistant
+      entity_id: weather.forecast_home_hourly
+      url: http://192.168.50.184:8123
+      token: !secret long_lived_token
+
   location:
     latitude: !secret lat
     longitude: !secret lon
     timezone: !secret time_zone
     altitude: !secret alt
-  long_lived_token: !secret long_lived_token
 
 
 # PV system configuration

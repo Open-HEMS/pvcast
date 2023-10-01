@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from urllib.parse import urljoin
 
 import requests
-from requests import Response, get, post
+from requests import Response
+from requests.adapters import HTTPAdapter, Retry
+
+s = requests.Session()
+
+retries = Retry(total=4, backoff_factor=0.2, backoff_max=5, status_forcelist=[502, 503, 504])
+
+s.mount("http://", HTTPAdapter(max_retries=retries))
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,13 +24,12 @@ class HassAPI:
     """Home Assistant API interface."""
 
     hass_url: str
-    token: str
-    timeout: int = field(default=5)
-    _headers: dict = field(default_factory=dict)
+    token: InitVar[str]
+    _headers: dict = field(default_factory=dict, init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self, token: str):
         self._headers = {
-            "Authorization": "Bearer " + self.token,
+            "Authorization": "Bearer " + token,
             "Content-Type": "application/json",
         }
 
@@ -40,7 +46,7 @@ class HassAPI:
     @property
     def online(self) -> bool:
         """Return True if the Home Assistant API is online."""
-        response: Response = get(self.url, headers=self.headers, timeout=self.timeout)
+        response: Response = s.get(self.url, headers=self.headers)
         _LOGGER.debug("Home Assistant API online: %s", response.ok)
         return response.ok
 
@@ -51,7 +57,7 @@ class HassAPI:
         :return: The state object for the specified entity_id.
         """
         url = self._format_entity_url(entity_id)
-        response: Response = get(url, headers=self.headers, timeout=self.timeout)
+        response: Response = s.get(url, headers=self.headers)
 
         # if we receive a 404 the entity does not exist and we can't continue
         if response.status_code == 404:
@@ -85,7 +91,7 @@ class HassAPI:
         :return: The response object.
         """
         url = self._format_entity_url(entity_id)
-        response: Response = post(url, headers=self.headers, json=state)
+        response: Response = s.post(url, headers=self.headers, json=state)
         if not response.ok:
             raise requests.ConnectionError(f"Error while posting entity {entity_id}: {response.reason}")
         _LOGGER.debug("Successfully updated/created entity: %s [code:%s]", entity_id, response.status_code)
@@ -96,11 +102,3 @@ class HassAPI:
         if not len(entity_id.split(".")) == 2:
             raise ValueError(f"Invalid entity_id: {entity_id}")
         return urljoin(self.url, f"states/{entity_id}")
-
-
-@dataclass
-class HassEntity:
-    """Home Assistant API backed entity."""
-
-    entity_id: str
-    api: HassAPI
