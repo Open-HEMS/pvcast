@@ -15,7 +15,7 @@ from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
 from .const import BASE_CEC_DATA_PATH
-from .forecasting import Clearsky, Live, Historical
+from .forecasting import Clearsky, Historical, Live
 
 _LOGGER = logging.getLogger(__name__)
 

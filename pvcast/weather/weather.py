@@ -13,7 +13,7 @@ import requests
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
 from requests import Response
-from voluptuous import All, Datetime, In, Range, Required, Schema, Optional
+from voluptuous import All, Datetime, In, Optional, Range, Required, Schema
 
 _LOGGER = logging.getLogger(__name__)
 
