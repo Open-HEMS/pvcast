@@ -26,7 +26,7 @@ class TestWeatherPlatform:
         return pd_time_aliases
 
     @pytest.fixture
-    def hass_api_setup(self, location, ha_weather_data):
+    def homeassistant_api_setup(self, location, ha_weather_data):
         """Setup the Home Assistant API."""
         with responses.RequestsMock() as rsps:
             rsps.add(
@@ -98,7 +98,9 @@ class TestWeatherPlatform:
         assert not weather.isna().values.any()
         assert weather.shape[0] >= 24
 
-    def test_weather_get_weather_max_days(self, weatherapi: WeatherAPI, max_forecast_day, time_aliases):
+    def test_weather_get_weather_max_days(
+        self, weatherapi: WeatherAPI, max_forecast_day, time_aliases
+    ):
         """Test the get_weather function with a number of higher data frequencies."""
         freq = "1H"
         weatherapi.freq_output = freq

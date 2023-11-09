@@ -53,7 +53,9 @@ class WeatherAPIClearOutside(WeatherAPI):
         # parse the data
         n_days = int(self.max_forecast_days / pd.Timedelta(days=1))
         for day_int in range(n_days):
-            result = BeautifulSoup(response.content, "html.parser").find_all(id=f"day_{day_int}")
+            result = BeautifulSoup(response.content, "html.parser").find_all(
+                id=f"day_{day_int}"
+            )
             if len(result) != 1:
                 _LOGGER.warning("No data for day %s.", day_int)
                 break
@@ -72,7 +74,9 @@ class WeatherAPIClearOutside(WeatherAPI):
             _LOGGER.debug("Dropping %s rows with NaN.", rows_with_nan.sum())
             if not weather_df.isna().any(axis=1).diff().sum() == 1:
                 _LOGGER.warning("Found NaN in the middle of the data.")
-                weather_df.interpolate(method="linear", inplace=True, limit_area="inside")
+                weather_df.interpolate(
+                    method="linear", inplace=True, limit_area="inside"
+                )
             weather_df.dropna(inplace=True)
 
         return weather_df
@@ -101,7 +105,12 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         # select subset of columns
         raw_data = raw_data[
-            ["Total Clouds (% Sky Obscured)", "Wind Speed/Direction (mph)", "Temperature (°C)", "Relative Humidity (%)"]
+            [
+                "Total Clouds (% Sky Obscured)",
+                "Wind Speed/Direction (mph)",
+                "Temperature (°C)",
+                "Relative Humidity (%)",
+            ]
         ]
 
         # rename columns

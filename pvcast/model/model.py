@@ -47,7 +47,10 @@ class PVPlantModel:
     location: Location = field(repr=False)
     inv_param: pd.DataFrame = field(repr=False)
     mod_param: pd.DataFrame = field(repr=False)
-    temp_param: dict = field(default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"], repr=False)
+    temp_param: dict = field(
+        default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"],
+        repr=False,
+    )
     name: str = field(init=False)
     _pv_models: list[ModelChain] = field(init=False, repr=False)
     _clearsky: Clearsky = field(init=False, repr=False)
@@ -56,7 +59,9 @@ class PVPlantModel:
 
     def __post_init__(self, config: dict):
         pv_systems = self._create_pv_systems(config)
-        self._pv_models = self._build_model_chain(pv_systems, self.location, config["name"])
+        self._pv_models = self._build_model_chain(
+            pv_systems, self.location, config["name"]
+        )
         self.name = config["name"]
 
         # create the forecast objects
@@ -104,7 +109,9 @@ class PVPlantModel:
             pv_systems = self._build_system_string(arrays, inverter, name)
         return pv_systems
 
-    def _build_system_micro(self, arrays: list[dict], inverter: str, name: str | None = None) -> list[PVSystem]:
+    def _build_system_micro(
+        self, arrays: list[dict], inverter: str, name: str | None = None
+    ) -> list[PVSystem]:
         """Build a PV system model for a system with microinverters.
 
         :param arrays: List of PV arrays.
@@ -118,7 +125,9 @@ class PVPlantModel:
         # create a PVSystem for each microinverter
         for _, array in enumerate(arrays):
             n_modules = array["strings"] * array["modules_per_string"]
-            mount = FixedMount(surface_tilt=array["tilt"], surface_azimuth=array["azimuth"])
+            mount = FixedMount(
+                surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
+            )
             module_param = self._retrieve_parameters(array["module"], inverter=False)
             inv_param = self._retrieve_parameters(inverter, inverter=True)
 
@@ -147,7 +156,9 @@ class PVPlantModel:
 
         return pv_systems
 
-    def _build_system_string(self, arrays: list[dict], inverter: str, name: str | None = None) -> list[PVSystem]:
+    def _build_system_string(
+        self, arrays: list[dict], inverter: str, name: str | None = None
+    ) -> list[PVSystem]:
         """Build a PV system model for a system with a regular string inverter.
 
         :param arrays: List of PV arrays.
@@ -160,7 +171,9 @@ class PVPlantModel:
 
         # a string system uses one inverter so we aggregate all arrays into one PVSystem
         for array_id, array in enumerate(arrays):
-            mount = FixedMount(surface_tilt=array["tilt"], surface_azimuth=array["azimuth"])
+            mount = FixedMount(
+                surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
+            )
             module_param = self._retrieve_parameters(array["module"], inverter=False)
 
             # define PV array
@@ -201,13 +214,17 @@ class PVPlantModel:
         # check if device is in the database
         try:
             params = candidates.loc[device].to_dict()
-            _LOGGER.debug("Found params %s for device %s in the database.", params, device)
+            _LOGGER.debug(
+                "Found params %s for device %s in the database.", params, device
+            )
         except KeyError as exc:
             raise KeyError(f"Device {device} not found in the database.") from exc
 
         return params
 
-    def _build_model_chain(self, pv_systems: list[PVSystem], location: Location, name: str) -> list[ModelChain]:
+    def _build_model_chain(
+        self, pv_systems: list[PVSystem], location: Location, name: str
+    ) -> list[ModelChain]:
         """Build the model chains for the list of PV systems.
 
         :param pv_systems: List of PVSystem objects.
@@ -215,7 +232,10 @@ class PVPlantModel:
         :param location: The location of the PV plant.
         :return: List of model chains.
         """
-        return [ModelChain(system, location, name=name, aoi_model="physical") for system in pv_systems]
+        return [
+            ModelChain(system, location, name=name, aoi_model="physical")
+            for system in pv_systems
+        ]
 
     def aggregate(self, results: list[ModelChainResult], key: str) -> pd.Series:
         """Aggregate the results of the model chains into a single pd.DataFrame.
@@ -255,16 +275,26 @@ class PVSystemManager:
     lat: InitVar[float] = field(repr=False)
     lon: InitVar[float] = field(repr=False)
     alt: InitVar[float] = field(default=0.0, repr=False)
-    inv_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_inverters.csv", repr=False)
-    mod_path: InitVar[Path] = field(default=BASE_CEC_DATA_PATH / "cec_modules.csv", repr=False)
+    inv_path: InitVar[Path] = field(
+        default=BASE_CEC_DATA_PATH / "cec_inverters.csv", repr=False
+    )
+    mod_path: InitVar[Path] = field(
+        default=BASE_CEC_DATA_PATH / "cec_modules.csv", repr=False
+    )
     _pv_plants: dict[PVPlantModel] = field(init=False, repr=False)
 
-    def __post_init__(self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path):
-        self._loc = Location(lat, lon, tz="UTC", altitude=alt, name=f"PV plant at {lat}, {lon}")
+    def __post_init__(
+        self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path
+    ):
+        self._loc = Location(
+            lat, lon, tz="UTC", altitude=alt, name=f"PV plant at {lat}, {lon}"
+        )
         inv_param = self._retrieve_sam_wrapper(inv_path)
         mod_param = self._retrieve_sam_wrapper(mod_path)
         self._pv_plants = self._create_pv_plants(inv_param, mod_param)
-        _LOGGER.info("Created PV system manager with %s PV plants.", len(self._pv_plants))
+        _LOGGER.info(
+            "Created PV system manager with %s PV plants.", len(self._pv_plants)
+        )
 
     @property
     def location(self):
@@ -303,7 +333,9 @@ class PVSystemManager:
         _LOGGER.debug("Retrieved %s SAM database entries from %s.", len(pv_df), path)
         return pv_df
 
-    def _create_pv_plants(self, inv_param: pd.DataFrame, mod_param: pd.DataFrame) -> dict[PVPlantModel]:
+    def _create_pv_plants(
+        self, inv_param: pd.DataFrame, mod_param: pd.DataFrame
+    ) -> dict[PVPlantModel]:
         """Create a PVPlantModel object from a user supplied config.
 
         :return: List of PV system model chains. One ModelChain instance for each inverter in the config.

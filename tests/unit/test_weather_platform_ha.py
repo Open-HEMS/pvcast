@@ -20,7 +20,12 @@ class TestWeatherPlatformHASS:
     hass_url = urljoin(HASS_TEST_URL, "/api/")
     valid_temp_units = ["°C", "°F", "C", "F"]
     valid_speed_units = ["m/s", "km/h", "mi/h", "ft/s", "kn"]
-    conv_dict_speed = {"km/h": 0.277777778, "mi/h": 0.44704, "ft/s": 0.3048, "kn": 0.51444}
+    conv_dict_speed = {
+        "km/h": 0.277777778,
+        "mi/h": 0.44704,
+        "ft/s": 0.3048,
+        "kn": 0.51444,
+    }
     token = HASS_TEST_TOKEN
 
     @pytest.fixture(params=valid_temp_units + ["wrong"])
@@ -49,7 +54,9 @@ class TestWeatherPlatformHASS:
     def mock_ha_api(self, wind_speed_unit, weatherapi):
         """Mock a HA weather API response and return the weatherapi object."""
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, HASS_TEST_URL + "/api/", json=wind_speed_unit, status=200)
+            rsps.add(
+                responses.GET, HASS_TEST_URL + "/api/", json=wind_speed_unit, status=200
+            )
             yield weatherapi
 
     def test_hass_init_errors(self):
@@ -77,7 +84,10 @@ class TestWeatherPlatformHASS:
         wind_unit = mock_ha_api._raw_data.json()["attributes"]["wind_speed_unit"]
 
         # test the _process_data function
-        if temp_unit not in self.valid_temp_units or wind_unit not in self.valid_speed_units:
+        if (
+            temp_unit not in self.valid_temp_units
+            or wind_unit not in self.valid_speed_units
+        ):
             with pytest.raises(ValueError):
                 mock_ha_api._process_data()
         else:

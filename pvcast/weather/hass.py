@@ -61,7 +61,9 @@ class WeatherAPIHASS(WeatherAPI):
 
         for key, unit in units.items():
             weather_df[key] = self.convert_unit(
-                weather_df[key], from_unit=response["attributes"][f"{key}_unit"], to_unit=unit
+                weather_df[key],
+                from_unit=response["attributes"][f"{key}_unit"],
+                to_unit=unit,
             )
 
         # check timezone is UTC
@@ -69,7 +71,9 @@ class WeatherAPIHASS(WeatherAPI):
             raise ValueError(f"Timezone is not UTC: {weather_df.index.tz}")
 
         # select columns
-        weather_df = weather_df[["temperature", "humidity", "cloud_coverage", "wind_speed"]]
+        weather_df = weather_df[
+            ["temperature", "humidity", "cloud_coverage", "wind_speed"]
+        ]
 
         # add data frequency
         weather_df.index = self._add_freq(weather_df.index)

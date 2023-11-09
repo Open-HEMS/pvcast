@@ -44,7 +44,9 @@ def main():
     datefmt = "%Y-%m-%d %H:%M:%S"
 
     # stdout handler
-    logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    logging.getLogger().handlers[0].setFormatter(
+        logging.Formatter(fmt, datefmt=datefmt)
+    )
 
     cec_inverters = get_cec_inverters()
     cec_modules = get_cec_modules()

@@ -62,7 +62,9 @@ class ForecastResult:
         :return: A new ForecastResult object with the resampled data.
         """
         if freq not in VALID_FREQS:
-            raise ValueError(f"Frequency {freq} not supported. Must be one of {VALID_FREQS}.")
+            raise ValueError(
+                f"Frequency {freq} not supported. Must be one of {VALID_FREQS}."
+            )
         if freq == self.freq:
             return self
 
@@ -96,7 +98,9 @@ class ForecastResult:
                 return idx
         idx.freq = pd.tseries.frequencies.to_offset(freq)
         if idx.freq is None:
-            raise AttributeError("No discernible frequency found to `idx`. Specify a frequency string with `freq`.")
+            raise AttributeError(
+                "No discernible frequency found to `idx`. Specify a frequency string with `freq`."
+            )
         return idx
 
     def energy(self, freq: str = "1D") -> pd.Series:
@@ -110,12 +114,16 @@ class ForecastResult:
         :return: A pd.Series with the energy output of the PV plant.
         """
         if self.ac_power is None:
-            raise ValueError("AC power output is not available, cannot calculate energy. Run simulation first.")
+            raise ValueError(
+                "AC power output is not available, cannot calculate energy. Run simulation first."
+            )
 
         # check if freq is ambiguous (monthly, yearly)
         ambiguous = freq in ("M", "A")
 
-        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta(self.ac_power.index.freq):
+        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta(
+            self.ac_power.index.freq
+        ):
             raise ValueError(
                 f"Cannot calculate energy for a frequency higher than the fundamental data frequency \
                 ({self.ac_power.index.freq})."
@@ -196,7 +204,10 @@ class PowerEstimate(ABC):
         raise NotImplementedError
 
     def _add_percepitable_water(
-        self, weather_df: pd.DataFrame, temp_col: str = "temp_air", rh_col: str = "relative_humidity"
+        self,
+        weather_df: pd.DataFrame,
+        temp_col: str = "temp_air",
+        rh_col: str = "relative_humidity",
     ) -> pd.DataFrame:
         """Add preciptable_water to weather_df if it is not in the weather data already.
 
@@ -206,7 +217,9 @@ class PowerEstimate(ABC):
         :return: The weather data with the preciptable_water column added.
         """
         if "precipitable_water" not in weather_df.columns:
-            weather_df["precipitable_water"] = gueymard94_pw(weather_df[temp_col], weather_df[rh_col])
+            weather_df["precipitable_water"] = gueymard94_pw(
+                weather_df[temp_col], weather_df[rh_col]
+            )
         return weather_df
 
     @property
@@ -234,7 +247,10 @@ class Live(PowerEstimate):
 
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
         # add preciptable_water to weather_df if it is not in the weather data already
-        weather_df.rename(columns={"temperature": "temp_air", "humidity": "relative_humidity"}, inplace=True)
+        weather_df.rename(
+            columns={"temperature": "temp_air", "humidity": "relative_humidity"},
+            inplace=True,
+        )
         weather_df = self._add_percepitable_water(weather_df)
         return weather_df
 
@@ -289,7 +305,9 @@ class Historical(PowerEstimate):
     def model_chain_attrs(self) -> dict:
         return {}
 
-    def get_pvgis_data(self, save_data: bool = True, force_api: bool = False) -> pd.DataFrame:
+    def get_pvgis_data(
+        self, save_data: bool = True, force_api: bool = False
+    ) -> pd.DataFrame:
         """
         Retrieve the PVGIS data using the PVGIS API. Returned data should include the following columns:
         [temp_air, relative_humidity, ghi, dni, dhi, wind_speed]. Other columns are ignored.
@@ -304,7 +322,9 @@ class Historical(PowerEstimate):
         if from_file:
             # read data from CSV file
             _LOGGER.debug("Reading PVGIS data from file at: %s.", self._pvgis_data_path)
-            tmy_data = pd.read_csv(self._pvgis_data_path, index_col=0, parse_dates=True, header=0)
+            tmy_data = pd.read_csv(
+                self._pvgis_data_path, index_col=0, parse_dates=True, header=0
+            )
         else:
             _LOGGER.debug("Retrieving PVGIS data from API.")
             # create parent directory
@@ -314,7 +334,12 @@ class Historical(PowerEstimate):
             lat = round(self.location.latitude, 4)
             lon = round(self.location.longitude, 4)
             tmy_data, __, __, __ = get_pvgis_tmy(
-                latitude=lat, longitude=lon, outputformat="json", startyear=2005, endyear=2016, map_variables=True
+                latitude=lat,
+                longitude=lon,
+                outputformat="json",
+                startyear=2005,
+                endyear=2016,
+                map_variables=True,
             )
 
         # change column names to match the model chain

@@ -207,4 +207,6 @@ def basic_config(request):
 
 @pytest.fixture
 def pv_sys_mngr(basic_config, location, altitude):
-    return PVSystemManager(basic_config, lat=location.latitude, lon=location.longitude, alt=altitude)
+    return PVSystemManager(
+        basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
+    )

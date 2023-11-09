@@ -26,12 +26,16 @@ class ConfigReader:
     def __post_init__(self) -> None:
         """Initialize the class."""
         if not self.config_file_path.exists():
-            raise FileNotFoundError(f"Configuration file {self.config_file_path} not found.")
+            raise FileNotFoundError(
+                f"Configuration file {self.config_file_path} not found."
+            )
 
         # load secrets file and add loader for secrets
         if self.secrets_file_path is not None:
             self._load_secrets_file()
-            yaml.add_constructor("!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader)
+            yaml.add_constructor(
+                "!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader
+            )
             _LOGGER.info("Loaded secrets file %s", self.secrets_file_path)
 
         # load the main configuration file
@@ -40,18 +44,25 @@ class ConfigReader:
                 config = yaml.safe_load(config_file)
             except yaml.YAMLError as exc:
                 _LOGGER.error(
-                    "Error parsing configuration file %s. Did you include secrets.yaml?", self.config_file_path
+                    "Error parsing configuration file %s. Did you include secrets.yaml?",
+                    self.config_file_path,
                 )
-                raise yaml.YAMLError(f"Error parsing configuration file {self.config_file_path}") from exc
+                raise yaml.YAMLError(
+                    f"Error parsing configuration file {self.config_file_path}"
+                ) from exc
 
             # validate the configuration
             Schema(self._config_schema)(config)
 
         # check if the timezone is valid
         try:
-            config["general"]["location"]["timezone"] = pytz.timezone(config["general"]["location"]["timezone"])
+            config["general"]["location"]["timezone"] = pytz.timezone(
+                config["general"]["location"]["timezone"]
+            )
         except UnknownTimeZoneError as exc:
-            raise UnknownTimeZoneError(f"Unknown timezone {config['general']['location']['timezone']}") from exc
+            raise UnknownTimeZoneError(
+                f"Unknown timezone {config['general']['location']['timezone']}"
+            ) from exc
 
         self._config = config
 
@@ -66,7 +77,9 @@ class ConfigReader:
         secret = self._secrets.get(value)
         if secret is None:
             _LOGGER.error("Secret %s not found in %s!", value, self.secrets_file_path)
-            raise yaml.YAMLError(f"Secret {value} not found in {self.secrets_file_path}!")
+            raise yaml.YAMLError(
+                f"Secret {value} not found in {self.secrets_file_path}!"
+            )
         return secret
 
     def _load_secrets_file(self) -> None:

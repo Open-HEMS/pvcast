@@ -18,7 +18,9 @@ def init_logger():
     datefmt = "%Y-%m-%d %H:%M:%S"
 
     # stdout handler
-    logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    logging.getLogger().handlers[0].setFormatter(
+        logging.Formatter(fmt, datefmt=datefmt)
+    )
 
 
 def main():
@@ -28,7 +30,13 @@ def main():
     _LOGGER.info("Starting pvcast webserver")
 
     # start uvicorn server
-    uvicorn.run("pvcast.webserver.app:app", host=WEBSERVER_URL, port=PORT, reload=True, workers=3)
+    uvicorn.run(
+        "pvcast.webserver.app:app",
+        host=WEBSERVER_URL,
+        port=PORT,
+        reload=True,
+        workers=3,
+    )
 
 
 if __name__ == "__main__":
