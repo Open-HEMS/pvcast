@@ -10,8 +10,14 @@ from pathlib import Path
 
 import pandas as pd
 import pvlib
-from const import (INV_PROC_PATH, INV_PVLIB_PATH, INV_SAM_PATH, MOD_PROC_PATH,
-                   MOD_PVLIB_PATH, MOD_SAM_PATH)
+from const import (
+    INV_PROC_PATH,
+    INV_PVLIB_PATH,
+    INV_SAM_PATH,
+    MOD_PROC_PATH,
+    MOD_PVLIB_PATH,
+    MOD_SAM_PATH,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +46,9 @@ def main():
     datefmt = "%Y-%m-%d %H:%M:%S"
 
     # stdout handler
-    logging.getLogger().handlers[0].setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    logging.getLogger().handlers[0].setFormatter(
+        logging.Formatter(fmt, datefmt=datefmt)
+    )
 
     # print paths
     _LOGGER.info("INV_PVLIB_PATH: %s", INV_PVLIB_PATH)
@@ -61,10 +69,16 @@ def main():
 
     # drop duplicates
     if inv_df.duplicated(subset=["index"]).any():
-        _LOGGER.info("Dropping %s duplicate inverters.", len(inv_df[inv_df.duplicated(subset=["index"])]))
+        _LOGGER.info(
+            "Dropping %s duplicate inverters.",
+            len(inv_df[inv_df.duplicated(subset=["index"])]),
+        )
         inv_df = inv_df.drop_duplicates(subset=["index"], keep="first")
     if mod_df.duplicated(subset=["index"]).any():
-        _LOGGER.info("Dropping %s duplicate modules.", len(mod_df[mod_df.duplicated(subset=["index"])]))
+        _LOGGER.info(
+            "Dropping %s duplicate modules.",
+            len(mod_df[mod_df.duplicated(subset=["index"])]),
+        )
         mod_df = mod_df.drop_duplicates(subset=["index"], keep="first")
 
     # sort in alphabetical order

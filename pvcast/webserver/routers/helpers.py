@@ -30,7 +30,8 @@ def multi_idx_to_nested_dict(data: pd.DataFrame, value_only=False) -> OrderedDic
     """
     if isinstance(data.index, MultiIndex):
         return OrderedDict(
-            (k, multi_idx_to_nested_dict(data.loc[k])) for k in data.index.remove_unused_levels().levels[0]
+            (k, multi_idx_to_nested_dict(data.loc[k]))
+            for k in data.index.remove_unused_levels().levels[0]
         )
     if value_only:
         return OrderedDict((k, data.loc[k].values[0]) for k in data.index)
@@ -112,7 +113,9 @@ def get_forecast_result_dict(
     if all_arg:
         result_df[("watt", "Total")] = result_df["watt"].sum(axis=1)
         result_df[("watt_hours", "Total")] = result_df["watt_hours"].sum(axis=1)
-        result_df[("watt_hours_cumsum", "Total")] = result_df["watt_hours_cumsum"].sum(axis=1)
+        result_df[("watt_hours_cumsum", "Total")] = result_df["watt_hours_cumsum"].sum(
+            axis=1
+        )
 
     # check if there are any NaN values in the result
     if result_df.isnull().values.any():

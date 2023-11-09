@@ -48,7 +48,9 @@ class TestHassAPI:
     @pytest.fixture
     def mocked_ha_post(self):
         with responses.RequestsMock() as rsps:
-            rsps.add(responses.POST, self.entity_url, json=self.post_response, status=200)
+            rsps.add(
+                responses.POST, self.entity_url, json=self.post_response, status=200
+            )
             yield rsps
 
     @pytest.fixture
@@ -92,7 +94,9 @@ class TestHassAPI:
 
     def test_get_entity_state(self, hass_api: HassAPI, mocked_ha_weather_data):
         """Test the get_entity_state method."""
-        entity_data: requests.Response = hass_api.get_entity_state(self.weather_entity_id)
+        entity_data: requests.Response = hass_api.get_entity_state(
+            self.weather_entity_id
+        )
         assert entity_data.ok
         assert entity_data.status_code == 200
         assert entity_data.headers["Content-Type"] == "application/json"
@@ -120,12 +124,16 @@ class TestHassAPI:
         with pytest.raises(ValueError):
             hass_api.get_entity_state("wrongentity_id")
 
-    def test_get_entity_state_not_found(self, hass_api: HassAPI, mocked_ha_entity_not_found):
+    def test_get_entity_state_not_found(
+        self, hass_api: HassAPI, mocked_ha_entity_not_found
+    ):
         """Test the get_entity_state method when the entity is not found."""
         with pytest.raises(ValueError):
             hass_api.get_entity_state("not.found")
 
-    def test_get_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_response_err):
+    def test_get_entity_state_connection_error(
+        self, hass_api: HassAPI, mocked_ha_response_err
+    ):
         """Test the get_entity_state method when the connection fails."""
         with pytest.raises(requests.ConnectionError):
             hass_api.get_entity_state(self.weather_entity_id)
@@ -133,7 +141,8 @@ class TestHassAPI:
     def test_post_entity_state(self, hass_api: HassAPI, mocked_ha_post):
         """Test the post_state method."""
         entity_data: requests.Response = hass_api.post_entity_state(
-            self.weather_entity_id, {"state": "25", "attributes": {"unit_of_measurement": "°C"}}
+            self.weather_entity_id,
+            {"state": "25", "attributes": {"unit_of_measurement": "°C"}},
         )
         assert entity_data.ok
         assert entity_data.status_code == 200
@@ -145,9 +154,12 @@ class TestHassAPI:
         assert "last_changed" in entity_data.keys()
         assert "last_updated" in entity_data.keys()
 
-    def test_post_entity_state_connection_error(self, hass_api: HassAPI, mocked_ha_post_err):
+    def test_post_entity_state_connection_error(
+        self, hass_api: HassAPI, mocked_ha_post_err
+    ):
         """Test the post_state method when the connection fails."""
         with pytest.raises(requests.ConnectionError):
             hass_api.post_entity_state(
-                self.weather_entity_id, {"state": "25", "attributes": {"unit_of_measurement": "°C"}}
+                self.weather_entity_id,
+                {"state": "25", "attributes": {"unit_of_measurement": "°C"}},
             )

@@ -12,7 +12,9 @@ from requests.adapters import HTTPAdapter, Retry
 
 s = requests.Session()
 
-retries = Retry(total=4, backoff_factor=0.2, backoff_max=5, status_forcelist=[502, 503, 504])
+retries = Retry(
+    total=4, backoff_factor=0.2, backoff_max=5, status_forcelist=[502, 503, 504]
+)
 
 s.mount("http://", HTTPAdapter(max_retries=retries))
 
@@ -63,7 +65,9 @@ class HassAPI:
         if response.status_code == 404:
             raise ValueError(f"Entity {entity_id} not found.")
         if not response.ok:
-            raise requests.ConnectionError(f"Error while getting entity {entity_id}: {response.reason}")
+            raise requests.ConnectionError(
+                f"Error while getting entity {entity_id}: {response.reason}"
+            )
         return response
 
     def post_entity_state(self, entity_id: str, state: dict) -> Response:
@@ -93,8 +97,14 @@ class HassAPI:
         url = self._format_entity_url(entity_id)
         response: Response = s.post(url, headers=self.headers, json=state)
         if not response.ok:
-            raise requests.ConnectionError(f"Error while posting entity {entity_id}: {response.reason}")
-        _LOGGER.debug("Successfully updated/created entity: %s [code:%s]", entity_id, response.status_code)
+            raise requests.ConnectionError(
+                f"Error while posting entity {entity_id}: {response.reason}"
+            )
+        _LOGGER.debug(
+            "Successfully updated/created entity: %s [code:%s]",
+            entity_id,
+            response.status_code,
+        )
         return response
 
     def _format_entity_url(self, entity_id: str) -> str:

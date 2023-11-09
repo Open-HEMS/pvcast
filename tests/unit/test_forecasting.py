@@ -134,7 +134,9 @@ class TestForecastResult:
         assert energy.index.freq == freq
         # calculate power -> energy conversion factor
         conv_factor = pd.Timedelta(freq).total_seconds() / 3600
-        assert np.allclose(energy.values, forecast_result_res.ac_power.values * conv_factor, atol=3)
+        assert np.allclose(
+            energy.values, forecast_result_res.ac_power.values * conv_factor, atol=3
+        )
 
     @pytest.mark.parametrize("freq", ["1D", "1W", "M", "A"])
     def test_forecast_energy_function_sum(self, forecast_result_year, freq):

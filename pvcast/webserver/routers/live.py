@@ -50,7 +50,9 @@ def post(
     weather_df.index = pd.to_datetime(weather_df["datetime"])
 
     # get the PV power output
-    response_dict = get_forecast_result_dict(str(plant_name.name), pv_system_mngr, "live", interval, weather_df)
+    response_dict = get_forecast_result_dict(
+        str(plant_name.name), pv_system_mngr, "live", interval, weather_df
+    )
 
     # add weather source from weather_dict to response_dict
     response_dict["weather_source"] = weather_dict["source"]

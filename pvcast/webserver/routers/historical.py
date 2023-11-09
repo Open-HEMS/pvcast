@@ -45,14 +45,22 @@ def post(
     """
     # build the datetime index
     if start_end is None:
-        _LOGGER.info("No start and end timestamps provided, using current time and interval")
-        datetimes = weather_api.get_source_dates(weather_api.start_forecast, weather_api.end_forecast, interval)
+        _LOGGER.info(
+            "No start and end timestamps provided, using current time and interval"
+        )
+        datetimes = weather_api.get_source_dates(
+            weather_api.start_forecast, weather_api.end_forecast, interval
+        )
     else:
-        datetimes = weather_api.get_source_dates(start_end.start, start_end.end, interval)
+        datetimes = weather_api.get_source_dates(
+            start_end.start, start_end.end, interval
+        )
 
     # convert datetimes to dataframe
     weather_df = pd.DataFrame(index=datetimes)
 
     # get the PV power output
-    response_dict = get_forecast_result_dict(str(plant_name.name), pv_system_mngr, "historical", interval, weather_df)
+    response_dict = get_forecast_result_dict(
+        str(plant_name.name), pv_system_mngr, "historical", interval, weather_df
+    )
     return HistoricalModel(**response_dict)

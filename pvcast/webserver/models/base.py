@@ -75,8 +75,12 @@ class BaseDataModel(BaseModel):
 class StartEndRequest(BaseModel):
     """Start end request body model."""
 
-    start: Annotated[datetime.datetime, "Start time of the returned data."] = "2023-09-19T15:39+00:00"
-    end: Annotated[datetime.datetime, "End time of the returned data."] = "2023-09-20T15:39+00:00"
+    start: Annotated[
+        datetime.datetime, "Start time of the returned data."
+    ] = "2023-09-19T15:39+00:00"
+    end: Annotated[
+        datetime.datetime, "End time of the returned data."
+    ] = "2023-09-20T15:39+00:00"
 
     @validator("start", "end", pre=True)
     def parse_datetime(cls, value: str) -> datetime:  # pylint: disable=no-self-argument; # noqa: B902
