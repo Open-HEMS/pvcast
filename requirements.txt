@@ -43,7 +43,7 @@ pre-commit==3.5.0
 pre-commit-hooks==4.5.0
 pvlib==0.10.1
 pydantic==2.4.2
-pydantic_core==2.10.1
+pydantic_core==2.14.1
 pylint==3.0.2
 pytest==7.3.1
 pytest-cov==4.0.0
