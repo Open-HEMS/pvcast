@@ -15,7 +15,7 @@ distlib==0.3.7
 docutils==0.20.1
 dparse==0.6.3
 execnet==2.0.2
-fastapi==0.103.1
+fastapi==0.104.1
 filelock==3.13.1
 flit==3.9.0
 flit_core==3.9.0
