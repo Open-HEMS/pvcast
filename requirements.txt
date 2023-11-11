@@ -33,7 +33,7 @@ mock==5.1.0
 mypy==1.7.0
 mypy-extensions==1.0.0
 nodeenv==1.8.0
-numpy==1.24.3
+numpy==1.26.1
 packaging==23.0
 pandas==2.0.2
 pathspec==0.11.2
