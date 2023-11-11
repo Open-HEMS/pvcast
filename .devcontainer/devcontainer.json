@@ -56,15 +56,14 @@
 	},
 	"features": {
 		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/python:1": {
-			"installTools": false
-		},
 		"git-lfs": "latest"
 	},
 	"runArgs": [
 		"--network=host"
 	],
 	"name": "PVCast Photovoltaic forecasting",
-	"onCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
-	"updateContentCommand": "pre-commit install --install-hooks"
+	"postAttachCommand": "pre-commit install --install-hooks",
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=ro"
+	]
 }
