@@ -18,6 +18,9 @@
 				"redhat.vscode-yaml",
 				"esbenp.prettier-vscode",
 				"charliermarsh.ruff",
+				"ms-python.vscode-pylance",
+				"ms-python.black-formatter",
+				"ms-vsliveshare.vsliveshare",
 				"ryanluker.vscode-coverage-gutters",
 				"tamasfe.even-better-toml",
 				"ms-python.black-formatter"
