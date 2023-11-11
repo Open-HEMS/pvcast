@@ -1,38 +1,70 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.222.0/containers/python-3-miniconda
 {
-	"name": "Python Environment",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": ".."
 	},
-	"runArgs": [
-		"--network=host"
-	],
 	"customizations": {
+		"codespaces": {
+			"openFiles": [
+				"README.md"
+			]
+		},
 		"vscode": {
 			"extensions": [
-				"editorconfig.editorconfig",
-				"github.vscode-pull-request-github",
-				"ms-azuretools.vscode-docker",
+				"GitHub.copilot",
+				"GitHub.vscode-pull-request-github",
+				"GitHub.vscode-github-actions",
 				"ms-python.python",
+				"redhat.vscode-yaml",
+				"esbenp.prettier-vscode",
+				"charliermarsh.ruff",
 				"ms-python.vscode-pylance",
 				"ms-python.black-formatter",
 				"ms-vsliveshare.vsliveshare",
 				"ryanluker.vscode-coverage-gutters",
-				"GitHub.copilot",
-				"tamasfe.even-better-toml"
+				"tamasfe.even-better-toml",
+				"ms-python.black-formatter"
 			],
 			"settings": {
+				"[python]": {
+					"editor.codeActionsOnSave": {
+						"source.fixAll": true,
+						"source.organizeImports": true
+					}
+				},
 				"python.defaultInterpreterPath": "/usr/local/bin/python",
 				"black-formatter.path": [
 					"/usr/local/py-utils/bin/black"
-				]
+				],
+				"coverage-gutters.customizable.context-menu": true,
+				"coverage-gutters.customizable.status-bar-toggler-watchCoverageAndVisibleEditors-enabled": true,
+				"coverage-gutters.showGutterCoverage": false,
+				"coverage-gutters.showLineCoverage": true,
+				"coverage-gutters.xmlname": "coverage.xml",
+				"python.analysis.extraPaths": [
+					"${workspaceFolder}/src"
+				],
+				"python.formatting.provider": "black",
+				"python.testing.cwd": "${workspaceFolder}",
+				"python.testing.pytestArgs": [
+					"--cov-report=xml"
+				],
+				"python.testing.pytestEnabled": true,
+				"terminal.integrated.defaultProfile.linux": "zsh"
 			}
 		}
 	},
-	"onCreateCommand": "pre-commit install-hooks",
 	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers/features/python:1": {
+			"installTools": false
+		},
 		"git-lfs": "latest"
-	}
+	},
+	"runArgs": [
+		"--network=host"
+	],
+	"name": "PVCast Photovoltaic forecasting",
+	"onCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder}",
+	"updateContentCommand": "pre-commit install --install-hooks"
 }
