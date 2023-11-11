@@ -56,9 +56,6 @@
 	},
 	"features": {
 		"ghcr.io/devcontainers/features/github-cli:1": {},
-		"ghcr.io/devcontainers/features/python:1": {
-			"installTools": false
-		},
 		"git-lfs": "latest"
 	},
 	"runArgs": [
