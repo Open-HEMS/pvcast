@@ -18,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 class WeatherAPIClearOutside(WeatherAPI):
     """Weather API class that scrapes the data from Clear Outside."""
 
+    sourcetype: str = field(default="clearoutside")
     url: str = field(init=False)
     _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
     _columns: list = field(default_factory=list)

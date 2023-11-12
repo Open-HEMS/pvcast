@@ -10,8 +10,8 @@ from typing_extensions import Annotated
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
 from ..models.base import Interval, PVPlantNames
-from ..models.live import LiveModel
-from ..routers.dependencies import get_pv_system_mngr, get_weather_api
+from ..models.live import LiveModel, WeatherSources
+from ..routers.dependencies import get_pv_system_mngr, get_weather_sources
 from .helpers import get_forecast_result_dict
 
 router = APIRouter()
@@ -19,11 +19,12 @@ router = APIRouter()
 _LOGGER = logging.getLogger("uvicorn")
 
 
-@router.post("/{plant_name}/{interval}")
+@router.post("/{plant_name}/{interval}/{weather_source}")
 def post(
     plant_name: PVPlantNames,
+    weather_source: WeatherSources,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
-    weather_api: Annotated[WeatherAPI, Depends(get_weather_api)],
+    weather_apis: Annotated[WeatherAPI, Depends(get_weather_sources)],
     interval: Interval = Interval.H1,
 ) -> LiveModel:
     """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
@@ -42,6 +43,14 @@ def post(
     :param interval: Interval of the returned data
     :return: Estimated PV power output in Watts at the given interval <interval> for the given PV system <name>
     """
+    # get the correct weather API from the list of weather APIs
+    for api in weather_apis:
+        if api.name == weather_source.value:
+            weather_api = api
+            break
+    else:
+        raise ValueError(f"Could not find weather source {weather_source.value}")
+
     # get the weather data
     weather_dict: dict = weather_api.get_weather(calc_irrads=True)
 

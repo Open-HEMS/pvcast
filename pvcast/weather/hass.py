@@ -19,6 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 class WeatherAPIHASS(WeatherAPI):
     """Weather API class that retrieves weather data from Home Assistant entity."""
 
+    sourcetype: str = field(default="homeassistant")
     entity_id: str = field(default=None)
     url: str = field(default=None)
     token: str = field(default=None)

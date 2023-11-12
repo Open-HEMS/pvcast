@@ -98,6 +98,12 @@ class WeatherAPI(ABC):
     location: Location
     url: str
 
+    # weather API source type identifier
+    sourcetype: str = field(default="")
+
+    # weather API unique name
+    name: str = field(default="")
+
     # timeout in seconds for the API request
     timeout: int = field(default=10)
 
