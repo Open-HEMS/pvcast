@@ -70,7 +70,6 @@ typing_extensions==4.8.0
 tzdata==2023.3
 urllib3==2.0.7
 uvicorn==0.24.0.post1
-virtualenv==20.24.6
 voluptuous==0.13.1
 yamllint==1.33.0
 types-requests==2.31.0.10
