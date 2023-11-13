@@ -19,7 +19,6 @@ general:
     timezone: !secret time_zone
     altitude: !secret alt
 
-
 # PV system configuration
 plant:
   - name: EastWest

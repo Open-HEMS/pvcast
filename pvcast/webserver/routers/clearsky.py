@@ -5,7 +5,7 @@ import logging
 
 import pandas as pd
 from fastapi import APIRouter, Depends
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Optional
 
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
@@ -23,8 +23,8 @@ _LOGGER = logging.getLogger("uvicorn")
 def post(
     plant_name: PVPlantNames,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
-    weather_api: Annotated[WeatherAPI, Depends(get_weather_sources)],
-    start_end: StartEndRequest = None,
+    weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
+    start_end: Optional[StartEndRequest] | None = None,
     interval: Interval = Interval.H1,
 ) -> ClearskyModel:
     """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
@@ -44,7 +44,7 @@ def post(
     :return: Estimated PV power output in Watts at the given interval <interval> for the given PV system <name>
     """
     # for clearsky we don't care which weather API is used, so just use the first one
-    weather_api = weather_api[0]
+    weather_api = weather_apis[0]
 
     # build the datetime index
     if start_end is None:

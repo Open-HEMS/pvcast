@@ -6,6 +6,7 @@ import logging
 from dataclasses import InitVar, dataclass, field
 from pathlib import Path
 from types import MappingProxyType
+from typing import Any
 
 import pandas as pd
 import pvlib
@@ -43,11 +44,11 @@ class PVPlantModel:
     :param loc: The location of the PV plant.
     """
 
-    config: InitVar[dict]
+    config: InitVar[MappingProxyType[str, Any]]
     location: Location = field(repr=False)
     inv_param: pd.DataFrame = field(repr=False)
     mod_param: pd.DataFrame = field(repr=False)
-    temp_param: dict = field(
+    temp_param: dict[str, dict[str, dict[str, Any]]] = field(
         default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"],
         repr=False,
     )
@@ -57,7 +58,7 @@ class PVPlantModel:
     _historical: Historical = field(init=False, repr=False)
     _live: Live = field(init=False, repr=False)
 
-    def __post_init__(self, config: dict):
+    def __post_init__(self, config: MappingProxyType[str, Any]) -> None:
         pv_systems = self._create_pv_systems(config)
         self._pv_models = self._build_model_chain(
             pv_systems, self.location, config["name"]
@@ -70,26 +71,26 @@ class PVPlantModel:
         self._live = Live(location=self.location, pv_plant=self)
 
     @property
-    def clearsky(self):
+    def clearsky(self) -> Clearsky:
         """The clear sky forecast result."""
         return self._clearsky
 
     @property
-    def historical(self):
+    def historical(self) -> Historical:
         """The historical forecast result."""
         return self._historical
 
     @property
-    def live(self):
+    def live(self) -> Live:
         """The live weather forecast result."""
         return self._live
 
     @property
-    def models(self):
+    def models(self) -> list[ModelChain]:
         """The PV system model chains."""
         return self._pv_models
 
-    def _create_pv_systems(self, config: dict) -> list[PVSystem]:
+    def _create_pv_systems(self, config: MappingProxyType[str, Any]) -> list[PVSystem]:
         """
         Create the PV system. This method is called by __post_init__.
 
@@ -98,7 +99,7 @@ class PVPlantModel:
         _LOGGER.debug("Creating PV system model for system %s", config["name"])
         micro: bool = config["microinverter"]
         inverter: str = config["inverter"]
-        arrays: list = config["arrays"]
+        arrays: list[dict[str, str | int]] = config["arrays"]
         name: str = config["name"]
 
         # system uses microinverters, create one model chain for each PV module
@@ -110,7 +111,7 @@ class PVPlantModel:
         return pv_systems
 
     def _build_system_micro(
-        self, arrays: list[dict], inverter: str, name: str | None = None
+        self, arrays: list[dict[str, str | int]], inverter: str, name: str | None = None
     ) -> list[PVSystem]:
         """Build a PV system model for a system with microinverters.
 
@@ -124,11 +125,13 @@ class PVPlantModel:
 
         # create a PVSystem for each microinverter
         for _, array in enumerate(arrays):
-            n_modules = array["strings"] * array["modules_per_string"]
+            n_modules = int(array["strings"]) * int(array["modules_per_string"])
             mount = FixedMount(
                 surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
             )
-            module_param = self._retrieve_parameters(array["module"], inverter=False)
+            module_param = self._retrieve_parameters(
+                str(array["module"]), inverter=False
+            )
             inv_param = self._retrieve_parameters(inverter, inverter=True)
 
             # each module has it's own inverter therefore must have its own PVSystem
@@ -157,7 +160,7 @@ class PVPlantModel:
         return pv_systems
 
     def _build_system_string(
-        self, arrays: list[dict], inverter: str, name: str | None = None
+        self, arrays: list[dict[str, str | int]], inverter: str, name: str | None = None
     ) -> list[PVSystem]:
         """Build a PV system model for a system with a regular string inverter.
 
@@ -174,7 +177,9 @@ class PVPlantModel:
             mount = FixedMount(
                 surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
             )
-            module_param = self._retrieve_parameters(array["module"], inverter=False)
+            module_param = self._retrieve_parameters(
+                str(array["module"]), inverter=False
+            )
 
             # define PV array
             arr = Array(
@@ -198,7 +203,7 @@ class PVPlantModel:
 
         return [pv_system]
 
-    def _retrieve_parameters(self, device: str, inverter: bool) -> dict:
+    def _retrieve_parameters(self, device: str, inverter: bool) -> dict[str, Any]:
         """Retrieve module or inverter parameters from the pvlib/SAM databases.
 
         :param device: The name of the module or inverter.
@@ -213,7 +218,7 @@ class PVPlantModel:
 
         # check if device is in the database
         try:
-            params = candidates.loc[device].to_dict()
+            params: dict[str, Any] = candidates.loc[device].to_dict()
             _LOGGER.debug(
                 "Found params %s for device %s in the database.", params, device
             )
@@ -245,14 +250,14 @@ class PVPlantModel:
         :return: The aggregated results.
         """
         # extract results.key
-        data = [getattr(result, key) for result in results]
+        data: list[Any] = [getattr(result, key) for result in results]
 
         # combine results
-        data: pd.DataFrame = pd.concat(data, axis=1)
-        data = data.sum(axis=1).clip(lower=0)
+        data_frame: pd.DataFrame = pd.concat(data, axis=1)
+        data_frame = data_frame.sum(axis=1).clip(lower=0)
 
         # convert to pd.Series and return
-        return data.squeeze()
+        return data_frame.squeeze()
 
 
 @dataclass
@@ -271,7 +276,7 @@ class PVSystemManager:
     """
 
     _loc: Location = field(init=False, repr=False)
-    config: list[MappingProxyType[dict]]
+    config: list[MappingProxyType[str, Any]]
     lat: InitVar[float] = field(repr=False)
     lon: InitVar[float] = field(repr=False)
     alt: InitVar[float] = field(default=0.0, repr=False)
@@ -281,11 +286,11 @@ class PVSystemManager:
     mod_path: InitVar[Path] = field(
         default=BASE_CEC_DATA_PATH / "cec_modules.csv", repr=False
     )
-    _pv_plants: dict[PVPlantModel] = field(init=False, repr=False)
+    _pv_plants: dict[str, PVPlantModel] = field(init=False, repr=False)
 
     def __post_init__(
         self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path
-    ):
+    ) -> None:
         self._loc = Location(
             lat, lon, tz="UTC", altitude=alt, name=f"PV plant at {lat}, {lon}"
         )
@@ -297,12 +302,12 @@ class PVSystemManager:
         )
 
     @property
-    def location(self):
+    def location(self) -> Location:
         """Location of the PV system encoded as a PVLib Location object."""
         return self._loc
 
     @property
-    def pv_plants(self):
+    def pv_plants(self) -> dict[str, PVPlantModel]:
         """The PV plants."""
         return self._pv_plants
 
@@ -335,7 +340,7 @@ class PVSystemManager:
 
     def _create_pv_plants(
         self, inv_param: pd.DataFrame, mod_param: pd.DataFrame
-    ) -> dict[PVPlantModel]:
+    ) -> dict[str, PVPlantModel]:
         """Create a PVPlantModel object from a user supplied config.
 
         :return: List of PV system model chains. One ModelChain instance for each inverter in the config.
@@ -356,4 +361,4 @@ class PVSystemManager:
     @property
     def plant_names(self) -> list[str]:
         """Return the names of the PV plants."""
-        return self._pv_plants.keys()
+        return list(self._pv_plants.keys())

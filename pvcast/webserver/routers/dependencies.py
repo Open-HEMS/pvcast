@@ -30,7 +30,7 @@ def get_pv_system_mngr() -> PVSystemManager:
 
 
 @lru_cache
-def get_weather_sources() -> tuple[WeatherAPI]:
+def get_weather_sources() -> tuple[WeatherAPI, ...]:
     """Get the weather API instances from _config_reader."""
     # all sources of weather data must be listed in the config file
     weather_data_sources = _config_reader.config["general"]["weather"]["sources"]

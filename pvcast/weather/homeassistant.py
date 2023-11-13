@@ -9,28 +9,27 @@ from dataclasses import dataclass, field
 import pandas as pd
 from requests import Response
 
-from ..hass.hassapi import HassAPI
-from ..weather.weather import WeatherAPI
+from ..homeassistant.homeassistantapi import HomeassistantAPI
+from .weather import WeatherAPI
 
 _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class WeatherAPIHASS(WeatherAPI):
+class WeatherAPIHomeassistant(WeatherAPI):
     """Weather API class that retrieves weather data from Home Assistant entity."""
 
+    entity_id: str | None = field(default=None)
     sourcetype: str = field(default="homeassistant")
-    entity_id: str = field(default=None)
-    url: str = field(default=None)
-    token: str = field(default=None)
-    _hass_api: HassAPI = field(init=False)
+    token: str | None = field(default=None)
+    _hass_api: HomeassistantAPI = field(init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.entity_id:
             raise ValueError("Entity ID not set.")
         if not self.token:
             raise ValueError("Token not set.")
-        self._hass_api = HassAPI(token=self.token, hass_url=self.url)
+        self._hass_api = HomeassistantAPI(token=self.token, hass_url=self.url)
 
     def _do_request(self) -> Response:
         """
@@ -39,7 +38,8 @@ class WeatherAPIHASS(WeatherAPI):
 
         :return: Response from Home Assistant API.
         """
-        return self._hass_api.get_entity_state(self.entity_id)
+        # we already check for None in self.get_weather()
+        return self._hass_api.get_entity_state(self.entity_id)  # type: ignore[arg-type]
 
     def _process_data(self) -> pd.DataFrame:
         """Process weather data from the Home Assistant API.
@@ -49,6 +49,8 @@ class WeatherAPIHASS(WeatherAPI):
         :return: Processed weather data.
         """
         # raw response data from request
+        if not self._raw_data:
+            raise ValueError("Field self._raw_data not set, run self.get_data() first.")
         response = self._raw_data.json()
         weather_df = pd.DataFrame(response["attributes"]["forecast"])
         weather_df["datetime"] = pd.to_datetime(weather_df["datetime"])

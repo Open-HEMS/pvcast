@@ -21,13 +21,13 @@ class WeatherAPIClearOutside(WeatherAPI):
     sourcetype: str = field(default="clearoutside")
     url: str = field(init=False)
     _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
-    _columns: list = field(default_factory=list)
+    _columns: list[str] = field(default_factory=list)
 
-    def __post_init__(self, _url_base: str):
+    def __post_init__(self, _url_base: str) -> None:
         self.url = self._url_formatter(_url_base)
         self._columns = ["cloud_coverage", "wind_speed", "temperature", "humidity"]
 
-    def _url_formatter(self, url_base) -> str:
+    def _url_formatter(self, url_base: str) -> str:
         """Format the url to the API."""
 
         def encode(coord: float) -> str:
@@ -46,6 +46,8 @@ class WeatherAPIClearOutside(WeatherAPI):
         This function takes no arguments, but response.content must be retrieved from self._raw_data.
         """
         # raw response data from request
+        if not self._raw_data:
+            raise ValueError("Field self._raw_data not set, run self.get_data() first.")
         response = self._raw_data
 
         # response (source) data bucket
@@ -82,7 +84,7 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         return weather_df
 
-    def _find_elements(self, table: list) -> pd.DataFrame:
+    def _find_elements(self, table: BeautifulSoup) -> pd.DataFrame:
         """Find weather data elements in the table.
 
         :param table: The table to search.

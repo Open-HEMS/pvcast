@@ -38,7 +38,7 @@ def retrieve_sam_wrapper(path: Path) -> pd.DataFrame:
     return pv_df
 
 
-def main():
+def main() -> None:
     """Main function."""
     # configure logging
     logging.basicConfig(level=logging.DEBUG)

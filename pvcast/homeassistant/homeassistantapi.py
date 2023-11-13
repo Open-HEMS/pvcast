@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import InitVar, dataclass, field
+from typing import Any
 from urllib.parse import urljoin
 
 import requests
@@ -22,14 +23,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
-class HassAPI:
+class HomeassistantAPI:
     """Home Assistant API interface."""
 
     hass_url: str
     token: InitVar[str]
-    _headers: dict = field(default_factory=dict, init=False, repr=False)
+    _headers: dict[str, str] = field(default_factory=dict, init=False, repr=False)
 
-    def __post_init__(self, token: str):
+    def __post_init__(self, token: str) -> None:
         self._headers = {
             "Authorization": "Bearer " + token,
             "Content-Type": "application/json",
@@ -41,7 +42,7 @@ class HassAPI:
         return urljoin(self.hass_url, "api/")
 
     @property
-    def headers(self) -> dict:
+    def headers(self) -> dict[str, str]:
         """Return the headers to the Home Assistant API."""
         return self._headers
 
@@ -70,7 +71,7 @@ class HassAPI:
             )
         return response
 
-    def post_entity_state(self, entity_id: str, state: dict) -> Response:
+    def post_entity_state(self, entity_id: str, state: dict[str, Any]) -> Response:
         """Post the state object for specified entity_id.
 
         Response will be something like:

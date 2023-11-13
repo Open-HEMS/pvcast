@@ -10,19 +10,19 @@ from const import INV_PVLIB_PATH, MOD_PVLIB_PATH
 _LOGGER = logging.getLogger(__name__)
 
 
-def get_cec_inverters():
+def get_cec_inverters() -> pd.DataFrame:
     """Retrieve CEC inverters from PVLib."""
     cec_inverters = pvlib.pvsystem.retrieve_sam("CECInverter")
     return cec_inverters
 
 
-def get_cec_modules():
+def get_cec_modules() -> pd.DataFrame:
     """Retrieve CEC modules from PVLib."""
     cec_modules = pvlib.pvsystem.retrieve_sam("CECMod")
     return cec_modules
 
 
-def save_to_csv(data: pd.DataFrame, path: pl.Path):
+def save_to_csv(data: pd.DataFrame, path: pl.Path) -> None:
     """Save datafram to CSV file."""
     cols = data.columns
     data = data.transpose()
@@ -36,7 +36,7 @@ def save_to_csv(data: pd.DataFrame, path: pl.Path):
     data.to_csv(path, index=False)
 
 
-def main():
+def main() -> None:
     """Main function."""
     # configure logging
     logging.basicConfig(level=logging.DEBUG)

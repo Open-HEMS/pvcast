@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter, Depends
@@ -24,7 +25,7 @@ def post(
     plant_name: PVPlantNames,
     weather_source: WeatherSources,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
-    weather_apis: Annotated[WeatherAPI, Depends(get_weather_sources)],
+    weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
     interval: Interval = Interval.H1,
 ) -> LiveModel:
     """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
@@ -52,7 +53,7 @@ def post(
         raise ValueError(f"Could not find weather source {weather_source.value}")
 
     # get the weather data
-    weather_dict: dict = weather_api.get_weather(calc_irrads=True)
+    weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)
 
     # convert to dataframe with datetime index
     weather_df = pd.DataFrame(weather_dict["data"])

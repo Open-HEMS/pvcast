@@ -11,7 +11,7 @@ from .webserver.const import PORT, WEBSERVER_URL
 _LOGGER = logging.getLogger(__name__)
 
 
-def init_logger():
+def init_logger() -> None:
     """Initialize python logger."""
     logging.basicConfig(level=logging.DEBUG)
     fmt = "%(asctime)s %(levelname)s (%(threadName)s) " + "[%(name)s] %(message)s"
@@ -23,7 +23,7 @@ def init_logger():
     )
 
 
-def main():
+def main() -> None:
     """Entry point for the application script"""
     # initialize logger
     init_logger()
