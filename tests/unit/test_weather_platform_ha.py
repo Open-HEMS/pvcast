@@ -1,6 +1,7 @@
-"""Tests specific to the HASS weather platform."""
+"""Tests specific to the homeassistantweather platform."""
 from __future__ import annotations
 
+from typing import Any, Generator
 from urllib.parse import urljoin
 
 import pandas as pd
@@ -9,13 +10,13 @@ import requests
 import responses
 from pvlib.location import Location
 
-from pvcast.weather.hass import WeatherAPIHASS
+from pvcast.weather.homeassistant import WeatherAPIHomeassistant
 
 from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestWeatherPlatformHASS:
-    """A few extra tests for the HASS weather platform specific functionality."""
+    """A few extra tests for the homeassistant weather platform specific functionality."""
 
     hass_url = urljoin(HASS_TEST_URL, "/api/")
     valid_temp_units = ["°C", "°F", "C", "F"]
@@ -29,21 +30,25 @@ class TestWeatherPlatformHASS:
     token = HASS_TEST_TOKEN
 
     @pytest.fixture(params=valid_temp_units + ["wrong"])
-    def temperature_unit(self, ha_weather_data, request):
+    def temperature_unit(
+        self, ha_weather_data: dict[str, Any], request: pytest.FixtureRequest
+    ) -> dict[str, Any]:
         """Load the weather test data."""
         ha_weather_data["attributes"]["temperature_unit"] = request.param
         return ha_weather_data
 
     @pytest.fixture(params=valid_speed_units + ["wrong"])
-    def wind_speed_unit(self, temperature_unit, request):
+    def wind_speed_unit(
+        self, temperature_unit: dict[str, Any], request: pytest.FixtureRequest
+    ) -> dict[str, Any]:
         """Load the weather test data."""
         temperature_unit["attributes"]["wind_speed_unit"] = request.param
         return temperature_unit
 
     @pytest.fixture
-    def weatherapi(self, location):
+    def weatherapi(self, location: Location) -> WeatherAPIHomeassistant:
         """Fixture that creates a weather API interface."""
-        return WeatherAPIHASS(
+        return WeatherAPIHomeassistant(
             entity_id="weather.forecast_thuis_hourly",
             url=HASS_TEST_URL,
             token=HASS_TEST_TOKEN,
@@ -51,7 +56,9 @@ class TestWeatherPlatformHASS:
         )
 
     @pytest.fixture
-    def mock_ha_api(self, wind_speed_unit, weatherapi):
+    def mock_ha_api(
+        self, wind_speed_unit: dict[str, Any], weatherapi: WeatherAPIHomeassistant
+    ) -> Generator[WeatherAPIHomeassistant, None, None]:
         """Mock a HA weather API response and return the weatherapi object."""
         with responses.RequestsMock() as rsps:
             rsps.add(
@@ -59,24 +66,24 @@ class TestWeatherPlatformHASS:
             )
             yield weatherapi
 
-    def test_hass_init_errors(self):
-        """Init WeatherAPIHASS with wrong parameters."""
+    def test_hass_init_errors(self) -> None:
+        """Init WeatherAPIhomeassistantwith wrong parameters."""
         with pytest.raises(ValueError, match="Token not set."):
-            WeatherAPIHASS(
+            WeatherAPIHomeassistant(
                 entity_id="weather.forecast_thuis_hourly",
                 url=HASS_TEST_URL,
                 token=None,
                 location=None,
             )
         with pytest.raises(ValueError, match="Entity ID not set."):
-            WeatherAPIHASS(
+            WeatherAPIHomeassistant(
                 entity_id=None,
                 url=HASS_TEST_URL,
                 token=None,
                 location=None,
             )
 
-    def test_hass_process_data(self, mock_ha_api: WeatherAPIHASS):
+    def test_hass_process_data(self, mock_ha_api: WeatherAPIHomeassistant) -> None:
         """Test the process_data function."""
         resp = requests.get(self.hass_url)
         mock_ha_api._raw_data = resp
@@ -96,7 +103,7 @@ class TestWeatherPlatformHASS:
             assert not weather_df.isna().values.any()
 
     @responses.activate
-    def test_hass_data_wrong_timezone(self, ha_weather_data):
+    def test_hass_data_wrong_timezone(self, ha_weather_data: dict[str, Any]) -> None:
         """Test the process_data function with wrong timezone"""
         forecast = ha_weather_data["attributes"]["forecast"]
         for datadict in forecast:
@@ -106,7 +113,7 @@ class TestWeatherPlatformHASS:
         resp = requests.get(self.hass_url)
 
         # test the _process_data function
-        weatherapi = WeatherAPIHASS(
+        weatherapi = WeatherAPIHomeassistant(
             entity_id="test.entity",
             url=HASS_TEST_URL,
             token=HASS_TEST_TOKEN,

@@ -10,6 +10,7 @@ from pvlib.location import Location
 from ...config.configreader import ConfigReader
 from ...model.model import PVSystemManager
 from ...weather import API_FACTORY
+from ...weather.weather import WeatherAPI
 
 # create a singleton config reader
 _config_path = Path("config.yaml")
@@ -29,26 +30,37 @@ def get_pv_system_mngr() -> PVSystemManager:
 
 
 @lru_cache
-def get_weather_api() -> API_FACTORY:
-    """Get the weather API instance from _config_reader."""
-    # metadata are all keys at level "source" which are not "source"
-    metadata: dict = _config_reader.config["general"]["weather"]["weather_source"]
-    weather_data_source = metadata.pop("source")
+def get_weather_sources() -> tuple[WeatherAPI, ...]:
+    """Get the weather API instances from _config_reader."""
+    # all sources of weather data must be listed in the config file
+    weather_data_sources = _config_reader.config["general"]["weather"]["sources"]
+
     max_forecast_days = pd.Timedelta(
         days=int(_config_reader.config["general"]["weather"]["max_forecast_days"])
     )
+
+    # get the location
     latitude = _config_reader.config["general"]["location"]["latitude"]
     longitude = _config_reader.config["general"]["location"]["longitude"]
     altitude = _config_reader.config["general"]["location"]["altitude"]
     location = Location(
         latitude=latitude, longitude=longitude, tz="UTC", altitude=altitude
     )
-    return API_FACTORY.get_weather_api(
-        weather_data_source,
-        max_forecast_days=max_forecast_days,
-        location=location,
-        **metadata,
-    )
 
+    # get all weather APIs from the factory
+    weather_apis = []
+    for source in weather_data_sources:
+        # metadata is everything except name and type
+        metadata = source.copy()
+        source_type = metadata.pop("type")
 
-__all__ = ["get_pv_system_mngr"]
+        # add the weather API to the list
+        weather_apis.append(
+            API_FACTORY.get_weather_api(
+                source_type,
+                max_forecast_days=max_forecast_days,
+                location=location,
+                **metadata,
+            )
+        )
+    return tuple(weather_apis)

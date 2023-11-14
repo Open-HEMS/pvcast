@@ -6,6 +6,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -98,6 +99,12 @@ class WeatherAPI(ABC):
     location: Location
     url: str
 
+    # weather API source type identifier
+    sourcetype: str = field(default="")
+
+    # weather API unique name
+    name: str = field(default="")
+
     # timeout in seconds for the API request
     timeout: int = field(default=10)
 
@@ -119,7 +126,7 @@ class WeatherAPI(ABC):
     )  # last time the weather data was updated
 
     # raw response data from the API
-    _raw_data: Response = field(default=None, init=False)
+    _raw_data: Response | None = field(default=None, init=False)
 
     @property
     def start_forecast(self) -> pd.Timestamp:
@@ -194,7 +201,9 @@ class WeatherAPI(ABC):
         :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
         """
 
-    def get_weather(self, live: bool = False, calc_irrads: bool = False) -> dict:
+    def get_weather(
+        self, live: bool = False, calc_irrads: bool = False
+    ) -> dict[str, Any]:
         """
         Get weather data from API response. This function will always return data return in UTC.
 
@@ -329,11 +338,11 @@ class WeatherAPI(ABC):
             elif response.status_code == 429:
                 raise WeatherAPIErrorTooManyReq()
             else:
-                raise WeatherAPIError(response.status_code)
+                raise WeatherAPIError("Unknown error", response.status_code)
 
     def cloud_cover_to_irradiance(
-        self, cloud_cover: pd.Series, how: str = "clearsky_scaling", **kwargs
-    ):
+        self, cloud_cover: pd.Series, how: str = "clearsky_scaling", **kwargs: Any
+    ) -> pd.DataFrame:
         """
         Convert cloud cover to irradiance. A wrapper method.
 
@@ -359,8 +368,8 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_irradiance_clearsky_scaling(
-        self, cloud_cover: pd.Series, method="linear", **kwargs
-    ):
+        self, cloud_cover: pd.Series, method: str = "linear", **kwargs: Any
+    ) -> pd.DataFrame:
         """
         Convert cloud cover to irradiance using the clearsky scaling method.
 
@@ -389,8 +398,8 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_irradiance_campbell_norman(
-        self, cloud_cover: pd.Series, **kwargs
-    ):
+        self, cloud_cover: pd.Series, **kwargs: Any
+    ) -> pd.DataFrame:
         """
         Convert cloud cover to irradiance using the Campbell and Norman model.
 
@@ -412,7 +421,7 @@ class WeatherAPI(ABC):
 
     def _cloud_cover_to_ghi_linear(
         self, cloud_cover: pd.Series, ghi_clear: pd.Series, offset: float = 35.0
-    ):
+    ) -> pd.Series:
         """
         Convert cloud cover to GHI using a linear relationship.
 
@@ -428,7 +437,7 @@ class WeatherAPI(ABC):
 
     def cloud_cover_to_transmittance_linear(
         self, cloud_cover: pd.Series, offset: float = 0.75
-    ):
+    ) -> pd.Series:
         """
         Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
@@ -439,7 +448,9 @@ class WeatherAPI(ABC):
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
 
-    def _add_freq(self, idx: pd.DatetimeIndex, freq=None) -> pd.DatetimeIndex:
+    def _add_freq(
+        self, idx: pd.DatetimeIndex, freq: str | None = None
+    ) -> pd.DatetimeIndex:
         """Add a frequency attribute to idx, through inference or directly.
 
         Returns a copy.  If `freq` is None, it is inferred.
@@ -466,8 +477,8 @@ class WeatherAPI(ABC):
 class WeatherAPIError(Exception):
     """Exception class for weather API errors."""
 
-    error: int
     message: str = field(default="Weather API error")
+    error: int = field(default=-1)
 
 
 @dataclass(frozen=True)
@@ -477,7 +488,7 @@ class WeatherAPIErrorNoData(WeatherAPIError):
     message: str = field(default="No weather data available")
 
     @classmethod
-    def from_date(cls, date: str):
+    def from_date(cls, date: str) -> WeatherAPIErrorNoData:
         """Create an exception for a specific date.
 
         :param date: The date for which no weather data is available.
@@ -521,9 +532,11 @@ class WeatherAPIErrorNoLocation(WeatherAPIError):
 class WeatherAPIFactory:
     """Factory class for weather APIs."""
 
-    _apis: dict[str, WeatherAPI] = field(default_factory=dict)
+    _apis: dict[str, Callable[..., WeatherAPI]] = field(default_factory=dict)
 
-    def register(self, api_id: str, weather_api_class: WeatherAPI) -> None:
+    def register(
+        self, api_id: str, weather_api_class: Callable[..., WeatherAPI]
+    ) -> None:
         """
         Register a new weather API class to the factory.
 
@@ -532,7 +545,7 @@ class WeatherAPIFactory:
         """
         self._apis[api_id] = weather_api_class
 
-    def get_weather_api(self, api_id: str, **kwargs) -> WeatherAPI:
+    def get_weather_api(self, api_id: str, **kwargs: Any) -> WeatherAPI:
         """
         Get a weather API instance.
 
@@ -541,13 +554,13 @@ class WeatherAPIFactory:
         :return: The weather API instance.
         """
         try:
-            weather_api_class = self._apis[api_id]
+            weather_api_class: Callable[..., WeatherAPI] = self._apis[api_id]
         except KeyError as exc:
             raise ValueError(f"Unknown weather API: {api_id}") from exc
 
         return weather_api_class(**kwargs)
 
-    def get_weather_api_list_obj(self) -> list[WeatherAPI]:
+    def get_weather_api_list_obj(self) -> list[Callable[..., WeatherAPI]]:
         """
         Get a list of all registered weather API instances.
 

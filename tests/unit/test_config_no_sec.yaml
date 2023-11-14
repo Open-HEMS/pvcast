@@ -5,8 +5,9 @@
 general:
   weather:
     max_forecast_days: 7
-    weather_source:
-      source: clearoutside
+    sources:
+      - name: CO
+        type: clearoutside
   location:
     latitude: 52.35845515630293
     longitude: 4.88115070391368

@@ -45,11 +45,11 @@ class ForecastResult:
 
     name: str
     type: ForecastType
-    ac_power: pd.Series = field(repr=False, default=None)
-    dc_power: tuple[pd.Series] = field(repr=False, default=None)
+    ac_power: pd.Series | None = field(repr=False, default=None)
+    dc_power: tuple[pd.Series] | None = field(repr=False, default=None)
     freq: str = field(repr=False, default="1H")
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Post-initialization function."""
         if self.ac_power is not None and self.ac_power.index.freq is None:
             self.ac_power.index = self._add_freq(self.ac_power.index)
@@ -81,7 +81,9 @@ class ForecastResult:
         plant_cpy.ac_power = res_f(plant_cpy.ac_power).astype("int64")
         return plant_cpy
 
-    def _add_freq(self, idx: pd.DatetimeIndex, freq=None) -> pd.DatetimeIndex:
+    def _add_freq(
+        self, idx: pd.DatetimeIndex, freq: str | None = None
+    ) -> pd.DatetimeIndex:
         """Add a frequency attribute to idx, through inference or directly.
 
         Returns a copy.  If `freq` is None, it is inferred.
@@ -152,6 +154,10 @@ class ForecastResult:
 
         :return: A pd.Series with the energy output of the PV plant.
         """
+        if self.ac_power is None:
+            raise ValueError(
+                "AC power output is not available, cannot calculate energy. Run simulation first."
+            )
         return self.energy(freq=self.ac_power.index.freq)
 
 
@@ -159,12 +165,12 @@ class ForecastResult:
 class PowerEstimate(ABC):
     """Abstract base class to do PV power estimation."""
 
+    location: Location = field(repr=False)
+    pv_plant: PVPlantModel = field(repr=False)
     type: ForecastType = field(default=ForecastType.LIVE)
-    location: Location = field(repr=False, default=None)
-    pv_plant: PVPlantModel = field(repr=False, default=None)
-    _result: ForecastResult = field(repr=False, default=None)
+    _result: ForecastResult | None = field(repr=False, default=None)
 
-    def run(self, weather_df: pd.DataFrame = None) -> ForecastResult:
+    def run(self, weather_df: pd.DataFrame | None = None) -> ForecastResult:
         """Run power estimate and store results in self._result.
 
         :param weather_df: The weather data or datetimes to forecast for.
@@ -175,7 +181,7 @@ class PowerEstimate(ABC):
             weather_df = pd.DataFrame(index=weather_df)
 
         # prepare weather data / datetimes
-        weather_df: pd.DataFrame = self._prepare_weather(weather_df)
+        weather_df = self._prepare_weather(weather_df)
 
         # run the forecast for each model chain
         results = []
@@ -224,7 +230,7 @@ class PowerEstimate(ABC):
 
     @property
     @abstractmethod
-    def model_chain_attrs(self) -> dict:
+    def model_chain_attrs(self) -> dict[str, str]:
         """Return the attributes to set on the model chain."""
 
     @property
@@ -242,7 +248,7 @@ class Live(PowerEstimate):
     type: ForecastType = field(default=ForecastType.LIVE)
 
     @property
-    def model_chain_attrs(self) -> dict:
+    def model_chain_attrs(self) -> dict[str, str]:
         return {}
 
     def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
@@ -265,7 +271,7 @@ class Clearsky(PowerEstimate):
         return self.location.get_clearsky(weather_df.index)
 
     @property
-    def model_chain_attrs(self) -> dict:
+    def model_chain_attrs(self) -> dict[str, str]:
         return {"aoi_model": "physical", "spectral_model": "no_loss"}
 
 
@@ -274,9 +280,9 @@ class Historical(PowerEstimate):
     """Class for PV power forecasts based on weather data."""
 
     type: ForecastType = field(default=ForecastType.HISTORICAL)
-    _pvgis_data_path: Path = field(init=False, repr=False, default=None)
+    _pvgis_data_path: Path = field(init=False, repr=False, default=Path())
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         lat = str(round(self.location.latitude, 4)).replace(".", "_")
         lon = str(round(self.location.longitude, 4)).replace(".", "_")
         self._pvgis_data_path = Path(f"pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
@@ -302,7 +308,7 @@ class Historical(PowerEstimate):
         return tmy_data.loc[start_date:end_date]
 
     @property
-    def model_chain_attrs(self) -> dict:
+    def model_chain_attrs(self) -> dict[str, str]:
         return {}
 
     def get_pvgis_data(

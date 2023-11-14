@@ -1,4 +1,6 @@
 """Helper functions for the webserver."""
+from __future__ import annotations
+
 import json
 import logging
 from collections import OrderedDict
@@ -14,14 +16,16 @@ from ...model.model import PVSystemManager
 _LOGGER = logging.getLogger("uvicorn")
 
 
-def _np_encoder(obj: Any) -> np.generic:
+def _np_encoder(obj: np.generic) -> Any:
     """Encode numpy types to python types."""
     if isinstance(obj, np.generic):
         return obj.item()
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
 
-def multi_idx_to_nested_dict(data: pd.DataFrame, value_only=False) -> OrderedDict:
+def multi_idx_to_nested_dict(
+    data: pd.DataFrame, value_only: bool = False
+) -> OrderedDict[str, Any]:
     """Convert a multiindex dataframe to a nested dict. Kudos to dcragusa.
 
     :param df: Multiindex dataframe
@@ -41,7 +45,7 @@ def multi_idx_to_nested_dict(data: pd.DataFrame, value_only=False) -> OrderedDic
         for col in data.columns:
             d_col[col] = data.loc[idx, col]
         odict[idx] = d_col
-    return json.loads(json.dumps(odict, default=_np_encoder))
+    return json.loads(json.dumps(odict, default=_np_encoder))  # type: ignore[no-any-return]
 
 
 def get_forecast_result_dict(
@@ -50,7 +54,7 @@ def get_forecast_result_dict(
     fc_type: str,
     interval: str,
     weather_df: pd.DataFrame = None,
-) -> dict:
+) -> dict[str, Any]:
     """Convert the forecast result to a nested dict.
 
     :param plant_name: Name of the PV system

@@ -11,7 +11,7 @@ from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
 from ..models.base import Interval, PVPlantNames, StartEndRequest
 from ..models.historical import HistoricalModel
-from ..routers.dependencies import get_pv_system_mngr, get_weather_api
+from ..routers.dependencies import get_pv_system_mngr, get_weather_sources
 from .helpers import get_forecast_result_dict
 
 router = APIRouter()
@@ -23,8 +23,8 @@ _LOGGER = logging.getLogger("uvicorn")
 def post(
     plant_name: PVPlantNames,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
-    weather_api: Annotated[WeatherAPI, Depends(get_weather_api)],
-    start_end: StartEndRequest = None,
+    weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
+    start_end: StartEndRequest | None = None,
     interval: Interval = Interval.H1,
 ) -> HistoricalModel:
     """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
@@ -43,6 +43,9 @@ def post(
     :param interval: Interval of the returned data
     :return: Estimated PV power output in Watts at the given interval <interval> for the given PV system <name>
     """
+    # for historical we don't care which weather API is used, so just use the first one
+    weather_api = weather_apis[0]
+
     # build the datetime index
     if start_end is None:
         _LOGGER.info(

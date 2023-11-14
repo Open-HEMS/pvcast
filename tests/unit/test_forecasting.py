@@ -67,7 +67,7 @@ class TestForecastResult:
     """Test the ForecastResult class."""
 
     @pytest.fixture
-    def forecast_result(self):
+    def forecast_result(self) -> ForecastResult:
         """Return a ForecastResult instance."""
         datetimes = pd.to_datetime(list(test_ac_power.keys()))
         ac_series = pd.Series(test_ac_power.values(), dtype="int64", index=datetimes)
@@ -79,8 +79,10 @@ class TestForecastResult:
         )
 
     @pytest.fixture
-    def forecast_result_year(self, forecast_result):
+    def forecast_result_year(self, forecast_result: ForecastResult) -> ForecastResult:
         """Duplicate the forecast_result to fill a year."""
+        if forecast_result.ac_power is None:
+            raise ValueError("ac_power is None")
         ac_power = pd.concat([forecast_result.ac_power] * 200, ignore_index=True)[:8766]
 
         # build index datetimes for one year
@@ -102,7 +104,7 @@ class TestForecastResult:
             dc_power=None,
         )
 
-    def test_forecast_creation(self, forecast_result):
+    def test_forecast_creation(self, forecast_result: ForecastResult) -> None:
         """Test the ForecastResult class."""
         assert forecast_result.name == "test"
         assert forecast_result.type == ForecastType.CLEARSKY
@@ -112,9 +114,11 @@ class TestForecastResult:
         assert forecast_result.ac_power.index.tzinfo == datetime.timezone.utc
         assert forecast_result.dc_power is None
 
-    def test_forecast_energy_property(self, forecast_result):
+    def test_forecast_energy_property(self, forecast_result: ForecastResult) -> None:
         """Test the ForecastResult class."""
         energy = forecast_result.ac_energy
+        if forecast_result.ac_power is None:
+            raise ValueError("ac_power is None")
         assert isinstance(energy, pd.Series)
         assert energy.dtype == "int64"
         assert energy.index.freq == "H"
@@ -122,10 +126,14 @@ class TestForecastResult:
         assert (energy.values == forecast_result.ac_power.values).all()
 
     @pytest.mark.parametrize("freq", ["1H", "30Min", "15Min", "5Min", "1Min"])
-    def test_forecast_energy_function(self, forecast_result, freq):
+    def test_forecast_energy_function(
+        self, forecast_result: ForecastResult, freq: str
+    ) -> None:
         """Test the energy function for intervals smaller than 1 hour."""
         # resample to 30 min
         forecast_result_res = forecast_result.resample(freq)
+        if forecast_result_res.ac_power is None:
+            raise ValueError("ac_power is None")
         assert forecast_result_res.ac_power.index.freq == freq
         assert forecast_result_res.ac_power.dtype == "int64"
         energy = forecast_result_res.ac_energy
@@ -139,7 +147,9 @@ class TestForecastResult:
         )
 
     @pytest.mark.parametrize("freq", ["1D", "1W", "M", "A"])
-    def test_forecast_energy_function_sum(self, forecast_result_year, freq):
+    def test_forecast_energy_function_sum(
+        self, forecast_result_year: ForecastResult, freq: str
+    ) -> None:
         """Test the energy function for intervals larger than 1 hour."""
         energy = forecast_result_year.energy(freq)
         assert isinstance(energy, pd.Series)

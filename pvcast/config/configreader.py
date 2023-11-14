@@ -9,7 +9,7 @@ from pathlib import Path
 import pytz
 import yaml
 from pytz import UnknownTimeZoneError
-from voluptuous import Any, Coerce, Optional, Required, Schema, Url
+from voluptuous import Any, Coerce, Required, Schema, Url
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,8 +18,8 @@ _LOGGER = logging.getLogger(__name__)
 class ConfigReader:
     """Reads PV plant configuration from a YAML file."""
 
-    _secrets: dict = field(init=False, repr=False)
-    _config: dict = field(init=False, repr=False)
+    _secrets: dict[str, Any] = field(init=False, repr=False)
+    _config: dict[str, Any] = field(init=False, repr=False)
     config_file_path: Path = field(repr=True)
     secrets_file_path: Path | None = field(repr=True, default=None)
 
@@ -66,20 +66,22 @@ class ConfigReader:
 
         self._config = config
 
-    def _yaml_secrets_loader(self, loader: yaml.SafeLoader, node: yaml.Node) -> str:
+    def _yaml_secrets_loader(self, loader: yaml.SafeLoader, node: yaml.Node) -> Any:
         """Load secrets from the secrets file.
 
         :param loader: The YAML loader.
         :param node: The YAML node.
         :return: The secret.
         """
-        value = loader.construct_scalar(node)
-        secret = self._secrets.get(value)
+        if isinstance(node, yaml.ScalarNode):
+            key = str(loader.construct_scalar(node))
+        else:
+            raise ValueError("Expected a ScalarNode")
+
+        secret = self._secrets.get(key)
         if secret is None:
-            _LOGGER.error("Secret %s not found in %s!", value, self.secrets_file_path)
-            raise yaml.YAMLError(
-                f"Secret {value} not found in {self.secrets_file_path}!"
-            )
+            _LOGGER.error("Secret not found in %s!", self.secrets_file_path)
+            raise yaml.YAMLError(f"Secret not found in {self.secrets_file_path}!")
         return secret
 
     def _load_secrets_file(self) -> None:
@@ -87,6 +89,9 @@ class ConfigReader:
 
         :param secrets_file_path: The path to the secrets file.
         """
+        if self.secrets_file_path is None:
+            raise ValueError("Secrets file path is not set.")
+
         if not self.secrets_file_path.exists():
             raise FileNotFoundError(f"Secrets file {self.secrets_file_path} not found.")
 
@@ -94,7 +99,7 @@ class ConfigReader:
             self._secrets = yaml.safe_load(secrets_file)
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         """Parse the YAML configuration and return it as a dictionary.
 
         :return: The configuration as a dictionary.
@@ -102,30 +107,27 @@ class ConfigReader:
         return self._config
 
     @property
-    def _config_schema(self) -> dict:
-        """Get the configuration schema as a dictionary.
+    def _config_schema(self) -> Schema:
+        """Get the configuration schema as a Schema object.
 
-        :return: Config schema dictionary.
+        :return: Config schema.
         """
         homessistant = Schema(
             {
-                Required("source"): "homeassistant",
+                Required("type"): "homeassistant",
                 Required("entity_id"): str,
                 Required("url"): Url,
                 Required("token"): str,
+                Required("name"): str,
             }
         )
-        clearoutside = Schema(
-            {
-                Required("source"): "clearoutside",
-            }
-        )
+        clearoutside = Schema({Required("type"): "clearoutside", Required("name"): str})
         return Schema(
             {
                 Required("general"): {
                     Required("weather"): {
-                        Optional("max_forecast_days"): int,
-                        Required("weather_source"): Any(homessistant, clearoutside),
+                        Required("sources"): [Any(homessistant, clearoutside)],
+                        Required("max_forecast_days"): Coerce(int),
                     },
                     Required("location"): {
                         Required("latitude"): float,

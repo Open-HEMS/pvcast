@@ -23,7 +23,8 @@
 				"ms-vsliveshare.vsliveshare",
 				"ryanluker.vscode-coverage-gutters",
 				"tamasfe.even-better-toml",
-				"ms-python.black-formatter"
+				"ms-python.black-formatter",
+				"mcu-debug.debug-tracker-vscode"
 			],
 			"settings": {
 				"[python]": {

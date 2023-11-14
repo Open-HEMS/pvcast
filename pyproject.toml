@@ -50,6 +50,8 @@ test = [
     "pylint==3.0.2",
     "safety==2.4.0b1",
     "yamllint==1.33.0",
+    "types-requests==2.31.0.10",
+    "types-pytz==2023.3.1.1",
 ]
 
 [project.urls]

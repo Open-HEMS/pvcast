@@ -5,18 +5,19 @@
 general:
   weather:
     max_forecast_days: 7
-    weather_source:
-      source: homeassistant
-      entity_id: weather.forecast_home_hourly
-      url: http://192.168.50.184:8123
-      token: !secret long_lived_token
-
+    sources:
+      - name: HomeAssistant
+        type: homeassistant
+        entity_id: weather.forecast_home_hourly
+        url: http://192.168.50.184:8123
+        token: !secret long_lived_token
+      - name: ClearOutside
+        type: clearoutside
   location:
     latitude: !secret lat
     longitude: !secret lon
     timezone: !secret time_zone
     altitude: !secret alt
-
 
 # PV system configuration
 plant:
@@ -46,4 +47,3 @@ plant:
         modules_per_string: 8
         strings: 1
         module: Trina_Solar_TSM_330DD14A_II_
-

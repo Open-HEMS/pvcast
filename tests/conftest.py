@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from types import MappingProxyType
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -25,7 +26,7 @@ from .const import LOC_AUS, LOC_EUW, LOC_USW
 
 
 @pytest.fixture()
-def weather_df():
+def weather_df() -> pd.DataFrame:
     """Fixture for a basic pvlib input weather dataframe."""
     # fmt: off
     data = {
@@ -79,7 +80,7 @@ def weather_df():
 
 
 @pytest.fixture(scope="session")
-def pd_time_aliases():
+def pd_time_aliases() -> dict[str, list[str]]:
     """Fixture for pandas time aliases."""
     return {
         "1H": ["H"],
@@ -90,10 +91,10 @@ def pd_time_aliases():
 
 
 @pytest.fixture(scope="function")
-def ha_weather_data():
+def ha_weather_data() -> dict[str, Any]:
     """Load the weather test data."""
     with open("tests/ha_weather_data.json") as json_file:
-        weather_data: dict = json.load(json_file)
+        weather_data: dict[str, Any] = json.load(json_file)
         # set to 1 to easily test if the data is correctly converted
         for forecast in weather_data["attributes"]["forecast"]:
             forecast["wind_speed"] = 1.0
@@ -102,26 +103,26 @@ def ha_weather_data():
 
 
 @pytest.fixture(scope="session")
-def clearoutside_html_page():
+def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
     with open("tests/clearoutside.txt") as html_file:
         return html_file.read()
 
 
 @pytest.fixture(params=[LOC_EUW, LOC_USW, LOC_AUS])
-def location(request):
+def location(request: pytest.FixtureRequest) -> Location:
     """Fixture that creates a location."""
     return Location(*request.param)
 
 
 @pytest.fixture
-def altitude():
+def altitude() -> float:
     """Fixture that creates an altitude."""
     return 10.0
 
 
 @pytest.fixture(scope="session")
-def valid_freqs():
+def valid_freqs() -> tuple[str, ...]:
     """Fixture for valid frequency strings."""
     return ("A", "M", "1W", "1D", "1H", "30Min", "15Min")
 
@@ -201,12 +202,17 @@ micro_system = [
 
 
 @pytest.fixture(params=[string_system, micro_system])
-def basic_config(request):
-    return request.param
+def basic_config(request: pytest.FixtureRequest) -> list[MappingProxyType[str, Any]]:
+    var = request.param
+    if isinstance(var, list):
+        return var
+    raise ValueError("basic_config fixture is not a list")
 
 
 @pytest.fixture
-def pv_sys_mngr(basic_config, location, altitude):
+def pv_sys_mngr(
+    basic_config: list[MappingProxyType[str, Any]], location: Location, altitude: float
+) -> PVSystemManager:
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
     )

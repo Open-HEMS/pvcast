@@ -22,21 +22,23 @@ class TestConfigReader:
     """Test the configreader module."""
 
     @pytest.fixture
-    def configreader_secfile_sectags(self):
+    def configreader_secfile_sectags(self) -> ConfigReader:
         """Fixture for the configreader."""
         return ConfigReader(TEST_CONF_PATH_SEC, TEST_SECRETS_PATH)
 
     @pytest.fixture
-    def configreader_no_secfile_no_sectags(self):
+    def configreader_no_secfile_no_sectags(self) -> ConfigReader:
         """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
         return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
 
-    def test_configreader_secrets_no_secrets_file(self):
+    def test_configreader_secrets_no_secrets_file(self) -> None:
         """Test the configreader with a secrets file but no secrets file path."""
         with pytest.raises(YAMLError):
             _ = ConfigReader(TEST_CONF_PATH_SEC).config
 
-    def test_configreader_no_secrets(self, configreader_no_secfile_no_sectags):
+    def test_configreader_no_secrets(
+        self, configreader_no_secfile_no_sectags: ConfigReader
+    ) -> None:
         """Test the configreader without a secrets file and no !secret tags in config."""
         assert isinstance(configreader_no_secfile_no_sectags, ConfigReader)
         config = configreader_no_secfile_no_sectags.config
@@ -44,7 +46,9 @@ class TestConfigReader:
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
-    def test_configreader_secrets(self, configreader_secfile_sectags):
+    def test_configreader_secrets(
+        self, configreader_secfile_sectags: ConfigReader
+    ) -> None:
         """Test the configreader with a secrets file and !secret tags in config."""
         assert isinstance(configreader_secfile_sectags, ConfigReader)
         config = configreader_secfile_sectags.config
@@ -52,27 +56,27 @@ class TestConfigReader:
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
-    def test_configreader_missing_secrets(self):
+    def test_configreader_missing_secrets(self) -> None:
         """Test the configreader with a secrets file and !secret tags for which no entry in secrets.yaml exists."""
         with pytest.raises(YAMLError):
             ConfigReader(TEST_CONF_PATH_MISSING_SEC, TEST_SECRETS_PATH)
 
-    def test_configreader_no_config_file(self):
+    def test_configreader_no_config_file(self) -> None:
         """Test the configreader without a config file."""
         with pytest.raises(TypeError):
-            ConfigReader()
+            ConfigReader()  # type: ignore[call-arg]
 
-    def test_configreader_wrong_config_file(self):
+    def test_configreader_wrong_config_file(self) -> None:
         """Test the configreader with a wrong config file."""
         with pytest.raises(FileNotFoundError):
             ConfigReader(Path("wrongfile.yaml")).config
 
-    def test_configreader_wrong_secrets_file(self):
+    def test_configreader_wrong_secrets_file(self) -> None:
         """Test the configreader with a wrong secrets file."""
         with pytest.raises(FileNotFoundError):
             ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml")).config
 
-    def test_invalid_timezone(self):
+    def test_invalid_timezone(self) -> None:
         """Test the configreader with an invalid timezone."""
         with pytest.raises(UnknownTimeZoneError):
             _ = ConfigReader(config_file_path=TEST_CONF_PATH_ERROR)
