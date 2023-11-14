@@ -111,8 +111,9 @@ repos:
         name: 🧪 Running tests and test coverage with pytest
         language: system
         types: [python]
-        entry: pytest
+        entry: pytest -n auto
         pass_filenames: false
+        stages: [push, manual]
       - id: trailing-whitespace
         name: ✄  Trim Trailing Whitespace
         language: system
