@@ -80,8 +80,8 @@ class ConfigReader:
 
         secret = self._secrets.get(key)
         if secret is None:
-            _LOGGER.error("Secret %s not found in %s!", key, self.secrets_file_path)
-            raise yaml.YAMLError(f"Secret {key} not found in {self.secrets_file_path}!")
+            _LOGGER.error("Secret not found in %s!", self.secrets_file_path)
+            raise yaml.YAMLError(f"Secret not found in {self.secrets_file_path}!")
         return secret
 
     def _load_secrets_file(self) -> None:
