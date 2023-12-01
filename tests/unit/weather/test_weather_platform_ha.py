@@ -12,7 +12,7 @@ from pvlib.location import Location
 
 from pvcast.weather.homeassistant import WeatherAPIHomeassistant
 
-from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
+from ...const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestWeatherPlatformHASS:

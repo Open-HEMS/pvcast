@@ -13,7 +13,7 @@ from pvcast.weather import API_FACTORY
 from pvcast.weather.homeassistant import WeatherAPIHomeassistant
 from pvcast.weather.weather import WeatherAPI
 
-from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
+from ...const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestWeatherPlatform:
