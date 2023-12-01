@@ -26,7 +26,7 @@ dependencies = [
     "pvlib==0.10.1",
     "pyyaml==6.0.1",
     "beautifulsoup4==4.12.2",
-    "voluptuous==0.13.1",
+    "voluptuous==0.14.1",
     "fastapi==0.103.1",
     "uvicorn==0.23.2",
 ]
