@@ -10,7 +10,7 @@ import responses
 
 from pvcast.homeassistant.homeassistantapi import HomeassistantAPI
 
-from ..const import HASS_TEST_TOKEN, HASS_TEST_URL
+from ...const import HASS_TEST_TOKEN, HASS_TEST_URL
 
 
 class TestHomeassistantAPI:

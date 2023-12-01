@@ -1,3 +1,4 @@
+"""Unit tests for the model module."""
 from __future__ import annotations
 
 from pathlib import Path

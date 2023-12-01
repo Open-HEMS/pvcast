@@ -9,7 +9,7 @@ from yaml import YAMLError
 
 from pvcast.config.configreader import ConfigReader
 
-from ..const import (
+from ...const import (
     TEST_CONF_PATH_ERROR,
     TEST_CONF_PATH_MISSING_SEC,
     TEST_CONF_PATH_NO_SEC,
