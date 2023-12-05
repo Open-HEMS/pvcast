@@ -63,8 +63,5 @@
 		"--network=host"
 	],
 	"name": "PVCast Photovoltaic forecasting",
-	"postAttachCommand": "pre-commit install --install-hooks",
-	"mounts": [
-		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=ro"
-	]
+	"postAttachCommand": "pre-commit install --install-hooks"
 }

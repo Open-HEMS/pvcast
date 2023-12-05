@@ -6,16 +6,23 @@ import copy
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pandas as pd
+import polars as pl
 from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 
-from .const import HISTORICAL_YEAR_MAPPING, VALID_FREQS
+from .const import (
+    HISTORICAL_YEAR_MAPPING,
+    SECONDS_PER_DAY,
+    SECONDS_PER_HOUR,
+    VALID_DOWN_SAMPLE_FREQ,
+    VALID_UPSAMPLE_FREQ,
+)
 
 if TYPE_CHECKING:
     from .model import PVPlantModel
@@ -39,73 +46,115 @@ class ForecastResult:
     :param name: The name of the PV plant.
     :param type: The type of the result: forecast based on live weather data, clearsky, or historic based on PVGIS TMY.
     :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
-    :param dc_power: If available, DC power broken down into individual arrays. Each array is a column in the DataFrame.
     :param freq: Frequency of original data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
     """
 
     name: str
     type: ForecastType
-    ac_power: pd.Series | None = field(repr=False, default=None)
-    dc_power: tuple[pd.Series] | None = field(repr=False, default=None)
-    freq: str = field(repr=False, default="1H")
+    ac_power: pl.DataFrame | None = field(repr=False, default=None)
 
     def __post_init__(self) -> None:
-        """Post-initialization function."""
-        if self.ac_power is not None and self.ac_power.index.freq is None:
-            self.ac_power.index = self._add_freq(self.ac_power.index)
+        if self.ac_power is None:
+            raise ValueError("Must provide AC power data.")
+        if "time" not in self.ac_power.columns:
+            raise ValueError("AC power data must have a 'time' column.")
+        if self.ac_power["time"].dtype != pl.Datetime:
+            raise ValueError(
+                f"Time column must have dtype datetime.datetime. Got {self.ac_power['time'].dtype}."
+            )
+        if self.ac_power.null_count().sum_horizontal().item() > 0:
+            raise ValueError("AC power data contains null values.")
+        if "ac_power" not in self.ac_power.columns:
+            raise ValueError("AC power data must have a 'ac_power' column.")
+        if self.ac_power["ac_power"].dtype != pl.Int64:
+            raise ValueError(
+                f"AC power column must have dtype int64. Got {self.ac_power['ac_power'].dtype}."
+            )
 
-    def resample(self, freq: str, interp_method: str = "linear") -> ForecastResult:
-        """Resample the entire ForecastResult to a new interval.
+    def upsample(self, freq: str) -> ForecastResult:
+        """Resample the ForecastResult to a new interval, apply linear interpolation and
+        return a new ForecastResult object.
 
-        :param freq: The frequency of the energy output. See pandas.resample() for valid options.
-        :param interp_method: The interpolation method to use. Any option of pd.interpolate() is valid.
+        :param freq: The frequency of the energy output. See polars.upsample() for valid options.
         :return: A new ForecastResult object with the resampled data.
         """
-        if freq not in VALID_FREQS:
+        if freq not in VALID_UPSAMPLE_FREQ:
             raise ValueError(
-                f"Frequency {freq} not supported. Must be one of {VALID_FREQS}."
+                f"Invalid frequency. Must be one of {VALID_UPSAMPLE_FREQ}."
             )
-        if freq == self.freq:
-            return self
+        if self.ac_power is None:
+            raise ValueError("No AC power data available. Run simulation first.")
 
-        # define resample function
-        def res_f(vals: pd.DataFrame) -> pd.DataFrame:
-            res = vals.resample(freq).mean().interpolate(interp_method)
-            res.index = self._add_freq(res.index, freq)
-            return res
+        # copy the ForecastResult object
+        fc_result_cpy = copy.deepcopy(self)
+        current_freq: int = fc_result_cpy.frequency
+        target_freq: int = fc_result_cpy._time_str_to_seconds(freq)
 
-        plant_cpy = copy.deepcopy(self)
-        plant_cpy.freq = freq
+        if current_freq < target_freq:
+            raise ValueError(
+                f"Cannot upsample to a lower frequency. Current frequency is {fc_result_cpy.frequency}s."
+            )
+        if current_freq == target_freq:
+            return fc_result_cpy
 
-        # resample all pd.Series attributes
-        plant_cpy.ac_power = res_f(plant_cpy.ac_power).astype("int64")
-        return plant_cpy
+        # upsample the data
+        fc_result_cpy.ac_power = (
+            fc_result_cpy.ac_power.sort(by="time")
+            .upsample(time_column="time", every=freq, maintain_order=True)
+            .select(pl.all().forward_fill())
+        )
+        return fc_result_cpy
 
-    def _add_freq(
-        self, idx: pd.DatetimeIndex, freq: str | None = None
-    ) -> pd.DatetimeIndex:
-        """Add a frequency attribute to idx, through inference or directly.
-
-        Returns a copy.  If `freq` is None, it is inferred.
-
-        :param idx: pd.DatetimeIndex to add frequency to.
-        :param freq: Frequency to add to idx.
-        :return: pd.DatetimeIndex with frequency attribute.
+    @property
+    def frequency(self) -> int:
+        """Return the frequency of the data in seconds.
+        NB: This is actually the data interval, not the frequency.
+        NB: We assume that the interval is constant throughout the data.
         """
-        idx = idx.copy()
-        if freq is None:
-            if idx.freq is None:
-                freq = pd.infer_freq(idx)
-            else:
-                return idx
-        idx.freq = pd.tseries.frequencies.to_offset(freq)
-        if idx.freq is None:
-            raise AttributeError(
-                "No discernible frequency found to `idx`. Specify a frequency string with `freq`."
-            )
-        return idx
+        t0 = self.ac_power.select(pl.col("time"))[0].item()
+        t1 = self.ac_power.select(pl.col("time"))[1].item()
+        return int(self._timedelta_to_pl_duration(t1 - t0)[:-1])
 
-    def energy(self, freq: str = "1D") -> pd.Series:
+    def _time_str_to_seconds(self, time_str: str) -> int:
+        """Convert a time string to seconds."""
+        if time_str.endswith("s"):
+            return int(time_str[:-1])
+        if time_str.endswith("m"):
+            return int(time_str[:-1]) * 60
+        if time_str.endswith("h"):
+            return int(time_str[:-1]) * 60 * 60
+        if time_str.endswith("d"):
+            return int(time_str[:-1]) * 60 * 60 * 24
+        raise ValueError(f"Invalid time string: {time_str}.")
+
+    def _timedelta_to_pl_duration(self, td: timedelta | str | None) -> str | None:
+        """Convert python timedelta to a polars duration string.
+        This function is copied from polars' utils.py.
+        """
+        if td is None or isinstance(td, str):
+            return td
+
+        if td.days >= 0:
+            d = td.days and f"{td.days}d" or ""
+            s = td.seconds and f"{td.seconds}s" or ""
+            us = td.microseconds and f"{td.microseconds}us" or ""
+        else:
+            if not td.seconds and not td.microseconds:
+                d = td.days and f"{td.days}d" or ""
+                s = ""
+                us = ""
+            else:
+                corrected_d = td.days + 1
+                d = corrected_d and f"{corrected_d}d" or "-"
+                corrected_seconds = SECONDS_PER_DAY - (
+                    td.seconds + (td.microseconds > 0)
+                )
+                s = corrected_seconds and f"{corrected_seconds}s" or ""
+                us = td.microseconds and f"{10**6 - td.microseconds}us" or ""
+
+        return f"{d}{s}{us}"
+
+    def energy(self, freq: str = "1d") -> pl.DataFrame:
         """Calculate the AC energy output of the PV plant.
 
         We assume that within the interval, the power output is constant. Therefore we will not use numerical
@@ -113,52 +162,36 @@ class ForecastResult:
         (and sum it up if freq > 1H)
 
         :param freq: The frequency of the energy output. See pandas.resample() for valid options.
-        :return: A pd.Series with the energy output of the PV plant.
+        :return: A pl.Series with the energy output of the PV plant.
         """
         if self.ac_power is None:
             raise ValueError(
                 "AC power output is not available, cannot calculate energy. Run simulation first."
             )
-
-        # check if freq is ambiguous (monthly, yearly)
-        ambiguous = freq in ("M", "A")
-
-        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta(
-            self.ac_power.index.freq
-        ):
+        if "".join(filter(str.isalpha, freq)) not in VALID_DOWN_SAMPLE_FREQ:
             raise ValueError(
-                f"Cannot calculate energy for a frequency higher than the fundamental data frequency \
-                ({self.ac_power.index.freq})."
+                f"Invalid frequency suffix. Must be one of {VALID_DOWN_SAMPLE_FREQ}."
             )
 
-        # if freq > 1H, we calculate the energy for each hour and sum it up
-        # we must verify that: freq(ac_power) <= 1H
-        if pd.Timedelta(self.ac_power.index.freq) > pd.Timedelta("1H"):
+        # check data frequency
+        if self.frequency > SECONDS_PER_HOUR:
             raise ValueError(
-                f"AC power interval ({self.ac_power.index.freq}) must be <= 1H in order to calculate valid energy data."
+                f"Cannot calculate energy for data with frequency {self.frequency}s. Must be <= 1H."
             )
 
-        # ac_power [W, freq] -> ac_energy [Wh] conversion factor
-        conv_factor = 1
-        if not ambiguous and pd.Timedelta(freq) < pd.Timedelta("1H"):
-            conv_factor = pd.Timedelta(freq).total_seconds() / 3600
+        # compute the conversion factor != 1 if frequency < 1H
+        conversion_factor = self.frequency / SECONDS_PER_HOUR
+        ac_energy: pl.DataFrame = self.ac_power.select(
+            pl.col("time"), pl.col("ac_power") * conversion_factor
+        )
 
-        ac_energy = self.ac_power * conv_factor
-
-        # now that AC energy has unit Wh, we can resample to the desired frequency and sum
-        return ac_energy.resample(freq).sum().round(0).astype("int64")
-
-    @property
-    def ac_energy(self) -> pd.Series:
-        """Calculate the AC energy output of the PV plant.
-
-        :return: A pd.Series with the energy output of the PV plant.
-        """
-        if self.ac_power is None:
-            raise ValueError(
-                "AC power output is not available, cannot calculate energy. Run simulation first."
-            )
-        return self.energy(freq=self.ac_power.index.freq)
+        # compute the energy output per period
+        ac_energy = (
+            ac_energy.sort(by="time")
+            .group_by_dynamic("time", every=freq)
+            .agg(pl.col("ac_power").sum().alias("ac_energy").cast(pl.Int64))
+        )
+        return ac_energy
 
 
 @dataclass
@@ -170,51 +203,48 @@ class PowerEstimate(ABC):
     type: ForecastType = field(default=ForecastType.LIVE)
     _result: ForecastResult | None = field(repr=False, default=None)
 
-    def run(self, weather_df: pd.DataFrame | None = None) -> ForecastResult:
+    def run(self, weather_df: pl.DataFrame | None = None) -> ForecastResult:
         """Run power estimate and store results in self._result.
 
         :param weather_df: The weather data or datetimes to forecast for.
         :return: A ForecastResult object containing the results of the power estimate.
         """
-        # if isinstance(weather_df, pd.DatetimeIndex), convert to pd.DataFrame with index = weather_df
-        if isinstance(weather_df, pd.DatetimeIndex):
-            weather_df = pd.DataFrame(index=weather_df)
-
         # prepare weather data / datetimes
         weather_df = self._prepare_weather(weather_df)
 
         # run the forecast for each model chain
-        results = []
-        for model_chain in copy.deepcopy(self.pv_plant.models):
+        results = pl.DataFrame()
+        for idx, model_chain in enumerate(self.pv_plant.models):
             # set the model chain attributes
             for attr, val in self.model_chain_attrs.items():
                 setattr(model_chain, attr, val)
             model_chain.run_model(weather_df)
-            results.append(model_chain.results)
 
-        # aggregate the results
-        ac_power = self.pv_plant.aggregate(results, "ac")
+            # add the results to the results DataFrame
+            res = model_chain.results.ac
+            _LOGGER.debug("res type: %s", type(res))
+            # convert to polars df
+            res = pl.from_pandas(res)
+            _LOGGER.debug("res : %s", res)
+
+        # create a ForecastResult object
         result = ForecastResult(
-            name=self.pv_plant.name,
-            type=self.type,
-            ac_power=ac_power,
-            dc_power=None,
-            freq=ac_power.index.freq,
+            name=self.pv_plant.name, type=self.type, ac_power=results
         )
         self._result = result
         return result
 
     @abstractmethod
-    def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
+    def _prepare_weather(self, weather_df: pl.DataFrame = None) -> pl.DataFrame:
         """Prepare weather data for the forecast."""
         raise NotImplementedError
 
     def _add_percepitable_water(
         self,
-        weather_df: pd.DataFrame,
+        weather_df: pl.DataFrame,
         temp_col: str = "temp_air",
         rh_col: str = "relative_humidity",
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """Add preciptable_water to weather_df if it is not in the weather data already.
 
         :param weather_df: The weather data to use for the simulation.
@@ -251,7 +281,7 @@ class Live(PowerEstimate):
     def model_chain_attrs(self) -> dict[str, str]:
         return {}
 
-    def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
+    def _prepare_weather(self, weather_df: pl.DataFrame = None) -> pl.DataFrame:
         # add preciptable_water to weather_df if it is not in the weather data already
         weather_df.rename(
             columns={"temperature": "temp_air", "humidity": "relative_humidity"},
@@ -267,7 +297,7 @@ class Clearsky(PowerEstimate):
 
     type: ForecastType = field(default=ForecastType.CLEARSKY)
 
-    def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
+    def _prepare_weather(self, weather_df: pl.DataFrame = None) -> pl.DataFrame:
         return self.location.get_clearsky(weather_df.index)
 
     @property
@@ -287,9 +317,9 @@ class Historical(PowerEstimate):
         lon = str(round(self.location.longitude, 4)).replace(".", "_")
         self._pvgis_data_path = Path(f"pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
 
-    def _prepare_weather(self, weather_df: pd.DataFrame = None) -> pd.DataFrame:
+    def _prepare_weather(self, weather_df: pl.DataFrame = None) -> pl.DataFrame:
         tmy_data = self.get_pvgis_data()
-        tmy_data.index = pd.date_range(
+        tmy_data.index = pl.date_range(
             start=f"{HISTORICAL_YEAR_MAPPING}-01-01 00:00",
             end=f"{HISTORICAL_YEAR_MAPPING}-12-31 23:00",
             freq="1H",
@@ -313,7 +343,7 @@ class Historical(PowerEstimate):
 
     def get_pvgis_data(
         self, save_data: bool = True, force_api: bool = False
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Retrieve the PVGIS data using the PVGIS API. Returned data should include the following columns:
         [temp_air, relative_humidity, ghi, dni, dhi, wind_speed]. Other columns are ignored.
@@ -322,13 +352,13 @@ class Historical(PowerEstimate):
 
         :param path: The path to the PVGIS data file in CSV format. If None, the data is retrieved using the PVGIS API.
         :param save_data: If True, data retrieved from the API is saved to the path so it can be reused later.
-        :return: PVGIS pd.DataFrame.
+        :return: PVGIS pl.DataFrame.
         """
         from_file = self._pvgis_data_path.exists() and not force_api
         if from_file:
             # read data from CSV file
             _LOGGER.debug("Reading PVGIS data from file at: %s.", self._pvgis_data_path)
-            tmy_data = pd.read_csv(
+            tmy_data = pl.read_csv(
                 self._pvgis_data_path, index_col=0, parse_dates=True, header=0
             )
         else:

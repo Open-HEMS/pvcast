@@ -6,7 +6,10 @@ from pathlib import Path
 BASE_DIR = Path("pvcast")
 BASE_CEC_DATA_PATH = BASE_DIR / "data/proc"
 
-VALID_FREQS = ("A", "M", "1W", "1D", "1H", "30Min", "15Min", "5Min", "1Min")
+VALID_UPSAMPLE_FREQ = ("1h", "60m", "30m", "15m", "5m", "1m")
+VALID_DOWN_SAMPLE_FREQ = ("h", "d", "w", "mo", "y")
+SECONDS_PER_DAY = 86_400
+SECONDS_PER_HOUR = 3_600
 
 # PVGIS TMY (typical meteorological year) data uses a typical month of a typical year.
 # Thus one 'year' of data can consist of dates such as: [Jan 2015, Feb 2008, Mar 2013, ...]

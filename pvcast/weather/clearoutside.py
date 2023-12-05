@@ -6,7 +6,7 @@ import logging
 from dataclasses import InitVar, dataclass, field
 from urllib.parse import urljoin
 
-import pandas as pd
+import polars as pl
 from bs4 import BeautifulSoup
 
 from ..weather.weather import WeatherAPI
@@ -38,7 +38,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         alt = encode(self.location.altitude)
         return urljoin(url_base, f"{lat}/{lon}/{alt}")
 
-    def _process_data(self) -> pd.DataFrame:
+    def _process_data(self) -> pl.DataFrame:
         """Process weather data scraped from the clear outside website.
 
         Credits to https://github.com/davidusb-geek/emhass for the parsing code.
@@ -51,10 +51,10 @@ class WeatherAPIClearOutside(WeatherAPI):
         response = self._raw_data
 
         # response (source) data bucket
-        weather_df = pd.DataFrame(index=self.source_dates, columns=self._columns)
+        weather_df = pl.DataFrame(index=self.source_dates, columns=self._columns)
 
         # parse the data
-        n_days = int(self.max_forecast_days / pd.Timedelta(days=1))
+        n_days = int(self.max_forecast_days / pl.Timedelta(days=1))
         for day_int in range(n_days):
             result = BeautifulSoup(response.content, "html.parser").find_all(
                 id=f"day_{day_int}"
@@ -84,11 +84,11 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         return weather_df
 
-    def _find_elements(self, table: BeautifulSoup) -> pd.DataFrame:
+    def _find_elements(self, table: BeautifulSoup) -> pl.DataFrame:
         """Find weather data elements in the table.
 
         :param table: The table to search.
-        :return: Weather data pd.DataFrame for one day (24 hours).
+        :return: Weather data pl.DataFrame for one day (24 hours).
         """
 
         list_names = table.find_all(class_="fc_detail_label")
@@ -100,7 +100,7 @@ class WeatherAPIClearOutside(WeatherAPI):
         list_tables = [list_tables[i] for i in sel_cols]
 
         # building the raw DF container
-        raw_data = pd.DataFrame(index=range(24), columns=col_names, dtype=float)
+        raw_data = pl.DataFrame(index=range(24), columns=col_names, dtype=float)
         for count_col, col in enumerate(col_names):
             list_rows = list_tables[count_col].find_all("li")
             for count_row, row in enumerate(list_rows):

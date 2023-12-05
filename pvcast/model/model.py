@@ -8,10 +8,11 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-import pandas as pd
+# import pandas as pd
+import polars as pl
 import pvlib
 from pvlib.location import Location
-from pvlib.modelchain import ModelChain, ModelChainResult
+from pvlib.modelchain import ModelChain
 from pvlib.pvsystem import Array, FixedMount, PVSystem
 from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 
@@ -46,8 +47,8 @@ class PVPlantModel:
 
     config: InitVar[MappingProxyType[str, Any]]
     location: Location = field(repr=False)
-    inv_param: pd.DataFrame = field(repr=False)
-    mod_param: pd.DataFrame = field(repr=False)
+    inv_param: pl.DataFrame = field(repr=False)
+    mod_param: pl.DataFrame = field(repr=False)
     temp_param: dict[str, dict[str, dict[str, Any]]] = field(
         default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"],
         repr=False,
@@ -213,15 +214,12 @@ class PVPlantModel:
         # retrieve parameter database
         candidates = self.inv_param if inverter else self.mod_param
 
-        # check if there are duplicates in the index and remove them
+        # check if there are duplicates and remove them
         candidates = candidates[~candidates.index.duplicated(keep="first")]
 
         # check if device is in the database
         try:
             params: dict[str, Any] = candidates.loc[device].to_dict()
-            _LOGGER.debug(
-                "Found params %s for device %s in the database.", params, device
-            )
         except KeyError as exc:
             raise KeyError(f"Device {device} not found in the database.") from exc
 
@@ -241,23 +239,6 @@ class PVPlantModel:
             ModelChain(system, location, name=name, aoi_model="physical")
             for system in pv_systems
         ]
-
-    def aggregate(self, results: list[ModelChainResult], key: str) -> pd.Series:
-        """Aggregate the results of the model chains into a single pd.DataFrame.
-
-        :param results: List of model chain result objects.
-        :param key: The key to aggregate on. Can be "ac", "dc", ..., but currently only "ac" is supported.
-        :return: The aggregated results.
-        """
-        # extract results.key
-        data: list[Any] = [getattr(result, key) for result in results]
-
-        # combine results
-        data_frame: pd.DataFrame = pd.concat(data, axis=1)
-        data_frame = data_frame.sum(axis=1).clip(lower=0)
-
-        # convert to pd.Series and return
-        return data_frame.squeeze()
 
 
 @dataclass

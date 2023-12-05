@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Any, Callable
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import requests
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
@@ -109,7 +109,7 @@ class WeatherAPI(ABC):
     timeout: int = field(default=10)
 
     # maximum number of days to include in the forecast
-    max_forecast_days: pd.Timedelta = field(default=pd.Timedelta(days=7))
+    max_forecast_days: pl.Timedelta = field(default=pl.Timedelta(days=7))
 
     # frequency of the source data and the output data
     freq_source: str = field(
@@ -120,32 +120,32 @@ class WeatherAPI(ABC):
     )  # frequency of the output data. Can be changed by user.
 
     # maximum age of weather data before requesting new data
-    max_age: pd.Timedelta = field(default=pd.Timedelta(hours=1))
-    _last_update: pd.Timestamp = field(
-        default=pd.Timestamp(0, tz="UTC"), init=False
+    max_age: pl.Timedelta = field(default=pl.Timedelta(hours=1))
+    _last_update: pl.Timestamp = field(
+        default=pl.Timestamp(0, tz="UTC"), init=False
     )  # last time the weather data was updated
 
     # raw response data from the API
     _raw_data: Response | None = field(default=None, init=False)
 
     @property
-    def start_forecast(self) -> pd.Timestamp:
+    def start_forecast(self) -> pl.Timestamp:
         """Get the start date of the forecast."""
-        return pd.Timestamp.utcnow().floor("1H")
+        return pl.Timestamp.utcnow().floor("1H")
 
     @property
-    def end_forecast(self) -> pd.Timestamp:
+    def end_forecast(self) -> pl.Timestamp:
         """Get the end date of the forecast."""
         return (
             self.start_forecast
             + self.max_forecast_days
-            - pd.Timedelta(self.freq_source)
+            - pl.Timedelta(self.freq_source)
         )
 
     @property
-    def source_dates(self) -> pd.DatetimeIndex:
+    def source_dates(self) -> pl.DatetimeIndex:
         """
-        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
+        Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
         also return datetime strings and in that case this index is not needed and even not preferred.
         """
         return self.get_source_dates(
@@ -154,27 +154,27 @@ class WeatherAPI(ABC):
 
     @staticmethod
     def get_source_dates(
-        start: pd.Timestamp | datetime, end: pd.Timestamp | datetime, freq: str
-    ) -> pd.DatetimeIndex:
+        start: pl.Timestamp | datetime, end: pl.Timestamp | datetime, freq: str
+    ) -> pl.DatetimeIndex:
         """
-        Get the pd.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
+        Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
         also return datetime strings and in that case this index is not needed and even not preferred.
         """
-        start = pd.Timestamp(start)
-        end = pd.Timestamp(end)
+        start = pl.Timestamp(start)
+        end = pl.Timestamp(end)
         # floor start, end to freq and return DatetimeIndex
-        return pd.date_range(start.floor("1H"), end.floor("1H"), freq=freq, tz="UTC")
+        return pl.date_range(start.floor("1H"), end.floor("1H"), freq=freq, tz="UTC")
 
     @staticmethod
-    def convert_unit(data: pd.Series, from_unit: str, to_unit: str) -> pd.Series:
-        """Convert units of a pd.Series.
+    def convert_unit(data: pl.Series, from_unit: str, to_unit: str) -> pl.Series:
+        """Convert units of a pl.Series.
 
-        :param data: The data to convert. This should be a pd.Series.
+        :param data: The data to convert. This should be a pl.Series.
         :param to_unit: The unit to convert to.
         :return: Data with applied unit conversion.
         """
-        if not isinstance(data, pd.Series):
-            raise TypeError("Data must be a pd.Series.")
+        if not isinstance(data, pl.Series):
+            raise TypeError("Data must be a pl.Series.")
 
         # remove degree symbol from units if present
         from_unit = from_unit.replace("°", "")
@@ -193,12 +193,12 @@ class WeatherAPI(ABC):
         return data.apply(CONV_DICT[from_unit][to_unit])
 
     @abstractmethod
-    def _process_data(self) -> pd.DataFrame:
+    def _process_data(self) -> pl.DataFrame:
         """Process data from the weather API.
 
-        The index of the returned pd.DataFrame should be a pd.DatetimeIndex in local time.
+        The index of the returned pl.DataFrame should be a pl.DatetimeIndex in local time.
 
-        :return: The weather data as a pd.DataFrame where the index is the datetime and the columns are the variables.
+        :return: The weather data as a pl.DataFrame where the index is the datetime and the columns are the variables.
         """
 
     def get_weather(
@@ -219,7 +219,7 @@ class WeatherAPI(ABC):
         self._api_error_handler(response)
 
         # process and return the data
-        processed_data: pd.DataFrame = self._process_data()
+        processed_data: pl.DataFrame = self._process_data()
 
         if processed_data.index.freq is None:
             raise WeatherAPIError("Processed data does not have a known frequency.")
@@ -232,11 +232,11 @@ class WeatherAPI(ABC):
         n_days_data = (processed_data.index[-1] - processed_data.index[0]).days + 1
         n_days = int(min(n_days_data, self.max_forecast_days.days))
         processed_data = processed_data.iloc[
-            : n_days * (pd.Timedelta(hours=24) // pd.Timedelta(self.freq_source))
+            : n_days * (pl.Timedelta(hours=24) // pl.Timedelta(self.freq_source))
         ]
 
         # check for NaN values
-        if pd.isnull(processed_data).any().any():
+        if pl.isnull(processed_data).any().any():
             raise WeatherAPIError("Processed data contains NaN values.")
 
         # set data types
@@ -289,7 +289,7 @@ class WeatherAPI(ABC):
 
         :param live: Force an update by ignoring self.max_age.
         """
-        delta_t = pd.Timestamp.now(tz="UTC") - self._last_update
+        delta_t = pl.Timestamp.now(tz="UTC") - self._last_update
         if self._raw_data is not None and delta_t < self.max_age and not live:
             _LOGGER.debug("Using cached weather data.")
             return self._raw_data
@@ -313,7 +313,7 @@ class WeatherAPI(ABC):
 
         # return the response
         self._raw_data = response
-        self._last_update = pd.Timestamp.now(tz="UTC")
+        self._last_update = pl.Timestamp.now(tz="UTC")
         return response
 
     def _do_request(self) -> Response:
@@ -341,14 +341,14 @@ class WeatherAPI(ABC):
                 raise WeatherAPIError("Unknown error", response.status_code)
 
     def cloud_cover_to_irradiance(
-        self, cloud_cover: pd.Series, how: str = "clearsky_scaling", **kwargs: Any
-    ) -> pd.DataFrame:
+        self, cloud_cover: pl.Series, how: str = "clearsky_scaling", **kwargs: Any
+    ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance. A wrapper method.
 
         NB: Code copied from pvlib.forecast as the pvlib forecast module is deprecated as of pvlib 0.9.1!
 
-        :param cloud_cover: Cloud cover as a pandas pd.Series
+        :param cloud_cover: Cloud cover as a pandas pl.Series
         :param how: Selects the method for conversion. Can be one of clearsky_scaling or campbell_norman.
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
@@ -368,12 +368,12 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_irradiance_clearsky_scaling(
-        self, cloud_cover: pd.Series, method: str = "linear", **kwargs: Any
-    ) -> pd.DataFrame:
+        self, cloud_cover: pl.Series, method: str = "linear", **kwargs: Any
+    ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance using the clearsky scaling method.
 
-        :param cloud_cover: Cloud cover as a pandas pd.Series
+        :param cloud_cover: Cloud cover as a pandas pl.Series
         :param method: Selects the method for conversion. Can be one of linear.
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
@@ -394,18 +394,18 @@ class WeatherAPI(ABC):
         dni = disc(ghi, solpos["zenith"], cloud_cover.index)["dni"]
         dhi = ghi - dni * np.cos(np.radians(solpos["zenith"]))
 
-        irrads = pd.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
+        irrads = pl.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
         return irrads
 
     def _cloud_cover_to_irradiance_campbell_norman(
-        self, cloud_cover: pd.Series, **kwargs: Any
-    ) -> pd.DataFrame:
+        self, cloud_cover: pl.Series, **kwargs: Any
+    ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance using the Campbell and Norman model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
         :param **kwargs: Passed to the selected method.
-        :return: Irradiance as a pandas pd.DataFrame with columns ghi, dni, dhi.
+        :return: Irradiance as a pandas pl.DataFrame with columns ghi, dni, dhi.
         """
         solar_position = self.location.get_solarposition(cloud_cover.index)
         dni_extra = get_extra_radiation(cloud_cover.index)
@@ -420,15 +420,15 @@ class WeatherAPI(ABC):
         return irrads
 
     def _cloud_cover_to_ghi_linear(
-        self, cloud_cover: pd.Series, ghi_clear: pd.Series, offset: float = 35.0
-    ) -> pd.Series:
+        self, cloud_cover: pl.Series, ghi_clear: pl.Series, offset: float = 35.0
+    ) -> pl.Series:
         """
         Convert cloud cover to GHI using a linear relationship.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
-        :param ghi_clear: Clear sky GHI as a pandas pd.Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
+        :param ghi_clear: Clear sky GHI as a pandas pl.Series.
         :param offset: Determines the maximum GHI for the linear model.
-        :return: GHI as a pandas pd.Series.
+        :return: GHI as a pandas pl.Series.
         """
         offset = offset / 100.0
         cloud_cover = cloud_cover / 100.0
@@ -436,36 +436,36 @@ class WeatherAPI(ABC):
         return ghi
 
     def cloud_cover_to_transmittance_linear(
-        self, cloud_cover: pd.Series, offset: float = 0.75
-    ) -> pd.Series:
+        self, cloud_cover: pl.Series, offset: float = 0.75
+    ) -> pl.Series:
         """
         Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
+        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
         :param offset: Determines the maximum transmittance for the linear model.
-        :return: Atmospheric transmittance as a pandas pd.Series.
+        :return: Atmospheric transmittance as a pandas pl.Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
 
     def _add_freq(
-        self, idx: pd.DatetimeIndex, freq: str | None = None
-    ) -> pd.DatetimeIndex:
+        self, idx: pl.DatetimeIndex, freq: str | None = None
+    ) -> pl.DatetimeIndex:
         """Add a frequency attribute to idx, through inference or directly.
 
         Returns a copy.  If `freq` is None, it is inferred.
 
-        :param idx: pd.DatetimeIndex to add frequency to.
+        :param idx: pl.DatetimeIndex to add frequency to.
         :param freq: Frequency to add to idx.
-        :return: pd.DatetimeIndex with frequency attribute.
+        :return: pl.DatetimeIndex with frequency attribute.
         """
         idx = idx.copy()
         if freq is None:
             if idx.freq is None:
-                freq = pd.infer_freq(idx)
+                freq = pl.infer_freq(idx)
             else:
                 return idx
-        idx.freq = pd.tseries.frequencies.to_offset(freq)
+        idx.freq = pl.tseries.frequencies.to_offset(freq)
         if idx.freq is None:
             raise AttributeError(
                 "no discernible frequency found to `idx`.  Specify a frequency string with `freq`."
