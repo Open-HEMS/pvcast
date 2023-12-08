@@ -1,6 +1,8 @@
 """Test the weather module."""
 from __future__ import annotations
 
+import datetime as dt
+from datetime import timezone as tz
 from typing import Generator
 
 import polars as pl
@@ -24,7 +26,7 @@ class MockWeatherAPI(WeatherAPI):
 
     def __init__(self, location: Location, url: str, data: pl.DataFrame = None):
         """Initialize the mock class."""
-        super().__init__(location, url, freq_source="30T")
+        super().__init__(location, url, freq_source=dt.timedelta(minutes=30))
         self.url = url
         self.data = data
 
@@ -37,6 +39,15 @@ class MockWeatherAPI(WeatherAPI):
             data = pl.from_dict(resp.json())
         else:
             data = self.data
+
+        # convert datetime column to datetime type
+        data = data.with_columns(
+            pl.col("datetime").str.to_datetime(format="%Y-%m-%d %H:%M:%S%z")
+        )
+        # print(data)
+        # print(
+        #     f"test diff: {all(data['datetime'].diff()[1:] == dt.timedelta(minutes=30))}"
+        # )
         return data
 
 
@@ -108,23 +119,27 @@ class TestWeather:
             "humidity": [0, 0.5, 1],
             "wind_speed": [0, 0.5, 1],
             "cloud_coverage": [0, 0.5, 1],
-            "time": [
-                "2020-01-01 00:00:00",
-                "2020-01-01 00:30:00",
-                "2020-01-01 01:00:00",
+            "datetime": [
+                "2020-01-01 00:00:00+00:00",
+                "2020-01-01 00:30:00+00:00",
+                "2020-01-01 01:00:00+00:00",
             ],
         }
-    ).with_columns(pl.col("time").str.to_datetime("%Y-%m-%d %H:%M:%S"))
+    )
 
     # test data with NaN values
     mock_data_NaN = pl.DataFrame(
         {
-            "temperature": [pl.NA, 0.5, pl.NA],
+            "temperature": [None, 0.5, None],
             "humidity": [0, 0.5, 1],
             "wind_speed": [0, 0.5, 1],
             "cloud_coverage": [0, 0.5, 1],
-        },
-        index=["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
+            "datetime": [
+                "2020-01-01 00:00:00+00:00",
+                "2020-01-01 00:30:00+00:00",
+                "2020-01-01 01:00:00+00:00",
+            ],
+        }
     )
 
     # mock data that will not pass the schema validation
@@ -135,8 +150,12 @@ class TestWeather:
             "wind_speed": [0, 0.5, 1],
             "cloud_coverage": [0, 0.5, 1],
             "invalid_column": [0, 0.5, 1],
-        },
-        index=["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
+            "datetime": [
+                "2020-01-01 00:00:00+00:00",
+                "2020-01-01 00:30:00+00:00",
+                "2020-01-01 01:00:00+00:00",
+            ],
+        }
     )
 
     @pytest.fixture
@@ -150,7 +169,7 @@ class TestWeather:
         else:
             data = request.param
 
-        data = data.to_dict(orient="index")
+        data = data.to_dict(as_series=False)
         with responses.RequestsMock() as rsps:
             rsps.add(responses.GET, self.test_url, json=data)
             response = requests.get(self.test_url)
@@ -173,7 +192,7 @@ class TestWeather:
     ) -> WeatherAPI:
         """Get a weather API object."""
         api = MockWeatherAPI(location=location, url=self.test_url)
-        api._last_update = pl.Timestamp.now(tz="UTC")
+        api._last_update = dt.datetime.now(tz.utc)
         api._raw_data = api_response
         return api
 
@@ -183,7 +202,7 @@ class TestWeather:
     ) -> WeatherAPI:
         """Get a weather API object."""
         api = MockWeatherAPI(location=location, url=self.test_url)
-        api._last_update = pl.Timestamp.now(tz="UTC")
+        api._last_update = dt.datetime.now(tz.utc)
         api._raw_data = api_error_response
         return api
 
@@ -193,7 +212,7 @@ class TestWeather:
         api = MockWeatherAPI(
             url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC")
         )
-        api._last_update = pl.Timestamp.now(tz="UTC")
+        api._last_update = dt.datetime.now(tz.utc)
         api._raw_data = api_response
         return api
 
@@ -205,9 +224,10 @@ class TestWeather:
     def test_get_weather_no_update(self, weather_obj_fixed_loc: WeatherAPI) -> None:
         """Test the get_weather function."""
         weather_obj_fixed_loc.get_weather()
-        assert pl.Timestamp.now(
-            tz="UTC"
-        ) - weather_obj_fixed_loc._last_update < pl.Timedelta(seconds=1)
+        assert weather_obj_fixed_loc.last_update is not None
+        dt_now = dt.datetime.now(tz.utc)
+        dt_delta = dt_now - weather_obj_fixed_loc.last_update
+        assert dt_delta.total_seconds() < 1
 
     @pytest.mark.parametrize("api_response", [mock_data_NaN], indirect=True)
     def test_get_weather_NaN(self, weather_obj_fixed_loc: WeatherAPI) -> None:

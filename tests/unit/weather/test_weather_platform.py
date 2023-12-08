@@ -105,7 +105,6 @@ class TestWeatherPlatform:
         self, weatherapi: WeatherAPI, freq: str, time_aliases: dict[str, list[str]]
     ) -> None:
         """Test the get_weather function with a number of higher data frequencies."""
-        weatherapi.freq_output = freq
         weather = weatherapi.get_weather()
         assert isinstance(weather, dict)
         weather = self.convert_to_df(weather)
@@ -122,7 +121,6 @@ class TestWeatherPlatform:
     ) -> None:
         """Test the get_weather function with a number of higher data frequencies."""
         freq = "1H"
-        weatherapi.freq_output = freq
         weatherapi.max_forecast_days = max_forecast_day
         weather = weatherapi.get_weather()
         assert isinstance(weather, dict)

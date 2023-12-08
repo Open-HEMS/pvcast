@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import timezone as tz
 from typing import Any, Callable
 
 import numpy as np
@@ -106,44 +107,40 @@ class WeatherAPI(ABC):
     name: str = field(default="")
 
     # timeout in seconds for the API request
-    timeout: int = field(default=10)
+    timeout: dt.timedelta = field(default=dt.timedelta(seconds=10))
 
     # maximum number of days to include in the forecast
-    max_forecast_days: pl.Timedelta = field(default=pl.Timedelta(days=7))
+    max_forecast_days: dt.timedelta = field(default=dt.timedelta(days=7))
 
-    # frequency of the source data and the output data
-    freq_source: str = field(
-        default="1H"
-    )  # frequency of the source data. This is fixed!
-    freq_output: str = field(
-        default="1H"
-    )  # frequency of the output data. Can be changed by user.
+    # frequency of the source data. This is fixed!
+    freq_source: dt.timedelta = field(default=dt.timedelta(hours=1))
 
     # maximum age of weather data before requesting new data
-    max_age: pl.Timedelta = field(default=pl.Timedelta(hours=1))
-    _last_update: pl.Timestamp = field(
-        default=pl.Timestamp(0, tz="UTC"), init=False
-    )  # last time the weather data was updated
+    max_age: dt.timedelta = field(default=dt.timedelta(hours=1))
+
+    # last time the weather data was updated
+    _last_update: dt.datetime = field(default=dt.datetime(1970, 1, 1, tzinfo=tz.utc))
 
     # raw response data from the API
     _raw_data: Response | None = field(default=None, init=False)
 
     @property
-    def start_forecast(self) -> pl.Timestamp:
+    def last_update(self) -> dt.datetime:
+        """Get the last time the weather data was updated."""
+        return self._last_update
+
+    @property
+    def start_forecast(self) -> dt.datetime:
         """Get the start date of the forecast."""
-        return pl.Timestamp.utcnow().floor("1H")
+        return dt.datetime.now(tz.utc).replace(minute=0, second=0, microsecond=0)
 
     @property
-    def end_forecast(self) -> pl.Timestamp:
+    def end_forecast(self) -> dt.datetime:
         """Get the end date of the forecast."""
-        return (
-            self.start_forecast
-            + self.max_forecast_days
-            - pl.Timedelta(self.freq_source)
-        )
+        return self.start_forecast + self.max_forecast_days - self.freq_source
 
     @property
-    def source_dates(self) -> pl.DatetimeIndex:
+    def source_dates(self) -> pl.datetime_range:
         """
         Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
         also return datetime strings and in that case this index is not needed and even not preferred.
@@ -154,16 +151,13 @@ class WeatherAPI(ABC):
 
     @staticmethod
     def get_source_dates(
-        start: pl.Timestamp | datetime, end: pl.Timestamp | datetime, freq: str
-    ) -> pl.DatetimeIndex:
+        start: dt.datetime, end: dt.datetime, int: dt.timedelta
+    ) -> pl.datetime_range:
         """
         Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
         also return datetime strings and in that case this index is not needed and even not preferred.
         """
-        start = pl.Timestamp(start)
-        end = pl.Timestamp(end)
-        # floor start, end to freq and return DatetimeIndex
-        return pl.date_range(start.floor("1H"), end.floor("1H"), freq=freq, tz="UTC")
+        return pl.datetime_range(start, end, interval=int, timezone=dt.timezone.utc)
 
     @staticmethod
     def convert_unit(data: pl.Series, from_unit: str, to_unit: str) -> pl.Series:
@@ -221,60 +215,51 @@ class WeatherAPI(ABC):
         # process and return the data
         processed_data: pl.DataFrame = self._process_data()
 
-        if processed_data.index.freq is None:
-            raise WeatherAPIError("Processed data does not have a known frequency.")
-        if processed_data.index.freq != self.freq_source:
-            raise WeatherAPIError(
-                f"Data freq ({processed_data.index.freq}) != source freq ({self.freq_source})."
-            )
+        # verify that data has a "datetime" column, all data is unique, sorted and in UTC
 
-        # cut off the data that exceeds either max_forecast_days or int(number of days in the source data)
-        n_days_data = (processed_data.index[-1] - processed_data.index[0]).days + 1
-        n_days = int(min(n_days_data, self.max_forecast_days.days))
-        processed_data = processed_data.iloc[
-            : n_days * (pl.Timedelta(hours=24) // pl.Timedelta(self.freq_source))
-        ]
+        if "datetime" not in processed_data.columns:
+            raise WeatherAPIError("Processed data does not have a datetime column.")
+        if not all(processed_data["datetime"].is_unique()):
+            raise WeatherAPIError("Processed data contains duplicate datetimes.")
+        if not processed_data["datetime"].is_sorted():
+            raise WeatherAPIError("Processed data is not sorted.")
+        dt_type = processed_data["datetime"].dtype
+        if dt_type != pl.Datetime:
+            raise WeatherAPIError(f"Datetime type should be pl.Datetime, is {dt_type}.")
+        if processed_data["datetime"].dtype.time_zone != str(dt.timezone.utc):
+            raise WeatherAPIError("Datetime column is not in UTC.")
+        if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
+            raise WeatherAPIError("Processed data contains gaps.")
+
+        # cut off the data that exceeds max_forecast_days
+        processed_data = processed_data.filter(pl.col("datetime") <= self.end_forecast)
 
         # check for NaN values
-        if pl.isnull(processed_data).any().any():
+        if any(col.has_validity() for col in processed_data):
             raise WeatherAPIError("Processed data contains NaN values.")
 
         # set data types
-        data_type_dict = {
-            "temperature": float,
-            "humidity": int,
-            "wind_speed": float,
-            "cloud_coverage": int,
-        }
-        processed_data = processed_data.astype(data_type_dict)
-
-        # resample to the output frequency and interpolate
-        if self.freq_output != self.freq_source:
-            processed_data = (
-                processed_data.resample(self.freq_output)
-                .interpolate(method="linear")
-                .iloc[:-1]
-            )
-
-        resampled = processed_data.tz_convert("UTC")
-        resampled["datetime"] = resampled.index.strftime("%Y-%m-%dT%H:%M:%S%z")
-
-        # set data types again after resampling
-        resampled = resampled.astype(data_type_dict)
+        processed_data = processed_data.cast(
+            {
+                "cloud_coverage": int,
+                "humidity": int,
+                "temperature": float,
+                "wind_speed": float,
+            }
+        )
 
         # calculate irradiance from cloud cover
         if calc_irrads:
-            irrads = self.cloud_cover_to_irradiance(resampled["cloud_coverage"])
-            resampled["ghi"] = irrads["ghi"]
-            resampled["dni"] = irrads["dni"]
-            resampled["dhi"] = irrads["dhi"]
-
+            _LOGGER.debug("Calculating irradiance from cloud cover.")
+            irrads = self.cloud_cover_to_irradiance(processed_data["cloud_coverage"])
+            processed_data = pl.concat([processed_data, irrads], how="horizontal")
+        print(f"processed_data: {processed_data}")
         # convert to dictionary and validate schema
         try:
             data_dict = {
                 "source": self.__class__.__name__,
-                "frequency": self.freq_output,
-                "data": resampled.to_dict(orient="records"),
+                "frequency": self.freq_source,
+                "data": processed_data.to_dict(),
             }
             WEATHER_SCHEMA(data_dict)
         except Exception as exc:
@@ -289,7 +274,7 @@ class WeatherAPI(ABC):
 
         :param live: Force an update by ignoring self.max_age.
         """
-        delta_t = pl.Timestamp.now(tz="UTC") - self._last_update
+        delta_t = dt.datetime.now(tz.utc) - self._last_update
         if self._raw_data is not None and delta_t < self.max_age and not live:
             _LOGGER.debug("Using cached weather data.")
             return self._raw_data
@@ -313,7 +298,7 @@ class WeatherAPI(ABC):
 
         # return the response
         self._raw_data = response
-        self._last_update = pl.Timestamp.now(tz="UTC")
+        self._last_update = dt.datetime.now(tz.utc)
         return response
 
     def _do_request(self) -> Response:
@@ -447,30 +432,6 @@ class WeatherAPI(ABC):
         :return: Atmospheric transmittance as a pandas pl.Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
-
-    def _add_freq(
-        self, idx: pl.DatetimeIndex, freq: str | None = None
-    ) -> pl.DatetimeIndex:
-        """Add a frequency attribute to idx, through inference or directly.
-
-        Returns a copy.  If `freq` is None, it is inferred.
-
-        :param idx: pl.DatetimeIndex to add frequency to.
-        :param freq: Frequency to add to idx.
-        :return: pl.DatetimeIndex with frequency attribute.
-        """
-        idx = idx.copy()
-        if freq is None:
-            if idx.freq is None:
-                freq = pl.infer_freq(idx)
-            else:
-                return idx
-        idx.freq = pl.tseries.frequencies.to_offset(freq)
-        if idx.freq is None:
-            raise AttributeError(
-                "no discernible frequency found to `idx`.  Specify a frequency string with `freq`."
-            )
-        return idx
 
 
 @dataclass(frozen=True)
