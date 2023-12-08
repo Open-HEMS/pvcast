@@ -15,7 +15,9 @@ import requests
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
 from requests import Response
-from voluptuous import All, Datetime, In, Optional, Range, Required, Schema
+from voluptuous import All, Datetime, Optional, Range, Required, Schema
+
+from ..model.util import _timedelta_to_pl_duration
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ _LOGGER = logging.getLogger(__name__)
 WEATHER_SCHEMA = Schema(
     {
         Required("source"): str,
-        Required("frequency"): In(["15Min", "30Min", "1H", "1D", "1W", "M", "Y"]),
+        Required("interval"): str,
         Required("data"): [
             {
                 Required("datetime"): All(
@@ -184,7 +186,7 @@ class WeatherAPI(ABC):
             )
 
         # do unit conversion
-        return data.apply(CONV_DICT[from_unit][to_unit])
+        return CONV_DICT[from_unit][to_unit](data)
 
     @abstractmethod
     def _process_data(self) -> pl.DataFrame:
@@ -230,13 +232,11 @@ class WeatherAPI(ABC):
             raise WeatherAPIError("Datetime column is not in UTC.")
         if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
             raise WeatherAPIError("Processed data contains gaps.")
+        if any(col.has_validity() for col in processed_data):
+            raise WeatherAPIError("Processed data contains NaN values.")
 
         # cut off the data that exceeds max_forecast_days
         processed_data = processed_data.filter(pl.col("datetime") <= self.end_forecast)
-
-        # check for NaN values
-        if any(col.has_validity() for col in processed_data):
-            raise WeatherAPIError("Processed data contains NaN values.")
 
         # set data types
         processed_data = processed_data.cast(
@@ -253,13 +253,20 @@ class WeatherAPI(ABC):
             _LOGGER.debug("Calculating irradiance from cloud cover.")
             irrads = self.cloud_cover_to_irradiance(processed_data["cloud_coverage"])
             processed_data = pl.concat([processed_data, irrads], how="horizontal")
-        print(f"processed_data: {processed_data}")
+
+        # convert datetime column to str
+        processed_data = processed_data.with_columns(
+            processed_data["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+        )
+
         # convert to dictionary and validate schema
+        data_dict = processed_data.to_dict(as_series=False)
+        data_dict = [dict(zip(data_dict, t)) for t in zip(*data_dict.values())]
         try:
             data_dict = {
                 "source": self.__class__.__name__,
-                "frequency": self.freq_source,
-                "data": processed_data.to_dict(),
+                "interval": _timedelta_to_pl_duration(self.freq_source),
+                "data": data_dict,
             }
             WEATHER_SCHEMA(data_dict)
         except Exception as exc:
@@ -349,7 +356,6 @@ class WeatherAPI(ABC):
             )
         else:
             raise ValueError(f"Invalid how argument: {how}")
-
         return irrads
 
     def _cloud_cover_to_irradiance_clearsky_scaling(
@@ -379,7 +385,7 @@ class WeatherAPI(ABC):
         dni = disc(ghi, solpos["zenith"], cloud_cover.index)["dni"]
         dhi = ghi - dni * np.cos(np.radians(solpos["zenith"]))
 
-        irrads = pl.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fillna(0)
+        irrads = pl.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fill_null(0)
         return irrads
 
     def _cloud_cover_to_irradiance_campbell_norman(
@@ -401,8 +407,7 @@ class WeatherAPI(ABC):
             solar_position["apparent_zenith"], transmittance, dni_extra=dni_extra
         )
         irrads = irrads.fillna(0)
-
-        return irrads
+        return pl.from_pandas(irrads)
 
     def _cloud_cover_to_ghi_linear(
         self, cloud_cover: pl.Series, ghi_clear: pl.Series, offset: float = 35.0

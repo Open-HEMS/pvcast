@@ -9,6 +9,7 @@ import polars as pl
 import pytest
 import requests
 import responses
+from polars.testing import assert_series_equal
 from pvlib.location import Location
 
 from pvcast.weather.weather import (
@@ -42,12 +43,8 @@ class MockWeatherAPI(WeatherAPI):
 
         # convert datetime column to datetime type
         data = data.with_columns(
-            pl.col("datetime").str.to_datetime(format="%Y-%m-%d %H:%M:%S%z")
+            pl.col("datetime").str.to_datetime(format="%Y-%m-%dT%H:%M:%S%z")
         )
-        # print(data)
-        # print(
-        #     f"test diff: {all(data['datetime'].diff()[1:] == dt.timedelta(minutes=30))}"
-        # )
         return data
 
 
@@ -120,9 +117,9 @@ class TestWeather:
             "wind_speed": [0, 0.5, 1],
             "cloud_coverage": [0, 0.5, 1],
             "datetime": [
-                "2020-01-01 00:00:00+00:00",
-                "2020-01-01 00:30:00+00:00",
-                "2020-01-01 01:00:00+00:00",
+                "2020-01-01T00:00:00+00:00",
+                "2020-01-01T00:30:00+00:00",
+                "2020-01-01T01:00:00+00:00",
             ],
         }
     )
@@ -135,9 +132,9 @@ class TestWeather:
             "wind_speed": [0, 0.5, 1],
             "cloud_coverage": [0, 0.5, 1],
             "datetime": [
-                "2020-01-01 00:00:00+00:00",
-                "2020-01-01 00:30:00+00:00",
-                "2020-01-01 01:00:00+00:00",
+                "2020-01-01T00:00:00+00:00",
+                "2020-01-01T00:30:00+00:00",
+                "2020-01-01T01:00:00+00:00",
             ],
         }
     )
@@ -151,9 +148,9 @@ class TestWeather:
             "cloud_coverage": [0, 0.5, 1],
             "invalid_column": [0, 0.5, 1],
             "datetime": [
-                "2020-01-01 00:00:00+00:00",
-                "2020-01-01 00:30:00+00:00",
-                "2020-01-01 01:00:00+00:00",
+                "2020-01-01T00:00:00+00:00",
+                "2020-01-01T00:30:00+00:00",
+                "2020-01-01T01:00:00+00:00",
             ],
         }
     )
@@ -237,39 +234,6 @@ class TestWeather:
         ):
             weather_obj_fixed_loc.get_weather()
 
-    def test_get_weather_unknown_freq(self, api_response: requests.Response) -> None:
-        """Test the get_weather function when the frequency is unknown."""
-        api = MockWeatherAPI(
-            url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC")
-        )
-        api._last_update = pl.Timestamp.now(tz="UTC")
-        api.data = self.mock_data.copy()
-        # this should raise an error because the frequency cannot be inferred (dt = 30 min --> 15 min)
-        api.data.index = pl.DatetimeIndex(
-            ["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 00:45:00"]
-        )
-        with pytest.raises(
-            WeatherAPIError, match="Processed data does not have a known frequency."
-        ):
-            api.get_weather()
-
-    def test_get_weather_conflicting_freq(
-        self, api_response: requests.Response
-    ) -> None:
-        """Test the get_weather function when the frequency is unknown."""
-        api = MockWeatherAPI(
-            url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC")
-        )
-        api._last_update = pl.Timestamp.now(tz="UTC")
-        api.data = self.mock_data.copy()
-        # self.freq_source = 30min, but the index has a frequency of 1h
-        api.data.index = pl.DatetimeIndex(
-            ["2020-01-01 00:00:00", "2020-01-01 01:00:00", "2020-01-01 02:00:00"],
-            freq="1h",
-        )
-        with pytest.raises(WeatherAPIError, match="!= source freq"):
-            api.get_weather()
-
     @pytest.mark.parametrize("api_response", [mock_data_invalid], indirect=True)
     def test_get_weather_schema_error(self, weather_obj_fixed_loc: WeatherAPI) -> None:
         """Test the get_weather function when NaN values are present."""
@@ -302,11 +266,16 @@ class TestWeather:
         irradiance = weather_obj.cloud_cover_to_irradiance(
             weather_df["cloud_cover"], irradiance_method
         )
+        rad_types = {"ghi", "dni", "dhi"}
         assert isinstance(irradiance, pl.DataFrame)
         assert irradiance.shape[0] == weather_df.shape[0]
         assert irradiance.shape[1] == 3
-        assert set(irradiance.columns) == {"ghi", "dni", "dhi"}
-        assert irradiance.index.equals(weather_df.index)
+        assert set(irradiance.columns) == rad_types
+        for rad_type in rad_types:
+            assert irradiance[rad_type].dtype == pl.Float64
+            assert irradiance[rad_type].is_finite().all()
+            assert irradiance[rad_type].min() >= 0
+            assert irradiance[rad_type].max() <= 1367
 
     def test_weather_cloud_cover_to_irradiance_error(
         self, weather_obj: WeatherAPI, weather_df: pl.DataFrame
@@ -322,25 +291,6 @@ class TestWeather:
             )
 
     @pytest.mark.parametrize(
-        "freq_opt, freq", [(None, "30T"), ("30T", None), ("30T", "30T")]
-    )
-    def test_add_freq(
-        self, weather_obj: WeatherAPI, freq_opt: str | None, freq: str | None
-    ) -> None:
-        """Test the add_freq function."""
-        index = pl.DatetimeIndex(
-            ["2020-01-01 00:00:00", "2020-01-01 00:30:00", "2020-01-01 01:00:00"],
-            tz="UTC",
-            freq=freq_opt,
-        )
-        if freq_opt is None:
-            assert index.freq is None
-        else:
-            assert index.freq.freqstr == freq_opt
-        weather_df = weather_obj._add_freq(index, freq)
-        assert weather_df.freq == "30T"
-
-    @pytest.mark.parametrize(
         "from_unit, to_unit, expected",
         valid_temperature_test_cases + valid_speed_test_cases,
     )
@@ -354,7 +304,8 @@ class TestWeather:
         result = weather_obj_fixed_loc.convert_unit(
             self.unit_conv_data, from_unit, to_unit
         )
-        pl.testing.assert_series_equal(
+        assert isinstance(result, pl.Series)
+        assert_series_equal(
             result,
             expected,
             check_dtype=False,

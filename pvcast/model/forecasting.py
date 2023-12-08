@@ -6,7 +6,6 @@ import copy
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,11 +17,11 @@ from pvlib.location import Location
 
 from .const import (
     HISTORICAL_YEAR_MAPPING,
-    SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
     VALID_DOWN_SAMPLE_FREQ,
     VALID_UPSAMPLE_FREQ,
 )
+from .util import _timedelta_to_pl_duration
 
 if TYPE_CHECKING:
     from .model import PVPlantModel
@@ -113,7 +112,7 @@ class ForecastResult:
         """
         t0 = self.ac_power.select(pl.col("time"))[0].item()
         t1 = self.ac_power.select(pl.col("time"))[1].item()
-        return int(self._timedelta_to_pl_duration(t1 - t0)[:-1])
+        return int(_timedelta_to_pl_duration(t1 - t0)[:-1])
 
     def _time_str_to_seconds(self, time_str: str) -> int:
         """Convert a time string to seconds."""
@@ -126,33 +125,6 @@ class ForecastResult:
         if time_str.endswith("d"):
             return int(time_str[:-1]) * 60 * 60 * 24
         raise ValueError(f"Invalid time string: {time_str}.")
-
-    def _timedelta_to_pl_duration(self, td: timedelta | str | None) -> str | None:
-        """Convert python timedelta to a polars duration string.
-        This function is copied from polars' utils.py.
-        """
-        if td is None or isinstance(td, str):
-            return td
-
-        if td.days >= 0:
-            d = td.days and f"{td.days}d" or ""
-            s = td.seconds and f"{td.seconds}s" or ""
-            us = td.microseconds and f"{td.microseconds}us" or ""
-        else:
-            if not td.seconds and not td.microseconds:
-                d = td.days and f"{td.days}d" or ""
-                s = ""
-                us = ""
-            else:
-                corrected_d = td.days + 1
-                d = corrected_d and f"{corrected_d}d" or "-"
-                corrected_seconds = SECONDS_PER_DAY - (
-                    td.seconds + (td.microseconds > 0)
-                )
-                s = corrected_seconds and f"{corrected_seconds}s" or ""
-                us = td.microseconds and f"{10**6 - td.microseconds}us" or ""
-
-        return f"{d}{s}{us}"
 
     def energy(self, freq: str = "1d") -> pl.DataFrame:
         """Calculate the AC energy output of the PV plant.
