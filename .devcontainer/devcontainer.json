@@ -50,8 +50,7 @@
 				"python.testing.pytestArgs": [
 					"--cov-report=xml"
 				],
-				"python.testing.pytestEnabled": true,
-				"terminal.integrated.defaultProfile.linux": "zsh"
+				"python.testing.pytestEnabled": true
 			}
 		}
 	},
