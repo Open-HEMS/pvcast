@@ -15,13 +15,13 @@ from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 
+from ..util.timestamps import timedelta_to_pl_duration
 from .const import (
     HISTORICAL_YEAR_MAPPING,
     SECONDS_PER_HOUR,
     VALID_DOWN_SAMPLE_FREQ,
     VALID_UPSAMPLE_FREQ,
 )
-from .util import _timedelta_to_pl_duration
 
 if TYPE_CHECKING:
     from .model import PVPlantModel
@@ -112,7 +112,7 @@ class ForecastResult:
         """
         t0 = self.ac_power.select(pl.col("time"))[0].item()
         t1 = self.ac_power.select(pl.col("time"))[1].item()
-        return int(_timedelta_to_pl_duration(t1 - t0)[:-1])
+        return int(timedelta_to_pl_duration(t1 - t0)[:-1])
 
     def _time_str_to_seconds(self, time_str: str) -> int:
         """Convert a time string to seconds."""

@@ -10,6 +10,7 @@ import pandas as pd
 from requests import Response
 
 from ..homeassistant.homeassistantapi import HomeassistantAPI
+from ..util.units import convert_unit
 from .weather import WeatherAPI
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class WeatherAPIHomeassistant(WeatherAPI):
         }
 
         for key, unit in units.items():
-            weather_df[key] = self.convert_unit(
+            weather_df[key] = convert_unit(
                 weather_df[key],
                 from_unit=response["attributes"][f"{key}_unit"],
                 to_unit=unit,

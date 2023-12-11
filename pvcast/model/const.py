@@ -8,7 +8,7 @@ BASE_CEC_DATA_PATH = BASE_DIR / "data/proc"
 
 VALID_UPSAMPLE_FREQ = ("1h", "60m", "30m", "15m", "5m", "1m")
 VALID_DOWN_SAMPLE_FREQ = ("h", "d", "w", "mo", "y")
-SECONDS_PER_DAY = 86_400
+
 SECONDS_PER_HOUR = 3_600
 
 # PVGIS TMY (typical meteorological year) data uses a typical month of a typical year.

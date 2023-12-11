@@ -1,7 +1,6 @@
 """Unit tests for PV power/energy forecasting logic."""
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import Type, Union
 
 import polars as pl
@@ -186,27 +185,6 @@ class TestForecastResult:
         assert ac_energy.item() == pytest.approx(
             sum_power["ac_energy"].item(), rel=0.05
         )
-
-    @pytest.mark.parametrize(
-        ("td", "expected"),
-        [
-            (timedelta(days=1), "1d"),
-            (timedelta(days=-1), "-1d"),
-            (timedelta(seconds=1), "1s"),
-            (timedelta(seconds=-1), "-1s"),
-            (timedelta(microseconds=1), "1us"),
-            (timedelta(microseconds=-1), "-1us"),
-            (timedelta(days=1, seconds=1), "1d1s"),
-            (timedelta(days=-1, seconds=-1), "-1d1s"),
-            (timedelta(days=1, microseconds=1), "1d1us"),
-            (timedelta(days=-1, microseconds=-1), "-1d1us"),
-        ],
-    )
-    def test_timedelta_to_pl_duration(
-        self, forecast_result: ForecastResult, td: timedelta, expected: str
-    ) -> None:
-        out = forecast_result._timedelta_to_pl_duration(td)
-        assert out == expected
 
     @pytest.mark.parametrize(
         "time_str, expected",

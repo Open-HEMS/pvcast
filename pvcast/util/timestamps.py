@@ -1,13 +1,11 @@
-"""Utility functions for the pvcast model."""
+"""Utilities for working with datetime objects."""
 from datetime import timedelta
 from typing import Union
 
-from .const import (
-    SECONDS_PER_DAY,
-)
+SECONDS_PER_DAY = 86_400
 
 
-def _timedelta_to_pl_duration(td: Union[timedelta, str, None]) -> Union[str, None]:
+def timedelta_to_pl_duration(td: Union[timedelta, str, None]) -> Union[str, None]:
     """Convert python timedelta to a polars duration string.
     This function is copied from polars' utils.py.
     """
