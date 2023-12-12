@@ -2,114 +2,146 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import random
+import typing
 from dataclasses import InitVar, dataclass, field
-from typing import Any
-from urllib.parse import urljoin
+from typing import Dict, Union
 
-import requests
-from requests import Response
-from requests.adapters import HTTPAdapter, Retry
-
-s = requests.Session()
-
-retries = Retry(
-    total=4, backoff_factor=0.2, backoff_max=5, status_forcelist=[502, 503, 504]
-)
-
-s.mount("http://", HTTPAdapter(max_retries=retries))
+from voluptuous import All, Coerce, Range, Required, Schema
+from websockets.sync.client import Connection, connect  # type: ignore
 
 _LOGGER = logging.getLogger(__name__)
 
 
+forecast_item_schema = Schema(
+    {
+        Required("condition"): str,
+        Required("datetime"): str,
+        Required("wind_bearing"): Coerce(float),
+        Required("cloud_coverage"): Coerce(float),
+        Required("temperature"): Coerce(float),
+        Required("wind_speed"): Coerce(float),
+        Required("precipitation"): Coerce(float),
+        Required("humidity"): All(int, Range(min=0, max=100)),
+    }
+)
+
+event_schema = Schema(
+    {
+        Required("type"): str,
+        Required("forecast"): [forecast_item_schema],
+    }
+)
+
+HA_API_WEATHER_DATA = Schema(
+    {
+        Required("id"): Coerce(int),
+        Required("type"): str,
+        Required("event"): event_schema,
+    }
+)
+
+
 @dataclass
-class HomeassistantAPI:
+class HomeAssistantAPI:
     """Home Assistant API interface."""
 
-    hass_url: str
+    host: InitVar[str]
     token: InitVar[str]
-    _headers: dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    entity_id: str
+    _hass_url: str = field(init=False, repr=False)
+    _auth_headers: dict[str, str] = field(default_factory=dict, init=False, repr=False)
+    _data_headers: dict[str, Union[str, int, float]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
-    def __post_init__(self, token: str) -> None:
-        self._headers = {
-            "Authorization": "Bearer " + token,
-            "Content-Type": "application/json",
+    def __post_init__(self, host: str, token: str) -> None:
+        """Initialize the Home Assistant API interface."""
+
+        if not len(self.entity_id.split(".")) == 2:
+            raise ValueError("Invalid entity_id: %s. Must use format 'weather.<name>'")
+        if not self.entity_id.startswith("weather."):
+            raise ValueError("Only weather entities are supported")
+
+        self._hass_url = f"ws://{host}/api/websocket"
+        _LOGGER.debug("Initializing HA API at %s", self._hass_url)
+
+        self._auth_headers = {
+            "type": "auth",
+            "access_token": token,
+        }
+        self._data_headers = {
+            "id": -1,
+            "type": "weather/subscribe_forecast",
+            "entity_id": self.entity_id,
+            "forecast_type": "hourly",
         }
 
     @property
     def url(self) -> str:
-        """Return the url to the Home Assistant API."""
-        return urljoin(self.hass_url, "api/")
-
-    @property
-    def headers(self) -> dict[str, str]:
-        """Return the headers to the Home Assistant API."""
-        return self._headers
+        """Return the Home Assistant API URL."""
+        return self._hass_url
 
     @property
     def online(self) -> bool:
-        """Return True if the Home Assistant API is online."""
-        response: Response = s.get(self.url, headers=self.headers)
-        _LOGGER.debug("Home Assistant API online: %s", response.ok)
-        return response.ok
+        """Return whether the Home Assistant API is online."""
+        try:
+            with connect(self.url) as websocket:
+                self._authenticate(websocket)
+                return True
+        except Exception:
+            return False
 
-    def get_entity_state(self, entity_id: str) -> Response:
-        """Get the state object for specified entity_id. Raises ValueError if entity is not found.
-
-        :param entity_id: The entity_id to get the state object for.
-        :return: The state object for the specified entity_id.
-        """
-        url = self._format_entity_url(entity_id)
-        response: Response = s.get(url, headers=self.headers)
-
-        # if we receive a 404 the entity does not exist and we can't continue
-        if response.status_code == 404:
-            raise ValueError(f"Entity {entity_id} not found.")
-        if not response.ok:
-            raise requests.ConnectionError(
-                f"Error while getting entity {entity_id}: {response.reason}"
-            )
-        return response
-
-    def post_entity_state(self, entity_id: str, state: dict[str, Any]) -> Response:
-        """Post the state object for specified entity_id.
-
-        Response will be something like:
-
-        {
-            "entity_id":"sensor.kitchen_temperature",
-            "state":"25",
-            "attributes":{
-                "unit_of_measurement":"°C"
-            },
-            "last_changed":"2023-07-27T10:33:35.834356+00:00",
-            "last_updated":"2023-07-27T10:33:35.834356+00:00",
-            "context":{
-                "id":"01H6BEJFTTT1W8BJ905B2YS3JA",
-                "parent_id":null,
-                "user_id":"f20d2b011d0f40c182c676dce72bd6a2"
-            }
+    @property
+    def data_headers(self) -> dict[str, Union[str, int]]:
+        """Return the data headers."""
+        return {
+            "id": random.randint(0, 100000),
+            "type": "weather/subscribe_forecast",
+            "entity_id": self.entity_id,
+            "forecast_type": "hourly",
         }
 
-        :param entity_id: The entity_id to post the state object for.
-        :param state: The state object to post.
-        :return: The response object.
-        """
-        url = self._format_entity_url(entity_id)
-        response: Response = s.post(url, headers=self.headers, json=state)
-        if not response.ok:
-            raise requests.ConnectionError(
-                f"Error while posting entity {entity_id}: {response.reason}"
-            )
-        _LOGGER.debug(
-            "Successfully updated/created entity: %s [code:%s]",
-            entity_id,
-            response.status_code,
-        )
-        return response
+    def _authenticate(self, websocket: Connection) -> None:
+        """Authenticate with the Home Assistant API."""
+        reply = json.loads(websocket.recv())
+        _LOGGER.debug("Received: %s", reply)
+        if not reply["type"] == "auth_required":
+            _LOGGER.error("Auth failed. Reply: %s", reply)
+            raise ValueError("Authentication failed")
+        websocket.send(json.dumps(self._auth_headers))
+        reply = json.loads(websocket.recv())
+        _LOGGER.debug("Received: %s", reply)
+        if not reply["type"] == "auth_ok":
+            _LOGGER.error("Auth failed. Reply: %s", reply)
+            raise ValueError("Authentication failed")
 
-    def _format_entity_url(self, entity_id: str) -> str:
-        """Format the url to the Home Assistant API for the specified entity_id."""
-        if not len(entity_id.split(".")) == 2:
-            raise ValueError(f"Invalid entity_id: {entity_id}")
-        return urljoin(self.url, f"states/{entity_id}")
+    @property
+    def forecast(self) -> list[dict[str, Union[str, int, float]]]:
+        """Get the weather forecast."""
+        with connect(self._hass_url) as websocket:
+            self._authenticate(websocket)
+            websocket.send(json.dumps(self.data_headers))
+
+            # first reply: {..., 'success': True, 'result': None}
+            status: Dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
+            if not status.get("success", False):
+                _LOGGER.error("Data request failed. Reply: %s", status)
+                raise ValueError("Data request failed")
+
+            # second reply contains the forecast data, using the format:
+            # {..., 'event': {'type': 'hourly', 'forecast': [{x}, {x}, ...]}}
+            reply: Dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
+            if not isinstance(reply, dict):
+                _LOGGER.error("Data request failed. Reply: %s", reply)
+                raise ValueError("Data request failed")
+
+            # validate the reply with voluptuous
+            HA_API_WEATHER_DATA(reply)
+            forecast = reply["event"]["forecast"]
+            if not isinstance(forecast, list):
+                _LOGGER.error("Invalid forecast data: %s", forecast)
+                raise ValueError("Invalid forecast data")
+            return forecast
