@@ -50,6 +50,7 @@ polars==0.19.19
 pre-commit==3.5.0
 pre-commit-hooks==4.5.0
 pvlib==0.10.1
+pyarrow==14.0.1
 pydantic==2.5.2
 pydantic_core==2.14.5
 pylint==3.0.2
