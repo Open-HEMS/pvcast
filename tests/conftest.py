@@ -203,3 +203,12 @@ def pv_sys_mngr(
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
     )
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Add integration marker to all tests that use the homeassistant_api_setup fixture.
+    """
+    for item in items:
+        if "homeassistant_api_setup" in getattr(item, "fixturenames", ()):
+            item.add_marker("integration")

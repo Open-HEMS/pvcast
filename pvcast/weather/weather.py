@@ -111,7 +111,7 @@ class WeatherAPI(ABC):
     @property
     def end_forecast(self) -> dt.datetime:
         """Get the end date of the forecast."""
-        return self.start_forecast + self.max_forecast_days - self.freq_source
+        return self.start_forecast + self.max_forecast_days
 
     @property
     def source_dates(self) -> pl.Series:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 from dataclasses import InitVar, dataclass, field
 
@@ -35,3 +36,24 @@ class WeatherAPIHomeassistant(WeatherAPI):
         :return: Response from the API
         """
         weather_df: pl.DataFrame = pl.from_dicts(self._hass_api.forecast)
+
+        # select relevant columns
+        weather_df = weather_df.select(
+            ["datetime", "temperature", "humidity", "wind_speed", "cloud_coverage"]
+        )
+
+        # interpolate NaN values
+        weather_df = weather_df.interpolate()
+        weather_df = weather_df.drop_nulls()
+
+        # convert datetime column to datetime
+        weather_df = weather_df.with_columns(pl.col("datetime").str.to_datetime())
+
+        # check that timezone is in UTC, if not, convert it
+        time_zone = weather_df["datetime"].dtype.time_zone
+        if time_zone != str(dt.timezone.utc):
+            _LOGGER.warning(f"HA weather data timezone is not UTC but: {time_zone}")
+            weather_df = weather_df.with_columns(
+                pl.col("datetime").cast(pl.Datetime, timezone=dt.timezone.utc)
+            )
+        return weather_df

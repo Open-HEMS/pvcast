@@ -1,9 +1,11 @@
 """Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
+import datetime as dt
 from typing import Generator
 from urllib.parse import urljoin
 
+import polars as pl
 import pytest
 import responses
 from pvlib.location import Location
@@ -13,14 +15,46 @@ from pvcast.weather.homeassistant import WeatherAPIHomeassistant
 from pvcast.weather.weather import WeatherAPI
 
 from ...const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
+from .test_weather import CommonWeatherTests
 
 
-class TestWeatherPlatform:
+class WeatherPlatform(CommonWeatherTests):
     """Test a weather platform that inherits from WeatherAPI class."""
 
-    weatherapis = API_FACTORY.get_weather_api_list_str()
+    weather_apis = API_FACTORY.get_weather_api_list_str()
     valid_temp_units = ["°C", "°F", "C", "F"]
     valid_speed_units = ["m/s", "km/h", "mi/h", "ft/s", "kn"]
+
+    @pytest.fixture(params=[1, 2, 5, 10])
+    def max_forecast_day(self, request: pytest.FixtureRequest) -> dt.timedelta:
+        return dt.timedelta(days=request.param)
+
+    def test_get_weather(self, weather_api: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        data = weather_api.get_weather()["data"]
+        weather = pl.from_dicts(data)
+        assert isinstance(weather, pl.DataFrame)
+        assert weather.null_count().sum_horizontal().item() == 0
+        assert weather.shape[0] >= 24
+
+    def test_weather_get_weather_max_days(
+        self,
+        weather_api: WeatherAPI,
+        max_forecast_day: dt.timedelta,
+    ) -> None:
+        """Test the get_weather function with a maximum number of days to forecast."""
+        weather_api.max_forecast_days = max_forecast_day
+        data = weather_api.get_weather()["data"]
+        weather = pl.from_dicts(data)
+        print(f"[n_days={max_forecast_day}]:\n{weather}")
+        assert isinstance(weather, pl.DataFrame)
+        assert weather.null_count().sum_horizontal().item() == 0
+        assert weather.shape[0] >= 24
+        assert weather.shape[0] <= max_forecast_day / dt.timedelta(hours=1)
+
+
+class TestHomeAssistantWeather(WeatherPlatform):
+    """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture
     def homeassistant_api_setup(
@@ -34,6 +68,17 @@ class TestWeatherPlatform:
             entity_id=HASS_WEATHER_ENTITY_ID,
         )
         yield api
+
+    @pytest.fixture
+    def weather_api(
+        self, homeassistant_api_setup: WeatherAPIHomeassistant
+    ) -> WeatherAPI:
+        """Return the weather api."""
+        return homeassistant_api_setup
+
+
+class TestClearOutsideWeather(WeatherPlatform):
+    """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture
     def clearoutside_api_setup(
@@ -54,21 +99,7 @@ class TestWeatherPlatform:
             api = API_FACTORY.get_weather_api("clearoutside", location=location)
             yield api
 
-    @pytest.fixture(params=weatherapis)
-    def weatherapi(
-        self, request: pytest.FixtureRequest, location: Location
-    ) -> WeatherAPI:
-        """Fixture that creates a weather API interface."""
-        fixt_val = request.getfixturevalue(f"{request.param}_api_setup")
-        if isinstance(fixt_val, WeatherAPI):
-            return fixt_val
-        else:
-            raise ValueError(f"Fixture {request.param}_api_setup not found.")
-
-    def test_get_weather(self, homeassistant_api_setup: WeatherAPI) -> None:
-        """Test the get_weather function."""
-        # # Check if the fixture used is homeassistant_api_setup
-        # if isinstance(weatherapi, WeatherAPIHomeassistant):
-        #     pytest.skip("Test not applicable to Home Assistant API")
-        weather = homeassistant_api_setup.get_weather()
-        assert isinstance(weather, dict)
+    @pytest.fixture
+    def weather_api(self, clearoutside_api_setup: WeatherAPI) -> WeatherAPI:
+        """Return the weather api."""
+        return clearoutside_api_setup
