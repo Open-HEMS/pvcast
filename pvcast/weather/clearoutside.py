@@ -8,9 +8,10 @@ from dataclasses import InitVar, dataclass, field
 from urllib.parse import urljoin
 
 import polars as pl
+import requests
 from bs4 import BeautifulSoup
 
-from ..weather.weather import WeatherAPI
+from ..weather.weather import WeatherAPI, WeatherAPIErrorTimeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,28 +25,17 @@ class WeatherAPIClearOutside(WeatherAPI):
     _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
 
     def __post_init__(self, _url_base: str) -> None:
-        self.url = self._url_formatter(_url_base)
+        lat = str(round(self.location.latitude, 2))
+        lon = str(round(self.location.longitude, 2))
+        alt = str(round(self.location.altitude, 2))
+        self.url = urljoin(_url_base, f"{lat}/{lon}/{alt}")
 
-    def _url_formatter(self, url_base: str) -> str:
-        """Format the url to the API."""
-
-        def encode(coord: float) -> str:
-            return str(round(coord, 2))
-
-        lat = encode(self.location.latitude)
-        lon = encode(self.location.longitude)
-        alt = encode(self.location.altitude)
-        return urljoin(url_base, f"{lat}/{lon}/{alt}")
-
-    def _process_data(self) -> pl.DataFrame:
-        """Process weather data scraped from the clear outside website.
-
-        This function takes no arguments, but response.content must be retrieved from self._raw_data.
-        """
-        # raw response data from request
-        if not self._raw_data:
-            raise ValueError("Field self._raw_data not set, run self.get_data() first.")
-        response = self._raw_data
+    def retrieve_new_data(self) -> pl.DataFrame:
+        """Retrieve weather data by scraping it from the clear outside website."""
+        try:
+            response = requests.get(self.url, timeout=self.timeout)
+        except requests.exceptions.Timeout as exc:
+            raise WeatherAPIErrorTimeout() from exc
 
         # response (source) data bucket
         weather_df = pl.DataFrame()

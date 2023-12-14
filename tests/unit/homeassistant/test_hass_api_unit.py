@@ -7,21 +7,19 @@ import pytest
 
 from pvcast.homeassistant.homeassistantapi import HomeAssistantAPI
 
-from ...const import HASS_TEST_TOKEN, HASS_TEST_URL
+from ...const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
 
 
 @pytest.mark.integration
 class TestHomeAssistantAPI:
     """Test the Home Assistant API class."""
 
-    weather_entity_id = "weather.forecast_thuis"
-
     @pytest.fixture
     def homeassistant_api(self) -> HomeAssistantAPI:
         """Return a Home Assistant API instance."""
         return HomeAssistantAPI(
             host=HASS_TEST_URL,
-            entity_id=self.weather_entity_id,
+            entity_id=HASS_WEATHER_ENTITY_ID,
             token=HASS_TEST_TOKEN,
         )
 
@@ -35,7 +33,7 @@ class TestHomeAssistantAPI:
         assert homeassistant_api._data_headers == {
             "id": -1,
             "type": "weather/subscribe_forecast",
-            "entity_id": self.weather_entity_id,
+            "entity_id": HASS_WEATHER_ENTITY_ID,
             "forecast_type": "hourly",
         }
 

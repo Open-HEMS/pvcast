@@ -9,7 +9,7 @@ import typing
 from dataclasses import InitVar, dataclass, field
 from typing import Dict, Union
 
-from voluptuous import All, Coerce, Range, Required, Schema
+from voluptuous import All, Coerce, MultipleInvalid, Range, Required, Schema
 from websockets.sync.client import Connection, connect  # type: ignore
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,7 +139,13 @@ class HomeAssistantAPI:
                 raise ValueError("Data request failed")
 
             # validate the reply with voluptuous
-            HA_API_WEATHER_DATA(reply)
+            try:
+                HA_API_WEATHER_DATA(reply)
+            except MultipleInvalid as exc:
+                _LOGGER.error("Invalid data received: %s", exc)
+                raise ValueError("Invalid data received")
+
+            # extract the forecast data from the reply
             forecast = reply["event"]["forecast"]
             if not isinstance(forecast, list):
                 _LOGGER.error("Invalid forecast data: %s", forecast)

@@ -11,10 +11,8 @@ from typing import Any, Callable
 
 import numpy as np
 import polars as pl
-import requests
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
-from requests import Response
 from voluptuous import All, Datetime, Optional, Range, Required, Schema
 
 from ..util.timestamps import timedelta_to_pl_duration
@@ -89,15 +87,21 @@ class WeatherAPI(ABC):
     max_age: dt.timedelta = field(default=dt.timedelta(hours=1))
 
     # last time the weather data was updated
-    _last_update: dt.datetime = field(default=dt.datetime(1970, 1, 1, tzinfo=tz.utc))
+    _last_update: dt.datetime = field(
+        default=dt.datetime(1970, 1, 1, tzinfo=tz.utc), repr=False, init=False
+    )
 
-    # raw response data from the API
-    _raw_data: Response | None = field(default=None, init=False)
+    # processed weather data as list of dicts
+    _weather_data: list[dict[str, Any]] = field(
+        default_factory=list, repr=False, init=False
+    )
 
     @property
-    def last_update(self) -> dt.datetime:
-        """Get the last time the weather data was updated."""
-        return self._last_update
+    def dt_new_data(self) -> dt.timedelta:
+        """Get the time delta since the last update."""
+        delta = dt.datetime.now(tz.utc) - self._last_update
+        _LOGGER.debug("Time since last data update: %s", delta)
+        return delta
 
     @property
     def start_forecast(self) -> dt.datetime:
@@ -132,12 +136,11 @@ class WeatherAPI(ABC):
         )
 
     @abstractmethod
-    def _process_data(self) -> pl.DataFrame:
-        """Process data from the weather API.
+    def retrieve_new_data(self) -> pl.DataFrame:
+        """
+        Retrieve new weather data from the API.
 
-        The index of the returned pl.DataFrame should be a pl.DatetimeIndex in local time.
-
-        :return: The weather data as a pl.DataFrame where the index is the datetime and the columns are the variables.
+        :return: Response from the API
         """
 
     def get_weather(
@@ -150,18 +153,20 @@ class WeatherAPI(ABC):
         :param calc_irrads: Whether to calculate irradiance from cloud cover and add it to the weather data.
         :return: The weather data as a dict.
         """
-        # get weather API data, if needed. If not, use cached data.
-        _LOGGER.debug("Getting weather data, force live data=%s", live)
-        response: Response = self._api_request_if_needed(live)
+        # if we have valid cached data available, return it
+        if len(self._weather_data) > 0 and self.dt_new_data < self.max_age and not live:
+            _LOGGER.debug("Using cached weather data with age %s.", self.dt_new_data)
+            return self._weather_data
 
-        # handle errors from the API
-        self._api_error_handler(response)
-
-        # process and return the data
-        processed_data: pl.DataFrame = self._process_data()
+        # no cached data available, retrieve new data
+        _LOGGER.debug("Retrieving new weather data.")
+        try:
+            processed_data = self.retrieve_new_data()
+            self._last_update = dt.datetime.now(tz.utc)
+        except WeatherAPIErrorNoData as exc:
+            raise WeatherAPIErrorNoData.from_date(self.start_forecast) from exc
 
         # verify that data has a "datetime" column, all data is unique, sorted and in UTC
-
         if "datetime" not in processed_data.columns:
             raise WeatherAPIError("Processed data does not have a datetime column.")
         if not all(processed_data["datetime"].is_unique()):
@@ -170,9 +175,17 @@ class WeatherAPI(ABC):
             raise WeatherAPIError("Processed data is not sorted.")
         dt_type = processed_data["datetime"].dtype
         if dt_type != pl.Datetime:
-            raise WeatherAPIError(f"Datetime type should be pl.Datetime, is {dt_type}.")
-        if processed_data["datetime"].dtype.time_zone != str(dt.timezone.utc):
-            raise WeatherAPIError("Datetime column is not in UTC.")
+            try:
+                processed_data = processed_data.with_columns(
+                    pl.col("datetime").str.to_datetime()
+                )
+            except Exception:
+                raise WeatherAPIError(
+                    f"Datetime type should be pl.Datetime, is {dt_type}."
+                )
+        time_zone = processed_data["datetime"].dtype.time_zone
+        if time_zone != str(dt.timezone.utc):
+            raise WeatherAPIError(f"Datetime column is not in UTC, is {time_zone}.")
         if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
             raise WeatherAPIError("Processed data contains gaps.")
         if any(col.has_validity() for col in processed_data):
@@ -217,63 +230,9 @@ class WeatherAPI(ABC):
                 f"Error validating weather data: {data_dict}"
             ) from exc
 
+        # cache data
+        self._weather_data = data_dict
         return data_dict
-
-    def _api_request_if_needed(self, live: bool = False) -> Response:
-        """Check if we need to do a request or not when weather data is outdated.
-
-        :param live: Force an update by ignoring self.max_age.
-        """
-        delta_t = dt.datetime.now(tz.utc) - self._last_update
-        if self._raw_data is not None and delta_t < self.max_age and not live:
-            _LOGGER.debug("Using cached weather data.")
-            return self._raw_data
-
-        _LOGGER.debug(
-            "Getting weather data from API. [dT = %ssec, max_age = %ssec, live = %s, raw_data = %s]",
-            round(delta_t.total_seconds(), 1),
-            round(self.max_age.total_seconds(), 1),
-            live,
-            self._raw_data is not None,
-        )
-
-        # do the request
-        try:
-            response = self._do_request()
-        except requests.exceptions.Timeout as exc:
-            raise WeatherAPIErrorTimeout() from exc
-
-        # request error handling
-        self._api_error_handler(response)
-
-        # return the response
-        self._raw_data = response
-        self._last_update = dt.datetime.now(tz.utc)
-        return response
-
-    def _do_request(self) -> Response:
-        """
-        Make GET request to weather API and return the response.
-        Can be overridden by subclasses if needed.
-
-        :return: Response from weather API.
-        """
-        return requests.get(self.url, timeout=self.timeout)
-
-    @staticmethod
-    def _api_error_handler(response: Response) -> None:
-        """Handle errors from the API.
-
-        :param response: The response from the API.
-        :raises WeatherAPIError: If the response is not 200.
-        """
-        if response.status_code != 200:
-            if response.status_code == 404:
-                raise WeatherAPIErrorWrongURL()
-            elif response.status_code == 429:
-                raise WeatherAPIErrorTooManyReq()
-            else:
-                raise WeatherAPIError("Unknown error", response.status_code)
 
     def cloud_cover_to_irradiance(
         self, cloud_cover: pl.Series, how: str = "clearsky_scaling", **kwargs: Any
@@ -407,22 +366,6 @@ class WeatherAPIErrorNoData(WeatherAPIError):
 
 
 @dataclass(frozen=True)
-class WeatherAPIErrorTooManyReq(WeatherAPIError):
-    """Exception error 429, too many requests."""
-
-    message: str = field(default="Too many requests")
-    error: int = field(default=429)
-
-
-@dataclass(frozen=True)
-class WeatherAPIErrorWrongURL(WeatherAPIError):
-    """Exception error 404, wrong URL."""
-
-    message: str = field(default="Wrong URL")
-    error: int = field(default=404)
-
-
-@dataclass(frozen=True)
 class WeatherAPIErrorTimeout(WeatherAPIError):
     """Exception error 408, timeout."""
 
@@ -432,7 +375,7 @@ class WeatherAPIErrorTimeout(WeatherAPIError):
 
 @dataclass(frozen=True)
 class WeatherAPIErrorNoLocation(WeatherAPIError):
-    """Exception error 404, no data for location."""
+    """No data for location available."""
 
     message: str = field(default="No data for location available")
 

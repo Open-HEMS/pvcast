@@ -2,59 +2,31 @@
 from __future__ import annotations
 
 import datetime as dt
-from datetime import timezone as tz
-from typing import Generator
 
 import polars as pl
 import pytest
-import requests
-import responses
 from pvlib.location import Location
 
-from pvcast.weather.weather import (
-    WeatherAPI,
-    WeatherAPIError,
-    WeatherAPIErrorTooManyReq,
-    WeatherAPIErrorWrongURL,
-    WeatherAPIFactory,
-)
+from pvcast.weather.weather import WeatherAPI, WeatherAPIError, WeatherAPIFactory
 
 
 # mock for WeatherAPI class
 class MockWeatherAPI(WeatherAPI):
     """Mock the WeatherAPI class."""
 
-    def __init__(self, location: Location, url: str, data: pl.DataFrame = None):
+    def __init__(self, location: Location, url: str, data: pl.DataFrame) -> None:
         """Initialize the mock class."""
         super().__init__(location, url, freq_source=dt.timedelta(minutes=30))
         self.url = url
         self.data = data
 
-    def _process_data(self) -> pl.DataFrame:
-        """Get weather data from API response."""
-        if self.data is None:
-            if self._raw_data is None:
-                raise WeatherAPIError("No data available.")
-            resp: requests.Response = self._raw_data
-            data = pl.from_dict(resp.json())
-        else:
-            data = self.data
-
-        # convert datetime column to datetime type
-        data = data.with_columns(
-            pl.col("datetime").str.to_datetime(format="%Y-%m-%dT%H:%M:%S%z")
-        )
-        return data
+    def retrieve_new_data(self) -> pl.DataFrame:
+        """Retrieve new data from the API."""
+        return self.data
 
 
 class TestWeather:
     """Test the weather module."""
-
-    error_dict = {
-        404: WeatherAPIErrorWrongURL,
-        429: WeatherAPIErrorTooManyReq,
-        500: WeatherAPIError,
-    }
 
     test_url = "http://fakeurl.com/status/"
 
@@ -105,139 +77,80 @@ class TestWeather:
     )
 
     @pytest.fixture
-    def api_response(
-        self, request: pytest.FixtureRequest
-    ) -> Generator[requests.Response, None, None]:
-        """Get a weather API response."""
+    def data(self, request: pytest.FixtureRequest) -> pl.DataFrame:
+        """Get test data."""
         # if request is not parametrized, use a default response
         if not hasattr(request, "param"):
             data: pl.DataFrame = self.mock_data
         else:
             data = request.param
-
-        data = data.to_dict(as_series=False)
-        with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, self.test_url, json=data)
-            response = requests.get(self.test_url)
-            yield response
+        return data
 
     @pytest.fixture
-    def api_error_response(
-        self, request: pytest.FixtureRequest
-    ) -> Generator[requests.Response, None, None]:
-        """Get a weather API error response."""
-        error_code = int(request.param["error_code"])
-        with responses.RequestsMock() as rsps:
-            rsps.add(responses.GET, self.test_url, status=error_code)
-            response = requests.get(self.test_url)
-            yield response
-
-    @pytest.fixture
-    def weather_obj(
-        self, location: Location, api_response: requests.Response
-    ) -> WeatherAPI:
+    def weatherapi(self, location: Location, data: pl.DataFrame) -> WeatherAPI:
         """Get a weather API object."""
-        api = MockWeatherAPI(location=location, url=self.test_url)
-        api._last_update = dt.datetime.now(tz.utc)
-        api._raw_data = api_response
-        return api
+        return MockWeatherAPI(location=location, url=self.test_url, data=data)
 
-    @pytest.fixture
-    def weather_obj_error(
-        self, location: Location, api_error_response: requests.Response
-    ) -> WeatherAPI:
-        """Get a weather API object."""
-        api = MockWeatherAPI(location=location, url=self.test_url)
-        api._last_update = dt.datetime.now(tz.utc)
-        api._raw_data = api_error_response
-        return api
-
-    @pytest.fixture
-    def weather_obj_fixed_loc(self, api_response: requests.Response) -> WeatherAPI:
-        """Get a weather API object."""
-        api = MockWeatherAPI(
-            url=self.test_url, location=Location(52.35818, 4.88124, tz="UTC")
-        )
-        api._last_update = dt.datetime.now(tz.utc)
-        api._raw_data = api_response
-        return api
-
-    def test_weather_obj_init(self, weather_obj: WeatherAPI) -> None:
+    def test_weatherapi_init(self, weatherapi: WeatherAPI) -> None:
         """Test the get_weather function."""
-        assert isinstance(weather_obj, WeatherAPI)
-        assert isinstance(weather_obj.location, Location)
+        assert isinstance(weatherapi, WeatherAPI)
+        assert isinstance(weatherapi.location, Location)
 
-    def test_get_weather_no_update(self, weather_obj_fixed_loc: WeatherAPI) -> None:
+    def test_get_weather_no_update(self, weatherapi: WeatherAPI) -> None:
         """Test the get_weather function."""
-        weather_obj_fixed_loc.get_weather()
-        assert weather_obj_fixed_loc.last_update is not None
-        dt_now = dt.datetime.now(tz.utc)
-        dt_delta = dt_now - weather_obj_fixed_loc.last_update
-        assert dt_delta.total_seconds() < 1
-
-    @pytest.mark.parametrize("api_response", [mock_data_NaN], indirect=True)
-    def test_get_weather_NaN(self, weather_obj_fixed_loc: WeatherAPI) -> None:
-        """Test the get_weather function when NaN values are present."""
-        with pytest.raises(
-            WeatherAPIError, match="Processed data contains NaN values."
-        ):
-            weather_obj_fixed_loc.get_weather()
-
-    @pytest.mark.parametrize("api_response", [mock_data_invalid], indirect=True)
-    def test_get_weather_schema_error(self, weather_obj_fixed_loc: WeatherAPI) -> None:
-        """Test the get_weather function when NaN values are present."""
-        with pytest.raises(WeatherAPIError, match="Error validating weather data:"):
-            weather_obj_fixed_loc.get_weather()
+        weatherapi.get_weather()
+        assert weatherapi._last_update is not None
+        t_now = dt.datetime.now(dt.timezone.utc)
+        assert t_now - weatherapi._last_update < dt.timedelta(seconds=1)
 
     @pytest.mark.parametrize(
-        "api_error_response",
+        "data, error_match",
         [
-            {"error_code": code, "data": data}
-            for (code, data) in zip(error_dict.keys(), [mock_data] * len(error_dict))
+            (mock_data_NaN, "Processed data contains NaN values."),
+            (mock_data_invalid, "Error validating weather data:"),
         ],
-        indirect=True,
+        indirect=["data"],
     )
-    def test_http_error_handling(self, weather_obj_error: WeatherAPI) -> None:
-        """Test the get_weather error handling function."""
-        if weather_obj_error._raw_data is None:
-            raise ValueError("No data available.")
-        error_code = weather_obj_error._raw_data.status_code
-        with pytest.raises(self.error_dict[error_code]):
-            weather_obj_error.get_weather()
-
-    @pytest.mark.parametrize(
-        "irradiance_method", ["campbell_norman", "clearsky_scaling"]
-    )
-    def test_weather_cloud_cover_to_irradiance(
-        self, weather_obj: WeatherAPI, weather_df: pl.DataFrame, irradiance_method: str
+    def test_get_weather(
+        self, weatherapi: WeatherAPI, data: pl.DataFrame, error_match: str
     ) -> None:
-        """Test the cloud_cover_to_irradiance function."""
-        irradiance = weather_obj.cloud_cover_to_irradiance(
-            weather_df["cloud_cover"], irradiance_method
-        )
-        rad_types = {"ghi", "dni", "dhi"}
-        assert isinstance(irradiance, pl.DataFrame)
-        assert irradiance.shape[0] == weather_df.shape[0]
-        assert irradiance.shape[1] == 3
-        assert set(irradiance.columns) == rad_types
-        for rad_type in rad_types:
-            assert irradiance[rad_type].dtype == pl.Float64
-            assert irradiance[rad_type].is_finite().all()
-            assert irradiance[rad_type].min() >= 0
-            assert irradiance[rad_type].max() <= 1367
+        """Test the get_weather function with different input data."""
+        with pytest.raises(WeatherAPIError, match=error_match):
+            weatherapi.get_weather()
 
-    def test_weather_cloud_cover_to_irradiance_error(
-        self, weather_obj: WeatherAPI, weather_df: pl.DataFrame
-    ) -> None:
-        """Test the cloud_cover_to_irradiance function with errors."""
-        with pytest.raises(ValueError):
-            weather_obj.cloud_cover_to_irradiance(
-                weather_df["cloud_cover"], "wrong_method"
-            )
-        with pytest.raises(ValueError):
-            weather_obj.cloud_cover_to_irradiance(
-                weather_df["cloud_cover"], method="wrong_method"
-            )
+    def test_weather_data_cache(self, weatherapi: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        # get first weather data object
+        weather1 = weatherapi.get_weather()
+        assert isinstance(weather1, dict)
+        last_update1 = weatherapi._last_update
+        # get second weather data object, should see that it is cached data
+        weather2 = weatherapi.get_weather()
+        assert isinstance(weather2, dict)
+        last_update2 = weatherapi._last_update
+        assert last_update1 == last_update2
+
+    def test_weather_data_live(self, weatherapi: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        weather1 = weatherapi.get_weather()
+        assert isinstance(weather1, dict)
+        last_update1 = weatherapi._last_update
+        weather2 = weatherapi.get_weather(live=True)
+        assert isinstance(weather2, dict)
+        last_update2 = weatherapi._last_update
+        assert last_update2 > last_update1
+
+    def test_weather_data_outdated(self, weatherapi: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        # set max data age to -1 seconds, i.e. always outdated
+        weatherapi.max_age = dt.timedelta(seconds=-1)
+        weather1 = weatherapi.get_weather()
+        assert isinstance(weather1, dict)
+        last_update1 = weatherapi._last_update
+        weather2 = weatherapi.get_weather()
+        assert isinstance(weather2, dict)
+        last_update2 = weatherapi._last_update
+        assert last_update2 > last_update1
 
 
 class TestWeatherFactory:
@@ -257,13 +170,19 @@ class TestWeatherFactory:
         assert isinstance(weather_api_factory, WeatherAPIFactory)
         assert isinstance(
             weather_api_factory.get_weather_api(
-                "mock", location=Location(0, 0, "UTC", 0), url=self.test_url
+                "mock",
+                location=Location(0, 0, "UTC", 0),
+                url=self.test_url,
+                data=TestWeather.mock_data,
             ),
             MockWeatherAPI,
         )
         with pytest.raises(ValueError):
             weather_api_factory.get_weather_api(
-                "wrong_api", location=Location(0, 0, "UTC", 0), url=self.test_url
+                "wrong_api",
+                location=Location(0, 0, "UTC", 0),
+                url=self.test_url,
+                data=TestWeather.mock_data,
             )
 
     def test_get_weather_api_list_obj(
