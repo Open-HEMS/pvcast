@@ -7,13 +7,14 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timezone as tz
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
-from voluptuous import All, Datetime, Optional, Range, Required, Schema
+from voluptuous import All, Coerce, Datetime, Optional, Range, Required, Schema
 
 from ..util.timestamps import timedelta_to_pl_duration
 
@@ -32,7 +33,7 @@ WEATHER_SCHEMA = Schema(
                 Required("temperature"): All(float, Range(min=-100, max=100)),
                 Required("humidity"): All(int, Range(min=0, max=100)),
                 Required("wind_speed"): All(float, Range(min=0)),
-                Required("cloud_coverage"): All(int, Range(min=0, max=100)),
+                Required("cloud_coverage"): All(Coerce(float), Range(min=0, max=100)),
                 Optional("ghi"): All(float, Range(min=0)),
                 Optional("dni"): All(float, Range(min=0)),
                 Optional("dhi"): All(float, Range(min=0)),
@@ -92,8 +93,8 @@ class WeatherAPI(ABC):
     )
 
     # processed weather data as list of dicts
-    _weather_data: list[dict[str, Any]] = field(
-        default_factory=list, repr=False, init=False
+    _weather_data: dict[str, list[dict[str, Any]] | str | None] = field(
+        default_factory=dict, repr=False, init=False
     )
 
     @property
@@ -145,7 +146,7 @@ class WeatherAPI(ABC):
 
     def get_weather(
         self, live: bool = False, calc_irrads: bool = False
-    ) -> dict[str, Any]:
+    ) -> dict[str, list[dict[str, Any]] | str | None]:
         """
         Get weather data from API response. This function will always return data return in UTC.
 
@@ -166,26 +167,31 @@ class WeatherAPI(ABC):
         except WeatherAPIErrorNoData as exc:
             raise WeatherAPIErrorNoData.from_date(self.start_forecast) from exc
 
-        # verify that data has a "datetime" column, all data is unique, sorted and in UTC
+        # verify that data has a "datetime" column, all data is unique and sorted
         if "datetime" not in processed_data.columns:
             raise WeatherAPIError("Processed data does not have a datetime column.")
         if not all(processed_data["datetime"].is_unique()):
             raise WeatherAPIError("Processed data contains duplicate datetimes.")
         if not processed_data["datetime"].is_sorted():
             raise WeatherAPIError("Processed data is not sorted.")
-        dt_type = processed_data["datetime"].dtype
-        if dt_type != pl.Datetime:
+        if processed_data["datetime"].dtype != pl.Datetime:
             try:
                 processed_data = processed_data.with_columns(
                     pl.col("datetime").str.to_datetime()
                 )
             except Exception:
                 raise WeatherAPIError(
-                    f"Datetime type should be pl.Datetime, is {dt_type}."
+                    f"Datetime type should be pl.Datetime, is {processed_data['datetime'].dtype}."
                 )
-        time_zone = processed_data["datetime"].dtype.time_zone
-        if time_zone != str(dt.timezone.utc):
-            raise WeatherAPIError(f"Datetime column is not in UTC, is {time_zone}.")
+
+        # check if datetime is in UTC
+        dt_type: pl.Datetime = processed_data["datetime"].dtype  # type: ignore
+        if dt_type.time_zone != str(dt.timezone.utc):
+            raise WeatherAPIError(
+                f"Datetime column is not in UTC, is {dt_type.time_zone}."
+            )
+
+        # check for gaps and NaN values
         if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
             raise WeatherAPIError("Processed data contains gaps.")
         if any(col.has_validity() for col in processed_data):
@@ -197,17 +203,19 @@ class WeatherAPI(ABC):
         # set data types
         processed_data = processed_data.cast(
             {
-                "cloud_coverage": int,
-                "humidity": int,
-                "temperature": float,
-                "wind_speed": float,
+                "cloud_coverage": pl.Float64,
+                "humidity": pl.Int64,
+                "temperature": pl.Float64,
+                "wind_speed": pl.Float64,
             }
         )
 
         # calculate irradiance from cloud cover
         if calc_irrads:
             _LOGGER.debug("Calculating irradiance from cloud cover.")
-            irrads = self.cloud_cover_to_irradiance(processed_data["cloud_coverage"])
+            irrads = self.cloud_cover_to_irradiance(
+                processed_data["cloud_coverage"].to_frame()
+            )
             processed_data = pl.concat([processed_data, irrads], how="horizontal")
 
         # convert datetime column to str
@@ -217,128 +225,148 @@ class WeatherAPI(ABC):
 
         # convert to dictionary and validate schema
         data_dict = processed_data.to_dict(as_series=False)
-        data_dict = [dict(zip(data_dict, t)) for t in zip(*data_dict.values())]
+        data_list = [dict(zip(data_dict, t)) for t in zip(*data_dict.values())]
         try:
-            data_dict = {
+            validated_data = {
                 "source": self.__class__.__name__,
                 "interval": timedelta_to_pl_duration(self.freq_source),
-                "data": data_dict,
+                "data": data_list,
             }
-            WEATHER_SCHEMA(data_dict)
+            WEATHER_SCHEMA(validated_data)
         except Exception as exc:
             raise WeatherAPIError(
-                f"Error validating weather data: {data_dict}"
+                f"Error validating weather data: {validated_data}"
             ) from exc
 
         # cache data
-        self._weather_data = data_dict
-        return data_dict
+        self._weather_data = validated_data
+        return validated_data
 
     def cloud_cover_to_irradiance(
-        self, cloud_cover: pl.Series, how: str = "clearsky_scaling", **kwargs: Any
+        self, cloud_cover: pl.DataFrame, how: str = "clearsky_scaling", **kwargs: Any
     ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance. A wrapper method.
 
         NB: Code copied from pvlib.forecast as the pvlib forecast module is deprecated as of pvlib 0.9.1!
 
-        :param cloud_cover: Cloud cover as a pandas pl.Series
+        :param cloud_cover: Cloud cover as a polars pl.Series
         :param how: Selects the method for conversion. Can be one of clearsky_scaling or campbell_norman.
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
         """
+        # datetimes must be provided as a pd.DatetimeIndex otherwise pvlib fails
+        times = pd.date_range(
+            cloud_cover["datetime"].min(),
+            cloud_cover["datetime"].max(),
+            freq=self.freq_source,
+        )
+
+        # convert cloud cover to GHI/DNI/DHI
         how = how.lower()
         if how == "clearsky_scaling":
             irrads = self._cloud_cover_to_irradiance_clearsky_scaling(
-                cloud_cover, **kwargs
+                cloud_cover, times, **kwargs
             )
         elif how == "campbell_norman":
             irrads = self._cloud_cover_to_irradiance_campbell_norman(
-                cloud_cover, **kwargs
+                cloud_cover, times, **kwargs
             )
         else:
             raise ValueError(f"Invalid how argument: {how}")
+        _LOGGER.debug(
+            "Converted cloud cover to irradiance using %s. Result: \n%s", how, irrads
+        )
         return irrads
 
     def _cloud_cover_to_irradiance_clearsky_scaling(
-        self, cloud_cover: pl.Series, method: str = "linear", **kwargs: Any
+        self, cloud_cover: pl.DataFrame, times: pd.DatetimeIndex, **kwargs: Any
     ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance using the clearsky scaling method.
 
-        :param cloud_cover: Cloud cover as a pandas pl.Series
-        :param method: Selects the method for conversion. Can be one of linear.
+        :param cloud_cover: Cloud cover as a polars pl.Series
         :param **kwargs: Passed to the selected method.
         :return: Irradiance, columns include ghi, dni, dhi.
         """
-        solpos = self.location.get_solarposition(cloud_cover.index)
-        clear_sky = self.location.get_clearsky(
-            cloud_cover.index, model="ineichen", solar_position=solpos
+        # get clear sky data for provided datetimes
+        solpos = self.location.get_solarposition(times)
+        clear_sky = self.location.get_clearsky(times, "ineichen", solpos)
+        cover = pl.Series.to_pandas(cloud_cover["cloud_cover"])
+
+        # convert cloud cover to GHI/DNI/DHI
+        ghi = self._cloud_cover_to_ghi_linear(
+            cover.to_numpy(), clear_sky["ghi"].to_numpy(), **kwargs
         )
 
-        method = method.lower()
-        if method == "linear":
-            ghi = self._cloud_cover_to_ghi_linear(
-                cloud_cover, clear_sky["ghi"], **kwargs
-            )
-        else:
-            raise ValueError(f"Invalid method argument: {method}")
-
-        dni = disc(ghi, solpos["zenith"], cloud_cover.index)["dni"]
+        dni = disc(ghi, solpos["zenith"], times)["dni"]
         dhi = ghi - dni * np.cos(np.radians(solpos["zenith"]))
 
-        irrads = pl.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fill_null(0)
-        return irrads
+        # construct df with ghi, dni, dhi and fill NaNs with 0
+        return (
+            pl.DataFrame({"ghi": ghi, "dni": dni, "dhi": dhi}).fill_null(0).fill_nan(0)
+        )
 
     def _cloud_cover_to_irradiance_campbell_norman(
-        self, cloud_cover: pl.Series, **kwargs: Any
+        self, cloud_cover: pl.DataFrame, times: pd.DatetimeIndex, **kwargs: Any
     ) -> pl.DataFrame:
         """
         Convert cloud cover to irradiance using the Campbell and Norman model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
+        :param cloud_cover: Cloud cover in [%] as a polars pl.DataFrame.
         :param **kwargs: Passed to the selected method.
-        :return: Irradiance as a pandas pl.DataFrame with columns ghi, dni, dhi.
+        :return: Irradiance as a polars pl.DataFrame with columns ghi, dni, dhi.
         """
-        solar_position = self.location.get_solarposition(cloud_cover.index)
-        dni_extra = get_extra_radiation(cloud_cover.index)
-
-        transmittance = self.cloud_cover_to_transmittance_linear(cloud_cover, **kwargs)
-
-        irrads = campbell_norman(
-            solar_position["apparent_zenith"], transmittance, dni_extra=dni_extra
+        # get clear sky data for provided datetimes
+        zen = self.location.get_solarposition(times)["apparent_zenith"].to_numpy()
+        dni_extra = get_extra_radiation(times).to_numpy()
+        transmittance = self._cloud_cover_to_transmittance_linear(
+            cloud_cover["cloud_cover"].to_numpy(), **kwargs
         )
-        irrads = irrads.fillna(0)
-        return pl.from_pandas(irrads)
 
-    def _cloud_cover_to_ghi_linear(
-        self, cloud_cover: pl.Series, ghi_clear: pl.Series, offset: float = 35.0
-    ) -> pl.Series:
-        """
-        Convert cloud cover to GHI using a linear relationship.
+        # convert cloud cover to GHI/DNI/DHI
+        irrads = campbell_norman(zen, transmittance, dni_extra=dni_extra)
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
-        :param ghi_clear: Clear sky GHI as a pandas pl.Series.
-        :param offset: Determines the maximum GHI for the linear model.
-        :return: GHI as a pandas pl.Series.
-        """
-        offset = offset / 100.0
-        cloud_cover = cloud_cover / 100.0
-        ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
-        return ghi
+        # construct df with ghi, dni, dhi and fill NaNs with 0
+        return (
+            pl.DataFrame(
+                {"ghi": irrads["ghi"], "dni": irrads["dni"], "dhi": irrads["dhi"]}
+            )
+            .fill_null(0)
+            .fill_nan(0)
+        )
 
-    def cloud_cover_to_transmittance_linear(
-        self, cloud_cover: pl.Series, offset: float = 0.75
-    ) -> pl.Series:
+    def _cloud_cover_to_transmittance_linear(
+        self, cloud_cover: np.ndarray[float, Any], offset: float = 0.75
+    ) -> np.ndarray[float, Any]:
         """
         Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
 
-        :param cloud_cover: Cloud cover in [%] as a pandas pl.Series.
+        :param cloud_cover: Cloud cover in [%] as a polars pl.Series.
         :param offset: Determines the maximum transmittance for the linear model.
-        :return: Atmospheric transmittance as a pandas pl.Series.
+        :return: Atmospheric transmittance as a polars pl.Series.
         """
         return ((100.0 - cloud_cover) / 100.0) * offset
+
+    def _cloud_cover_to_ghi_linear(
+        self,
+        cloud_cover: np.ndarray[float, Any],
+        ghi_clear: np.ndarray[float, Any],
+        offset: float = 35.0,
+    ) -> np.ndarray[float, Any]:
+        """
+        Convert cloud cover to GHI using a linear relationship.
+
+        :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
+        :param ghi_clear: Clear sky GHI as a pandas pd.Series.
+        :param offset: Determines the maximum GHI for the linear model.
+        :return: GHI as a numpy array.
+        """
+        offset = offset / 100.0
+        cloud_cover = cloud_cover / 100.0
+        ghi = (offset + (1 - offset) * (1 - cloud_cover)) * ghi_clear
+        return np.array(ghi, dtype=np.float64)
 
 
 @dataclass(frozen=True)
@@ -356,7 +384,7 @@ class WeatherAPIErrorNoData(WeatherAPIError):
     message: str = field(default="No weather data available")
 
     @classmethod
-    def from_date(cls, date: str) -> WeatherAPIErrorNoData:
+    def from_date(cls, date: Union[str, dt.datetime]) -> WeatherAPIErrorNoData:
         """Create an exception for a specific date.
 
         :param date: The date for which no weather data is available.

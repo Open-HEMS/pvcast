@@ -1,6 +1,7 @@
 """Unit tests for PV power/energy forecasting logic."""
 from __future__ import annotations
 
+import datetime as dt
 from typing import Type, Union
 
 import polars as pl
@@ -89,45 +90,59 @@ class TestForecastResult:
     @pytest.fixture
     def forecast_result(self, forecast_df: pl.DataFrame) -> ForecastResult:
         """Return a ForecastResult instance."""
-
-        # convert column names
         return ForecastResult(
             name="test",
             type=ForecastType.CLEARSKY,
             ac_power=forecast_df,
         )
 
-    def test_init_no_timestamps(self) -> None:
-        """Test that forecast result init fails with no timestamps."""
-        with pytest.raises(ValueError, match="AC power data must have a 'time'"):
-            ForecastResult(
-                name="test",
-                type=ForecastType.CLEARSKY,
-                ac_power=pl.from_dict({"ac_power": [1, 2, 3]}),
-            )
-
-    def test_init_null_data(self, forecast_df: pl.DataFrame) -> None:
-        """Test that forecast result init fails with null data."""
-        forecast_df[0, "ac_power"] = None
-        print(forecast_df)
-        with pytest.raises(ValueError, match="AC power data contains null values."):
-            ForecastResult(
-                name="test",
-                type=ForecastType.CLEARSKY,
-                ac_power=forecast_df,
-            )
-
-    def test_init_ac_power_col_missing(self, forecast_df: pl.DataFrame) -> None:
-        """Test that forecast result init fails with missing ac_power column."""
-        forecast_df = forecast_df.drop("ac_power")
-        with pytest.raises(
-            ValueError, match="AC power data must have a 'ac_power' column."
-        ):
-            ForecastResult(
-                name="test",
-                type=ForecastType.CLEARSKY,
-                ac_power=forecast_df,
-            )
+    @pytest.mark.parametrize(
+        "ac_power, expected_exception, match",
+        [
+            (None, ValueError, "Must provide AC power data."),
+            (
+                pl.DataFrame({"time": ["2022-01-01T00:00:00+00:00"], "ac_power": [1]}),
+                ValueError,
+                "Time column must have dtype datetime.datetime",
+            ),
+            (
+                pl.DataFrame(
+                    {
+                        "time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
+                        "ac_power": [1.5],
+                    }
+                ),
+                ValueError,
+                "AC power column must have dtype int64",
+            ),
+            (
+                pl.DataFrame({"ac_power": [1, 2, 3]}),
+                ValueError,
+                "AC power data must have a 'time' column",
+            ),
+            (
+                pl.DataFrame(
+                    {
+                        "time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
+                        "ac_power": [None],
+                    }
+                ),
+                ValueError,
+                "AC power data contains null values",
+            ),
+            (
+                pl.DataFrame(
+                    {"time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)]}
+                ),
+                ValueError,
+                "AC power data must have a 'ac_power' column",
+            ),
+        ],
+    )
+    def test_init_exceptions(self, ac_power, expected_exception, match) -> None:
+        """Test various exceptions during forecast result initialization."""
+        with pytest.raises(expected_exception, match=match):
+            ForecastResult(name="test", type=ForecastType.CLEARSKY, ac_power=ac_power)
 
     @pytest.mark.parametrize(
         "frequency, expected",

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+import numpy as np
 import polars as pl
 import pytest
 from pvlib.location import Location
@@ -34,6 +35,11 @@ class MockWeatherAPI(WeatherAPI):
 
 
 class CommonWeatherTests:
+    """
+    These tests can be run on both the abstract WeatherAPI class and on platforms
+    that inherit from it. This class should no run platform specific tests.
+    """
+
     def test_weather_data_cache(self, weather_api: WeatherAPI) -> None:
         """Test the get_weather function."""
         # get first weather data object
@@ -70,7 +76,7 @@ class CommonWeatherTests:
 
 
 class TestWeatherAPI(CommonWeatherTests):
-    """Test the weather module."""
+    """These tests are run on the abstract WeatherAPI class only."""
 
     # define test data
     mock_data = pl.DataFrame(
@@ -154,6 +160,53 @@ class TestWeatherAPI(CommonWeatherTests):
         """Test the get_weather function with different input data."""
         with pytest.raises(WeatherAPIError, match=error_match):
             weather_api.get_weather()
+
+    # test cloud_cover_to_irradiance with proper data
+    @pytest.mark.parametrize("how", ["clearsky_scaling", "campbell_norman"])
+    @pytest.mark.parametrize(
+        "interval",
+        [
+            dt.timedelta(minutes=1),
+            dt.timedelta(minutes=5),
+            dt.timedelta(minutes=15),
+            dt.timedelta(minutes=30),
+            dt.timedelta(hours=1),
+        ],
+    )
+    def test_cloud_cover_to_irradiance(
+        self, weather_api: WeatherAPI, how: str, interval: dt.timedelta
+    ) -> None:
+        """Test the cloud_cover_to_irradiance function."""
+        # set frequency of source data
+        weather_api.freq_source = interval
+        n_points = int(dt.timedelta(days=2) / interval)
+
+        # construct dataframe
+        cloud_cover = pl.DataFrame(
+            {
+                "datetime": pl.datetime_range(
+                    dt.date(2022, 1, 1),
+                    dt.date(2022, 1, 3),
+                    interval,
+                    eager=True,
+                    time_zone="UTC",
+                )[0:n_points],
+                "cloud_cover": list(np.linspace(0, 100, n_points)),
+            }
+        )
+
+        assert isinstance(cloud_cover, pl.DataFrame)
+        assert cloud_cover["cloud_cover"].dtype == pl.Float64
+        irrads = weather_api.cloud_cover_to_irradiance(cloud_cover, how=how)
+        assert isinstance(irrads, pl.DataFrame)
+        for irr in ["ghi", "dni", "dhi"]:
+            assert irr in irrads.columns
+            assert irrads[irr].dtype == pl.Float64
+            assert irrads[irr].min() >= 0  # min irradiance on earth
+            assert irrads[irr].max() <= 1370  # max irradiance on earth
+            assert len(irrads[irr]) == len(cloud_cover)
+            assert irrads[irr].is_null().sum() == 0
+            assert irrads[irr].is_nan().sum() == 0
 
 
 class TestWeatherFactory:
