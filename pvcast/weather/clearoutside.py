@@ -33,7 +33,7 @@ class WeatherAPIClearOutside(WeatherAPI):
     def retrieve_new_data(self) -> pl.DataFrame:
         """Retrieve weather data by scraping it from the clear outside website."""
         try:
-            response = requests.get(self.url, timeout=self.timeout)
+            response = requests.get(self.url, timeout=int(self.timeout.total_seconds()))
         except requests.exceptions.Timeout as exc:
             raise WeatherAPIErrorTimeout() from exc
 
