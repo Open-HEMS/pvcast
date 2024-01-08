@@ -80,7 +80,7 @@ class TestHomeAssistantAPI:
         assert isinstance(homeassistant_api.data_headers["id"], int)
         assert homeassistant_api.data_headers["id"] > 0
         assert homeassistant_api.data_headers["type"] == "weather/subscribe_forecast"
-        assert homeassistant_api.data_headers["entity_id"] == self.weather_entity_id
+        assert homeassistant_api.data_headers["entity_id"] == HASS_WEATHER_ENTITY_ID
         assert homeassistant_api.data_headers["forecast_type"] == "hourly"
 
     def test_get_forecast(self, homeassistant_api: HomeAssistantAPI) -> None:

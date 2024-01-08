@@ -72,16 +72,18 @@ class TestForecastResult:
         """Return a DataFrame with test data."""
         # re-orient the test_ac_power dict to {time: [timestamps], ac_power: [values]}
         ac_data = {
-            "time": list(test_ac_power.keys()),
+            "datetime": list(test_ac_power.keys()),
             "ac_power": list(test_ac_power.values()),
         }
 
         # create a polars series from the test dict
-        ac_series = pl.from_dict(ac_data, schema={"time": str, "ac_power": pl.Int64})
+        ac_series = pl.from_dict(
+            ac_data, schema={"datetime": str, "ac_power": pl.Int64}
+        )
 
         # convert timestamps to datetime
         ac_series = ac_series.with_columns(
-            pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M:%S%z")
+            pl.col("datetime").str.to_datetime("%Y-%m-%dT%H:%M:%S%z")
         )
 
         # convert column names
@@ -101,14 +103,16 @@ class TestForecastResult:
         [
             (None, ValueError, "Must provide AC power data."),
             (
-                pl.DataFrame({"time": ["2022-01-01T00:00:00+00:00"], "ac_power": [1]}),
+                pl.DataFrame(
+                    {"datetime": ["2022-01-01T00:00:00+00:00"], "ac_power": [1]}
+                ),
                 ValueError,
-                "Time column must have dtype datetime.datetime",
+                "Datetime column must have dtype datetime.datetime",
             ),
             (
                 pl.DataFrame(
                     {
-                        "time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
+                        "datetime": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
                         "ac_power": [1.5],
                     }
                 ),
@@ -118,12 +122,12 @@ class TestForecastResult:
             (
                 pl.DataFrame({"ac_power": [1, 2, 3]}),
                 ValueError,
-                "AC power data must have a 'time' column",
+                "AC power data must have a 'datetime' column",
             ),
             (
                 pl.DataFrame(
                     {
-                        "time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
+                        "datetime": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)],
                         "ac_power": [None],
                     }
                 ),
@@ -132,7 +136,7 @@ class TestForecastResult:
             ),
             (
                 pl.DataFrame(
-                    {"time": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)]}
+                    {"datetime": [dt.datetime(2022, 1, 1, tzinfo=dt.timezone.utc)]}
                 ),
                 ValueError,
                 "AC power data must have a 'ac_power' column",
@@ -222,3 +226,10 @@ class TestForecastResult:
                 forecast_result._time_str_to_seconds(time_str)
         else:
             assert forecast_result._time_str_to_seconds(time_str) == expected
+
+
+class TestPowerEstimate:
+    # def test_percepitable_water(self, forecast_result: ForecastResult) -> None:
+    #     """Test that forecast result percepitable water calculation works."""
+    #     assert forecast_result.percepitable_water is None
+    pass

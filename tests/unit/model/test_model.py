@@ -5,7 +5,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
-import pandas as pd
+import polars as pl
 import pytest
 from pvlib.location import Location
 
@@ -60,8 +60,8 @@ class TestPVModelChain:
             )
 
     def test_aggregate_model_results(
-        self, pv_sys_mngr: PVSystemManager, weather_df: pd.DataFrame
+        self, pv_sys_mngr: PVSystemManager, weather_df: pl.DataFrame
     ) -> None:
         pvplant = pv_sys_mngr.get_pv_plant("EastWest")
-        cs_result = pvplant.clearsky.run(weather_df=weather_df)
+        cs_result = pvplant.clearsky.run(weather_df)
         assert cs_result.type == ForecastType.CLEARSKY
