@@ -30,13 +30,13 @@ WEATHER_SCHEMA = Schema(
                 Required("datetime"): All(
                     str, Datetime(format="%Y-%m-%dT%H:%M:%S%z")
                 ),  # RFC 3339
-                Required("temperature"): All(float, Range(min=-100, max=100)),
-                Required("humidity"): All(int, Range(min=0, max=100)),
-                Required("wind_speed"): All(float, Range(min=0)),
+                Required("temperature"): All(Coerce(float), Range(min=-100, max=100)),
+                Required("humidity"): All(Coerce(float), Range(min=0, max=100)),
+                Required("wind_speed"): All(Coerce(float), Range(min=0)),
                 Required("cloud_coverage"): All(Coerce(float), Range(min=0, max=100)),
-                Optional("ghi"): All(float, Range(min=0)),
-                Optional("dni"): All(float, Range(min=0)),
-                Optional("dhi"): All(float, Range(min=0)),
+                Optional("ghi"): All(Coerce(float), Range(0, 1400)),
+                Optional("dni"): All(Coerce(float), Range(0, 1400)),
+                Optional("dhi"): All(Coerce(float), Range(0, 1400)),
             }
         ],
     }
