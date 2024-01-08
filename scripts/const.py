@@ -18,3 +18,9 @@ MOD_SAM_PATH = BASE_PATH / "raw" / SAM_MOD_NAME
 # pvcast/data/proc
 INV_PROC_PATH = BASE_PATH / "proc" / "cec_inverters.csv"
 MOD_PROC_PATH = BASE_PATH / "proc" / "cec_modules.csv"
+
+# manual corrections index_value -> {"column_name": "new_value"}
+MANUAL_CORRECTIONS_INV = {
+    "Schneider_Electric_Solar_Inverters_USA___Inc___Conext_CL_18000NA": {"Vac": 528},
+    "Schneider_Electric_Solar_Inverters_USA___Inc___Conext_CL_25000NA": {"Vac": 528},
+}

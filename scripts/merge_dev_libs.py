@@ -14,6 +14,7 @@ from const import (
     INV_PROC_PATH,
     INV_PVLIB_PATH,
     INV_SAM_PATH,
+    MANUAL_CORRECTIONS_INV,
     MOD_PROC_PATH,
     MOD_PVLIB_PATH,
     MOD_SAM_PATH,
@@ -38,6 +39,35 @@ def retrieve_sam_wrapper(path: Path) -> pd.DataFrame:
     return pv_df
 
 
+def retrieve_and_merge(path1: Path, path2: Path) -> pd.DataFrame:
+    """Retrieve SAM databases and merge them.
+
+    :param path1: The first path to the SAM database.
+    :param path2: The second path to the SAM database.
+    :return: The merged SAM databases as a pandas DataFrame.
+    """
+    df1 = retrieve_sam_wrapper(path1)
+    _LOGGER.info(f"{path1.name} length: {len(df1)}")
+
+    df2 = retrieve_sam_wrapper(path2)
+    _LOGGER.info(f"{path2.name} length: {len(df2)}")
+
+    # merge databases
+    merged_df = pd.concat([df1, df2], axis=0)
+
+    # drop duplicates
+    if merged_df.duplicated(subset=["index"]).any():
+        _LOGGER.info(
+            f"Dropping {len(merged_df[merged_df.duplicated(subset=['index'])])} duplicate entries for {path1.name}."
+        )
+        merged_df = merged_df.drop_duplicates(subset=["index"], keep="first")
+
+    # sort in alphabetical order
+    merged_df = merged_df.sort_values(by=["index"])
+
+    return merged_df
+
+
 def main() -> None:
     """Main function."""
     # configure logging
@@ -53,37 +83,14 @@ def main() -> None:
     # print paths
     _LOGGER.info("INV_PVLIB_PATH: %s", INV_PVLIB_PATH)
 
-    # merge PVLib and SAM databases
-    pvlib_inv_df = retrieve_sam_wrapper(INV_PVLIB_PATH)
-    _LOGGER.info("pvlib_inv_df length: %s", len(pvlib_inv_df))
-    sam_inv_df = retrieve_sam_wrapper(INV_SAM_PATH)
-    _LOGGER.info("sam_inv_df length: %s", len(sam_inv_df))
-    pvlib_mod_df = retrieve_sam_wrapper(MOD_PVLIB_PATH)
-    _LOGGER.info("pvlib_mod_df length: %s", len(pvlib_mod_df))
-    sam_mod_df = retrieve_sam_wrapper(MOD_SAM_PATH)
-    _LOGGER.info("sam_mod_df length: %s", len(sam_mod_df))
+    # retrieve and merge databases for inverters and modules
+    inv_df = retrieve_and_merge(INV_PVLIB_PATH, INV_SAM_PATH)
+    mod_df = retrieve_and_merge(MOD_PVLIB_PATH, MOD_SAM_PATH)
 
-    # merge databases
-    inv_df = pd.concat([pvlib_inv_df, sam_inv_df], axis=0)
-    mod_df = pd.concat([pvlib_mod_df, sam_mod_df], axis=0)
-
-    # drop duplicates
-    if inv_df.duplicated(subset=["index"]).any():
-        _LOGGER.info(
-            "Dropping %s duplicate inverters.",
-            len(inv_df[inv_df.duplicated(subset=["index"])]),
-        )
-        inv_df = inv_df.drop_duplicates(subset=["index"], keep="first")
-    if mod_df.duplicated(subset=["index"]).any():
-        _LOGGER.info(
-            "Dropping %s duplicate modules.",
-            len(mod_df[mod_df.duplicated(subset=["index"])]),
-        )
-        mod_df = mod_df.drop_duplicates(subset=["index"], keep="first")
-
-    # sort in alphabetical order
-    inv_df = inv_df.sort_values(by=["index"])
-    mod_df = mod_df.sort_values(by=["index"])
+    # apply manual corrections
+    for key, value in MANUAL_CORRECTIONS_INV.items():
+        print(f"Got: {inv_df.loc[inv_df['index'] == key, list(value.keys())].head()}")
+        inv_df.loc[inv_df["index"] == key, list(value.keys())] = list(value.values())
 
     # save databases
     inv_df.to_csv(INV_PROC_PATH, index=False)
