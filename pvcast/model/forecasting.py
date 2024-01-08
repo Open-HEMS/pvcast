@@ -113,6 +113,7 @@ class ForecastResult:
         if self.ac_power is None:
             _LOGGER.warning("No AC power data available. Run simulation first.")
             return 0
+
         # check if time series data is equidistantly spaced in time
         if not self.ac_power["datetime"].is_sorted():
             raise ValueError("Datetime column must be sorted.")
@@ -120,11 +121,10 @@ class ForecastResult:
 
         # check if intervals are equidistantly spaced in time.
         # first value of diff() is NaN, hence we need two unique values
-        if not intervals.diff().n_unique() == 2:
+        if not intervals.n_unique() == 1:
             raise ValueError("Datetime column must be equidistantly spaced in time.")
-
         interval: dt.timedelta = intervals.item()
-        return int(interval.seconds)
+        return interval.seconds
 
     def _time_str_to_seconds(self, time_str: str) -> int:
         """Convert a time string to seconds."""
