@@ -24,7 +24,8 @@
 				"ryanluker.vscode-coverage-gutters",
 				"tamasfe.even-better-toml",
 				"ms-python.black-formatter",
-				"mcu-debug.debug-tracker-vscode"
+				"mcu-debug.debug-tracker-vscode",
+				"mechatroner.rainbow-csv"
 			],
 			"settings": {
 				"[python]": {
