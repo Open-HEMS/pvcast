@@ -116,10 +116,7 @@ class WeatherAPI(ABC):
 
     @property
     def source_dates(self) -> pl.Series:
-        """
-        Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
-        also return datetime strings and in that case this index is not needed and even not preferred.
-        """
+        """Get the datetime index with datetimes to forecast for."""
         return self.get_source_dates(
             self.start_forecast, self.end_forecast, self.freq_source
         )
@@ -128,10 +125,7 @@ class WeatherAPI(ABC):
     def get_source_dates(
         start: dt.datetime, end: dt.datetime, inter: dt.timedelta
     ) -> pl.Series:
-        """
-        Get the pl.DatetimeIndex to store the forecast. These are only used if missing from API, the weather API can
-        also return datetime strings and in that case this index is not needed and even not preferred.
-        """
+        """Get the datetime index with datetimes to forecast for."""
         return pl.datetime_range(
             start, end, inter, time_zone=str(dt.timezone.utc), eager=True
         )

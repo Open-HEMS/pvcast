@@ -8,7 +8,12 @@ import polars as pl
 import pytest
 
 from pvcast.model.const import VALID_UPSAMPLE_FREQ
-from pvcast.model.forecasting import ForecastResult, ForecastType
+from pvcast.model.forecasting import (
+    ForecastResult,
+    ForecastType,
+    PowerEstimate,
+)
+from pvcast.model.model import PVPlantModel
 
 # test dict for AC power output
 test_ac_power = {
@@ -181,6 +186,31 @@ class TestForecastResult:
         with pytest.raises(ValueError, match="Cannot upsample to a lower frequency"):
             forecast_result.upsample("1h")
 
+    def test_frequency_ac_power_missing(self, forecast_result: ForecastResult) -> None:
+        """Test that forecast result frequency returns -1 with no AC power data."""
+        forecast_result.ac_power = None
+        assert forecast_result.frequency == -1
+
+    def test_frequency_unsorted_datetimes(
+        self, forecast_result: ForecastResult
+    ) -> None:
+        """Test that forecast result frequency returns -1 with unsorted datetimes."""
+        forecast_result.ac_power = forecast_result.ac_power.select(
+            pl.col("datetime").shuffle(seed=42)
+        )
+        with pytest.raises(ValueError, match="Datetime column must be sorted"):
+            forecast_result.frequency
+
+    def test_frequency_missing_datetimes(self, forecast_result: ForecastResult) -> None:
+        """Test that forecast result frequency returns -1 with missing datetimes."""
+        forecast_result.ac_power = forecast_result.ac_power.with_row_count(
+            "row_nr"
+        ).filter(pl.col("row_nr") != 1)
+        with pytest.raises(
+            ValueError, match="Datetime column must be equidistantly spaced in time."
+        ):
+            forecast_result.frequency
+
     def test_upsample_ac_power_none(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result upsampling fails with no AC power data."""
         forecast_result.ac_power = None
@@ -199,11 +229,43 @@ class TestForecastResult:
         forecast_result = forecast_result.upsample(freq)
 
         # power data is hourly, so the sum == energy
-        fc_energy: ForecastResult = forecast_result.energy(period).sum()
+        fc_energy = forecast_result.energy(period).sum()
+        assert isinstance(fc_energy, pl.DataFrame)
         ac_energy: pl.Series = fc_energy["ac_energy"]
         assert ac_energy.item() == pytest.approx(
             sum_power["ac_energy"].item(), rel=0.05
         )
+
+    def test_energy_ac_power_unavailable(self, forecast_result: ForecastResult) -> None:
+        """Test that forecast result energy calculation fails with no AC power data."""
+        forecast_result.ac_power = None
+        with pytest.raises(
+            ValueError,
+            match="AC power output is not available, cannot calculate energy. Run simulation first.",
+        ):
+            forecast_result.energy("1h")
+
+    def test_energy_invalid_period(self, forecast_result: ForecastResult) -> None:
+        """Test that forecast result energy calculation fails with invalid period."""
+        with pytest.raises(
+            ValueError,
+            match=r"Invalid frequency suffix. Must be one of \('h', 'd', 'w', 'mo', 'y'\)\.",
+        ):
+            forecast_result.energy("1x")
+
+    def test_energy_invalid_ac_power_frequency(
+        self, forecast_result: ForecastResult
+    ) -> None:
+        """Test that forecast result energy calculation fails with invalid AC power frequency."""
+        assert forecast_result.ac_power is not None
+        forecast_result.ac_power = forecast_result.ac_power.with_row_count(
+            "row_nr"
+        ).filter(pl.col("row_nr") % 2 == 0)
+        with pytest.raises(
+            ValueError,
+            match="Cannot calculate energy for data with frequency 7200s. Must be <= 1H.",
+        ):
+            forecast_result.energy("1h")
 
     @pytest.mark.parametrize(
         "time_str, expected",
@@ -227,9 +289,53 @@ class TestForecastResult:
         else:
             assert forecast_result._time_str_to_seconds(time_str) == expected
 
+    @pytest.mark.parametrize("drop", [None, "temperature", "humidity"])
+    def test_add_precipitable_water(
+        self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame, drop: str | None
+    ) -> None:
+        """Test the add_precipitable_water method with missing data."""
+        weather_df = weather_df.drop(drop) if drop else weather_df
+        print(weather_df)
+        try:
+            result: ForecastResult = pv_plant_model.live.run(weather_df)
+        except ValueError as e:
+            print(f"got error: {e}")
+            assert f"Missing columns: {set([drop])} in weather_df." in str(e)
+        else:
+            assert result.type == ForecastType.LIVE
+            assert result.ac_power is not None
+            assert "ac_power" in result.ac_power.columns
+            assert result.ac_power["ac_power"].dtype == pl.Int64
 
-class TestPowerEstimate:
-    # def test_percepitable_water(self, forecast_result: ForecastResult) -> None:
-    #     """Test that forecast result percepitable water calculation works."""
-    #     assert forecast_result.percepitable_water is None
-    pass
+    def test_add_precipitable_water_already_present(
+        self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame
+    ) -> None:
+        """Test the add_precipitable_water method with precipitable_water already
+        present in weather_df."""
+        weather_df = weather_df.with_columns(pl.lit(1).alias("precipitable_water"))
+        result: ForecastResult = pv_plant_model.live.run(weather_df)
+        assert result.type == ForecastType.LIVE
+        assert result.ac_power is not None
+        assert "ac_power" in result.ac_power.columns
+        assert result.ac_power["ac_power"].dtype == pl.Int64
+
+    @pytest.mark.parametrize(
+        "type",
+        [
+            pytest.param(ForecastType.HISTORICAL, marks=pytest.mark.integration),
+            pytest.param(ForecastType.CLEARSKY),
+            pytest.param(ForecastType.LIVE),
+        ],
+    )
+    def test_power_run(
+        self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame, type: ForecastType
+    ) -> None:
+        """Test the power estimate run method."""
+        estimator: PowerEstimate = getattr(pv_plant_model, type.value)
+        result: ForecastResult = estimator.run(weather_df)
+        assert isinstance(result, ForecastResult)
+        assert result.name == "EastWest"
+        assert result.type == type
+        assert result.ac_power is not None
+        assert "ac_power" in result.ac_power.columns
+        assert result.ac_power["ac_power"].dtype == pl.Int64

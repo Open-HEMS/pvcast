@@ -21,7 +21,7 @@ import polars as pl
 import pytest
 from pvlib.location import Location
 
-from pvcast.model.model import PVSystemManager
+from pvcast.model.model import PVPlantModel, PVSystemManager
 
 from .const import LOC_AUS, LOC_EUW, LOC_USW
 
@@ -39,9 +39,9 @@ def weather_df() -> pl.DataFrame:
                 eager=True,
                 time_zone="UTC",
             )[0:n_points],
-            "cloud_cover": list(np.linspace(0, 100, n_points)),
+            "cloud_cover": list(np.linspace(20, 60, n_points)),
             "wind_speed": list(np.linspace(0, 10, n_points)),
-            "temperature": list(np.linspace(0, 40, n_points)),
+            "temperature": list(np.linspace(10, 25, n_points)),
             "humidity": list(np.linspace(0, 100, n_points)),
             "dni": list(np.linspace(0, 1000, n_points)),
             "dhi": list(np.linspace(0, 1000, n_points)),
@@ -163,6 +163,69 @@ def pv_sys_mngr(
 ) -> PVSystemManager:
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
+    )
+
+
+@pytest.fixture
+def pv_plant_model(
+    basic_config: list[MappingProxyType[str, Any]], location: Location
+) -> PVPlantModel:
+    inv_params = {
+        "index": basic_config[0]["inverter"],
+        "Vac": 240,
+        "Pso": 1.235644,
+        "Paco": 315.0,
+        "Pdco": 322.960602,
+        "Vdco": 60.0,
+        "C0": -2.8e-05,
+        "C1": -1.6e-05,
+        "C2": 0.003418,
+        "C3": -0.036432,
+        "Pnt": 0.0945,
+        "Vdcmax": 64.0,
+        "Idcmax": 5.382677,
+        "Mppt_low": 53.0,
+        "Mppt_high": 64.0,
+        "CEC_Date": "10/15/2018",
+        "CEC_Type": "Utility Interactive",
+        "CEC_hybrid": None,
+    }
+
+    mod_params = {
+        "index": basic_config[0]["arrays"][0]["module"],
+        "Technology": "Mono-c-Si",
+        "Bifacial": 0,
+        "STC": 385.1724,
+        "PTC": 357.9,
+        "A_c": 1.88,
+        "Length": None,
+        "Width": None,
+        "N_s": 72,
+        "I_sc_ref": 10.11,
+        "V_oc_ref": 48.98,
+        "I_mp_ref": 9.56,
+        "V_mp_ref": 40.29,
+        "alpha_sc": 0.004246,
+        "beta_oc": -0.132246,
+        "T_NOCT": 44.91,
+        "a_ref": 1.849046,
+        "I_L_ref": 10.116335,
+        "I_o_ref": 3.138217e-11,
+        "R_s": 0.317577,
+        "R_sh_ref": 506.821045,
+        "Adjust": 10.237704,
+        "gamma_r": -0.369,
+        "BIPV": "N",
+        "Version": "SAM 2018.11.11 r2",
+        "Date": "1/3/2019",
+        "Manufacturer": None,
+    }
+
+    return PVPlantModel(
+        basic_config[0],
+        location=location,
+        inv_param=pl.LazyFrame(inv_params),
+        mod_param=pl.LazyFrame(mod_params),
     )
 
 

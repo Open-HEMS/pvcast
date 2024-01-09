@@ -19,6 +19,8 @@ from pvlib.location import Location
 
 from .const import (
     HISTORICAL_YEAR_MAPPING,
+    PVGIS_TMY_END,
+    PVGIS_TMY_START,
     SECONDS_PER_HOUR,
     VALID_DOWN_SAMPLE_FREQ,
     VALID_UPSAMPLE_FREQ,
@@ -36,7 +38,7 @@ class ForecastType(str, Enum):
 
     LIVE = "live"
     CLEARSKY = "clearsky"
-    HISTORICAL = "historic"
+    HISTORICAL = "historical"
 
 
 @dataclass
@@ -101,7 +103,7 @@ class ForecastResult:
         fc_result_cpy.ac_power = (
             fc_result_cpy.ac_power.sort(by="datetime")  # type: ignore
             .upsample(time_column="datetime", every=freq, maintain_order=True)
-            .select(pl.all().forward_fill())
+            .select(pl.all().interpolate().forward_fill())
         )
         return fc_result_cpy
 
@@ -112,7 +114,7 @@ class ForecastResult:
         """
         if self.ac_power is None:
             _LOGGER.warning("No AC power data available. Run simulation first.")
-            return 0
+            return -1
 
         # check if time series data is equidistantly spaced in time
         if not self.ac_power["datetime"].is_sorted():
@@ -188,18 +190,17 @@ class PowerEstimate(ABC):
     _result: ForecastResult | None = field(repr=False, default=None)
 
     def run(self, weather_df: pl.DataFrame | None = None) -> ForecastResult:
-        """Run power estimate and store results in self._result.
+        """Run power estimate and store results.
 
         :param weather_df: The weather data or datetimes to forecast for.
         :return: A ForecastResult object containing the results of the power estimate.
         """
-        # prepare weather data / datetimes
         weather_df = self._prepare_weather(weather_df)
 
         # run the forecast for each model chain
         result_df = pl.DataFrame(weather_df["datetime"])
         for model_chain in self.pv_plant.models:
-            # set the model chain attributes
+            # set the model chain attributes to the values specified in the subclass
             for attr, val in self.model_chain_attrs.items():
                 setattr(model_chain, attr, val)
             model_chain.run_model(weather_df.to_pandas().set_index("datetime"))
@@ -212,8 +213,8 @@ class PowerEstimate(ABC):
         results = result_df.select("datetime").with_columns(
             result_df.select(pl.exclude("datetime"))
             .sum_horizontal()
-            .alias("ac_power")
             .cast(pl.Int64)
+            .alias("ac_power")
         )
         return ForecastResult(name=self.pv_plant.name, type=self.type, ac_power=results)
 
@@ -230,13 +231,13 @@ class PowerEstimate(ABC):
         """
 
     @staticmethod
-    def _add_percepitable_water(
+    def _add_precipitable_water(
         weather_df: pl.DataFrame,
         temp_col: str = "temperature",
         rh_col: str = "humidity",
     ) -> pl.DataFrame:
         """
-        Add the precipitable water column to the weather data.
+        Add a precipitable_water column to the weather dataframe.
 
         Gueymard94_pw alculates precipitable water (cm) from ambient air temperature (C) and
         relatively humidity (%) using an empirical model. The accuracy of this method is
@@ -252,8 +253,16 @@ class PowerEstimate(ABC):
         :param rh_col: The name of the column in weather_df that contains the relative humidity data.
         :return: The weather data with the preciptable_water column added.
         """
-        if not {"temperature", "humidity"}.issubset(weather_df.columns):
-            raise ValueError("Weather data must contain 'temperature' and 'humidity'.")
+        if "precipitable_water" in weather_df.columns:
+            _LOGGER.debug("precipitable_water already present. Skipping calculation.")
+            return weather_df
+        _LOGGER.debug("Calculating precipitable_water, columns: %s", weather_df.columns)
+
+        # check if weather_df contains the required columns to calculate precipitable water
+        if not {temp_col, rh_col}.issubset(weather_df.columns):
+            raise ValueError(
+                f"Missing columns: {set([temp_col, rh_col]) - set(weather_df.columns)} in weather_df."
+            )
         temperature = weather_df[temp_col].to_numpy()
         humidity = weather_df[rh_col].to_numpy()
         precipitable_water = gueymard94_pw(temperature, humidity)
@@ -265,13 +274,6 @@ class PowerEstimate(ABC):
     @abstractmethod
     def model_chain_attrs(self) -> dict[str, str]:
         """Return the attributes to set on the model chain."""
-
-    @property
-    def result(self) -> ForecastResult:
-        """Return the result of the power estimate."""
-        if self._result is None:
-            raise ValueError("Power estimate has not been run yet. Run .run() first.")
-        return self._result
 
 
 @dataclass
@@ -287,7 +289,7 @@ class Live(PowerEstimate):
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
         if weather_df is None:
             raise ValueError("Must provide weather data.")
-        return self._add_percepitable_water(weather_df)
+        return self._add_precipitable_water(weather_df)
 
 
 @dataclass
@@ -300,16 +302,12 @@ class Clearsky(PowerEstimate):
         if weather_df is None:
             raise ValueError("Must provide weather data.")
 
-        # convert datetimes to strings
+        # convert datetimes to a format that pvlib can handle
         dt_strings = pd.DatetimeIndex(
             weather_df["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
         )
-        cs = self.location.get_clearsky(dt_strings)
-        return weather_df.with_columns(
-            pl.Series("ghi", cs["ghi"]),
-            pl.Series("dni", cs["dni"]),
-            pl.Series("dhi", cs["dhi"]),
-        )
+        cs = pl.from_pandas(self.location.get_clearsky(dt_strings))
+        return weather_df.with_columns([cs["ghi"], cs["dni"], cs["dhi"]])
 
     @property
     def model_chain_attrs(self) -> dict[str, str]:
@@ -324,83 +322,101 @@ class Historical(PowerEstimate):
     _pvgis_data_path: Path = field(init=False, repr=False, default=Path())
 
     def __post_init__(self) -> None:
-        lat = str(round(self.location.latitude, 4)).replace(".", "_")
-        lon = str(round(self.location.longitude, 4)).replace(".", "_")
-        self._pvgis_data_path = Path(f"pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}.csv")
-
-    def _prepare_weather(self, weather_df: pl.DataFrame = None) -> pl.DataFrame:
-        tmy_data = self.get_pvgis_data()
-        tmy_data.index = pl.date_range(
-            start=f"{HISTORICAL_YEAR_MAPPING}-01-01 00:00",
-            end=f"{HISTORICAL_YEAR_MAPPING}-12-31 23:00",
-            freq="1H",
-            tz="UTC",
+        lat_i, lat_d = str(round(self.location.latitude, 4)).split(".")
+        lon_i, lon_d = str(round(self.location.longitude, 4)).split(".")
+        lat = f"{lat_i}_{lat_d.ljust(4, '0')}N"
+        lon = f"{lon_i}_{lon_d.ljust(4, '0')}E"
+        self._pvgis_data_path = Path(
+            f"pvcast/data/pvgis/pvgis_tmy_{lat}_{lon}_{PVGIS_TMY_START}_{PVGIS_TMY_END}.csv"
         )
+
+    def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
+        # if the PVGIS data file does not exist, retrieve it from the API and save it
+        if not self._pvgis_data_path.exists():
+            tmy_data = self._store_pvgis_data_api()
+
+        # scan data from CSV file
+        tmy_data: pl.LazyFrame = pl.scan_csv(self._pvgis_data_path)
 
         # if there are no specifically requested dates, return the entire TMY dataset
         if weather_df is None:
-            return tmy_data
+            return tmy_data.collect()
 
         # get start and end dates we want to obtain TMY data for
-        start_date = weather_df.index[0].replace(year=HISTORICAL_YEAR_MAPPING)
-        end_date = weather_df.index[-1].replace(year=HISTORICAL_YEAR_MAPPING)
-
-        # get the corresponding TMY data
-        return tmy_data.loc[start_date:end_date]
+        lower = weather_df["datetime"].min().replace(year=HISTORICAL_YEAR_MAPPING)
+        upper = weather_df["datetime"].max().replace(year=HISTORICAL_YEAR_MAPPING)
+        return (
+            tmy_data.filter(
+                (
+                    (pl.col("datetime").str.to_datetime() >= lower)
+                    & (pl.col("datetime").str.to_datetime() <= upper)
+                )
+            )
+            .collect()
+            .cast({"datetime": pl.Datetime(time_unit="ms", time_zone="UTC")})
+        )
 
     @property
     def model_chain_attrs(self) -> dict[str, str]:
         return {}
 
-    def get_pvgis_data(
-        self, save_data: bool = True, force_api: bool = False
-    ) -> pl.DataFrame:
-        """
-        Retrieve the PVGIS data using the PVGIS API. Returned data should include the following columns:
-        [temp_air, relative_humidity, ghi, dni, dhi, wind_speed]. Other columns are ignored.
+    def _store_pvgis_data_api(self) -> None:
+        """Retrieve the PVGIS data using the PVGIS API and store it as a CSV file."""
+        _LOGGER.debug("Saving PVGIS data from API at: %s", self._pvgis_data_path)
 
-        If the path is provided, columnnames of the supplied CSV file must follow the same naming convention.
+        # create parent directory
+        self._pvgis_data_path.parent.mkdir(parents=True, exist_ok=True)
 
-        :param path: The path to the PVGIS data file in CSV format. If None, the data is retrieved using the PVGIS API.
-        :param save_data: If True, data retrieved from the API is saved to the path so it can be reused later.
-        :return: PVGIS pl.DataFrame.
-        """
-        from_file = self._pvgis_data_path.exists() and not force_api
-        if from_file:
-            # read data from CSV file
-            _LOGGER.debug("Reading PVGIS data from file at: %s.", self._pvgis_data_path)
-            tmy_data = pl.read_csv(
-                self._pvgis_data_path, index_col=0, parse_dates=True, header=0
+        # 4th decimal is accurate to 11.1m
+        lat = round(self.location.latitude, 4)
+        lon = round(self.location.longitude, 4)
+        tmy_data, __, __, __ = get_pvgis_tmy(
+            latitude=lat,
+            longitude=lon,
+            outputformat="json",
+            startyear=PVGIS_TMY_START,
+            endyear=PVGIS_TMY_END,
+            map_variables=True,
+        )
+
+        # convert the data to a polars DataFrame
+        tmy_df: pl.DataFrame = pl.from_pandas(tmy_data)  # type: ignore
+        tmy_df = tmy_df.rename(
+            {
+                "temp_air": "temperature",
+                "relative_humidity": "humidity",
+                "IR(h)": "infrared",
+            }
+        )
+
+        # calculate precipitable water from temperature and humidity and add it to tmy_df
+        tmy_df = self._add_precipitable_water(tmy_df)
+
+        # add datetime column
+        tmy_df = tmy_df.with_columns(
+            pl.datetime_range(
+                dt.datetime(HISTORICAL_YEAR_MAPPING, 1, 1),
+                dt.datetime(HISTORICAL_YEAR_MAPPING, 12, 31, 23),
+                "1h",
+                eager=False,
+                time_zone="UTC",
             )
-        else:
-            _LOGGER.debug("Retrieving PVGIS data from API.")
-            # create parent directory
-            self._pvgis_data_path.parent.mkdir(parents=True, exist_ok=True)
+            .cast(pl.Datetime(time_unit="ms", time_zone="UTC"))
+            .alias("datetime")
+        ).select(
+            [
+                "datetime",
+                "temperature",
+                "humidity",
+                "ghi",
+                "dni",
+                "dhi",
+                "wind_speed",
+                "wind_direction",
+                "precipitable_water",
+            ]
+        )
+        _LOGGER.debug("PVGIS data retrieved: %s", tmy_df)
 
-            # 4th decimal is accurate to 11.1m
-            lat = round(self.location.latitude, 4)
-            lon = round(self.location.longitude, 4)
-            tmy_data, __, __, __ = get_pvgis_tmy(
-                latitude=lat,
-                longitude=lon,
-                outputformat="json",
-                startyear=2005,
-                endyear=2016,
-                map_variables=True,
-            )
-
-        # change column names to match the model chain
-        tmy_data.index.name = "datetime"
-        tmy_data = tmy_data.tz_convert("UTC")
-
-        # check if data is complete
-        if tmy_data.isnull().values.any():
-            raise ValueError("PVGIS data contains NaN values.")
-
-        # add preciptable_water to weather_df if it is not in the weather data already
-        tmy_data = self._add_percepitable_water(tmy_data)
-
-        # save data to CSV file if it was retrieved from the API
-        if not from_file and save_data:
-            tmy_data.to_csv(self._pvgis_data_path)
-        return tmy_data
+        # save the PVGIS data as a CSV file to the path
+        tmy_df.write_csv(self._pvgis_data_path)

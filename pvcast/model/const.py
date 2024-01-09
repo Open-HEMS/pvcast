@@ -15,3 +15,5 @@ SECONDS_PER_HOUR = 3_600
 # Thus one 'year' of data can consist of dates such as: [Jan 2015, Feb 2008, Mar 2013, ...]
 # This is very inconvenient for our purposes, so we will mapp all of it to a single year of data instead.
 HISTORICAL_YEAR_MAPPING = 2021
+PVGIS_TMY_START = 2005
+PVGIS_TMY_END = 2015

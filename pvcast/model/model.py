@@ -46,8 +46,8 @@ class PVPlantModel:
 
     config: InitVar[MappingProxyType[str, Any]]
     location: Location = field(repr=False)
-    inv_param: InitVar[MappingProxyType[str, Any]]
-    mod_param: InitVar[MappingProxyType[str, Any]]
+    inv_param: InitVar[pl.LazyFrame]
+    mod_param: InitVar[pl.LazyFrame]
     temp_param: dict[str, dict[str, dict[str, Any]]] = field(
         default_factory=lambda: TEMPERATURE_MODEL_PARAMETERS["pvsyst"]["freestanding"],
         repr=False,
@@ -61,8 +61,8 @@ class PVPlantModel:
     def __post_init__(
         self,
         config: MappingProxyType[str, Any],
-        inv_param: MappingProxyType[str, Any],
-        mod_param: MappingProxyType[str, Any],
+        inv_param: pl.LazyFrame,
+        mod_param: pl.LazyFrame,
     ) -> None:
         pv_systems = self._create_pv_systems(config, inv_param, mod_param)
         self._pv_models = self._build_model_chain(
@@ -117,13 +117,16 @@ class PVPlantModel:
         if inv_df.is_empty():
             raise KeyError(f"Device {inverter} not found in the database.")
         inv_dict = dict(inv_df.rows_by_key(key=["index"], named=True, unique=True))
-        _LOGGER.debug("Inverter parameters: %s", inv_dict)
 
         # get module params from the SAM database
         modules = pl.Series([array["module"] for array in arrays]).unique()
         mod_df: pl.DataFrame = mod_param.filter(index=modules).collect()
-        if mod_df.is_empty():
-            raise KeyError(f"One of {modules} not found in the database.")
+
+        if len(modules) != len(mod_df):
+            found_modules = set(mod_df["index"])
+            not_found = set(modules) - found_modules
+            raise KeyError(f"One of {not_found} not found in the database.")
+
         mod_dict = dict(mod_df.rows_by_key(key=["index"], named=True, unique=True))
 
         # system uses microinverters, create one model chain for each PV module
@@ -155,7 +158,6 @@ class PVPlantModel:
         """
         _LOGGER.debug("Building microinverter system model for system %s", name)
         pv_systems = []
-        inv_name = next(iter(inv_param.keys()))
 
         # create a PVSystem for each microinverter
         for _, array in enumerate(arrays):
