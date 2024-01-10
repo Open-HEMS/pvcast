@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pandas as pd
+import polars as pl
 from fastapi import APIRouter, Depends
 from typing_extensions import Annotated
 
@@ -55,9 +55,10 @@ def post(
     # get the weather data
     weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)
 
-    # convert to dataframe with datetime index
-    weather_df = pd.DataFrame(weather_dict["data"])
-    weather_df.index = pd.to_datetime(weather_df["datetime"])
+    # convert dict to dataframe
+    weather_df = pl.DataFrame(weather_dict["data"]).with_columns(
+        pl.col("datetime").str.to_datetime()
+    )
 
     # get the PV power output
     response_dict = get_forecast_result_dict(

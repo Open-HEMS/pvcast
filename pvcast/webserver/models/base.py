@@ -10,59 +10,56 @@ from typing_extensions import Annotated
 from ...model.model import PVSystemManager
 from ..routers.dependencies import get_pv_system_mngr
 
-res_examp = {
-    "watt": {
-        "EastWest": {
-            "2023-09-19T15:00:00+0000": 1428,
-            "2023-09-19T16:00:00+0000": 1012,
-            "2023-09-19T17:00:00+0000": 279,
-            "2023-09-19T18:00:00+0000": 0,
-        }
+res_examp = [
+    {
+        "datetime": "2023-09-19T15:00:00+0000",
+        "watt": 1428,
+        "watt_cumsum": 1428,
     },
-    "watt_hours": {
-        "EastWest": {
-            "2023-09-19T15:00:00+0000": 1428,
-            "2023-09-19T16:00:00+0000": 1012,
-            "2023-09-19T17:00:00+0000": 279,
-            "2023-09-19T18:00:00+0000": 0,
-        }
+    {
+        "datetime": "2023-09-19T15:30:00+0000",
+        "watt": 1012,
+        "watt_cumsum": 2440,
     },
-    "watt_hours_cumsum": {
-        "EastWest": {
-            "2023-09-19T15:00:00+0000": 1428,
-            "2023-09-19T16:00:00+0000": 2440,
-            "2023-09-19T17:00:00+0000": 2719,
-            "2023-09-19T18:00:00+0000": 2719,
-        }
+    {
+        "datetime": "2023-09-19T16:00:00+0000",
+        "watt": 279,
+        "watt_cumsum": 2719,
     },
-}
+    {
+        "datetime": "2023-09-19T16:30:00+0000",
+        "watt": 0,
+        "watt_cumsum": 2719,
+    },
+]
+
 
 data_example = {
     "clearskymodel": "Ineichen",
     "start": "2023-09-19T15:00:00+0000",
     "end": "2023-09-20T15:00:00+0000",
     "timezone": "UTC",
-    "interval": "1H",
-    "result": res_examp,
+    "interval": "1h",
+    "period": res_examp,
 }
 
 
 class Interval(str, Enum):
     """Power interval enum."""
 
-    MIN1 = "1Min"
-    MIN5 = "5Min"
-    MIN15 = "15Min"
-    MIN30 = "30Min"
-    H1 = "1H"
+    MIN1 = "1m"
+    MIN5 = "5m"
+    MIN15 = "15m"
+    MIN30 = "30m"
+    H1 = "1h"
 
 
 class PowerData(BaseModel):
     """Power data model."""
 
-    watt: dict[str, dict[str, int]]
-    watt_hours: dict[str, dict[str, int]]
-    watt_hours_cumsum: dict[str, dict[str, int]]
+    datetime: str
+    watt: int
+    watt_cumsum: int
 
 
 class BaseDataModel(BaseModel):
@@ -70,9 +67,11 @@ class BaseDataModel(BaseModel):
 
     start: Annotated[str | None, "Start time of the returned data."]
     end: Annotated[str | None, "End time of the returned data."]
+    forecast_type: Annotated[str | None, "Forecast type used to generate the data."]
+    plant_name: Annotated[str | None, "Name of the PV system"]
     timezone: Annotated[str | None, "Timezone of the returned data"] = "UTC"
     interval: Annotated[Interval, "Interval of the returned data"]
-    result: Annotated[PowerData, "Result of the returned data"] = PowerData(**res_examp)
+    period: Annotated[list[PowerData], "PV power at the requested interval."]
 
 
 class StartEndRequest(BaseModel):
@@ -80,13 +79,17 @@ class StartEndRequest(BaseModel):
 
     start: Annotated[
         datetime.datetime, "Start time of the returned data."
-    ] = datetime.datetime.now(datetime.timezone.utc)
+    ] = datetime.datetime.now(datetime.timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     end: Annotated[datetime.datetime, "End time of the returned data."] = (
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
-    )
+    ).replace(hour=0, minute=0, second=0, microsecond=0)
 
     @validator("start", "end", pre=True)
-    def parse_datetime(cls, value: str) -> datetime.datetime:  # pylint: disable=no-self-argument; # noqa: B902
+    def parse_datetime(
+        cls, value: str
+    ) -> datetime.datetime:  # pylint: disable=no-self-argument; # noqa: B902
         """Parse datetime."""
         date_time = datetime.datetime.fromisoformat(value)
         if date_time.tzinfo is None:

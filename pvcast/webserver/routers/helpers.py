@@ -1,61 +1,29 @@
 """Helper functions for the webserver."""
 from __future__ import annotations
 
-import json
 import logging
-from collections import OrderedDict
 from typing import Any
 
-import numpy as np
-import pandas as pd
-from pandas.core.indexes.multi import MultiIndex
+import polars as pl
 
+from ...const import DT_FORMAT
 from ...model.forecasting import ForecastResult, PowerEstimate
 from ...model.model import PVSystemManager
+from ...webserver.models.base import Interval
 
 _LOGGER = logging.getLogger("uvicorn")
-
-
-def _np_encoder(obj: np.generic) -> Any:
-    """Encode numpy types to python types."""
-    if isinstance(obj, np.generic):
-        return obj.item()
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
-
-def multi_idx_to_nested_dict(
-    data: pd.DataFrame, value_only: bool = False
-) -> OrderedDict[str, Any]:
-    """Convert a multiindex dataframe to a nested dict. Kudos to dcragusa.
-
-    :param df: Multiindex dataframe
-    :param value_only: If true, only return the values of the dataframe
-    :return: Nested dict
-    """
-    if isinstance(data.index, MultiIndex):
-        return OrderedDict(
-            (k, multi_idx_to_nested_dict(data.loc[k]))
-            for k in data.index.remove_unused_levels().levels[0]
-        )
-    if value_only:
-        return OrderedDict((k, data.loc[k].values[0]) for k in data.index)
-    odict = OrderedDict()
-    for idx in data.index:
-        d_col = OrderedDict()
-        for col in data.columns:
-            d_col[col] = data.loc[idx, col]
-        odict[idx] = d_col
-    return json.loads(json.dumps(odict, default=_np_encoder))  # type: ignore[no-any-return]
 
 
 def get_forecast_result_dict(
     plant_name: str,
     pv_system_mngr: PVSystemManager,
     fc_type: str,
-    interval: str,
-    weather_df: pd.DataFrame = None,
+    interval: Interval,
+    weather_df: pl.DataFrame = None,
 ) -> dict[str, Any]:
-    """Convert the forecast result to a nested dict.
+    """
+    Use the weather data to compute the estimated PV output power in Watts at the \
+    given interval <interval> for the given PV system <name>.
 
     :param plant_name: Name of the PV system
     :param pv_system_mngr: PV system manager
@@ -68,25 +36,15 @@ def get_forecast_result_dict(
     all_arg = plant_name.lower() == "all"
     pv_plant_names = list(pv_system_mngr.pv_plants.keys()) if all_arg else [plant_name]
 
-    # build multi-index columns
-    cols = [("watt", pv_plant) for pv_plant in pv_plant_names]
-    cols += [("watt_hours", pv_plant) for pv_plant in pv_plant_names]
-    cols += [("watt_hours_cumsum", pv_plant) for pv_plant in pv_plant_names]
-    cols += [("watt_hours", "Total")] if all_arg else []
-    cols += [("watt_hours_cumsum", "Total")] if all_arg else []
-    cols += [("watt", "Total")] if all_arg else []
-    multi_index = pd.MultiIndex.from_tuples(cols, names=["type", "plant"])
-
-    # build the result dataframe
-    result_df = pd.DataFrame(columns=multi_index)
-
-    # loop over all PV plants and compute the clearsky power output
+    # loop over all PV plants and compute the estimated power output
+    ac_w_period = pl.DataFrame()
     for pv_plant in pv_plant_names:
-        _LOGGER.info("Estimating clearsky performance for plant: %s", pv_plant)
+        _LOGGER.info("Calculating PV output for plant: %s", pv_plant)
 
         # compute the PV output for the given PV system and datetimes
         try:
             pvplant = pv_system_mngr.get_pv_plant(pv_plant)
+            _LOGGER.info("PV plant found: %s", pv_plant)
         except KeyError:
             _LOGGER.error("No PV system found with plant_name %s", plant_name)
             continue
@@ -99,42 +57,44 @@ def get_forecast_result_dict(
             continue
         output: ForecastResult = pv_plant_type.run(weather_df=weather_df)
 
-        # resample the output to the given interval
-        output = output.resample(interval)
-
-        # convert ac power timestamps to string
-        ac_power: pd.Series = output.ac_power
-        ac_energy: pd.Series = output.ac_energy
-        ac_power.index = ac_power.index.strftime("%Y-%m-%dT%H:%M:%S%z")
-        ac_energy.index = ac_energy.index.strftime("%Y-%m-%dT%H:%M:%S%z")
-
-        # build the output dataframe with multi-index
-        result_df[("watt", pv_plant)] = ac_power
-        result_df[("watt_hours", pv_plant)] = ac_energy
-        result_df[("watt_hours_cumsum", pv_plant)] = ac_energy.cumsum()
-
-    # if all_arg, sum the power and energy columns
-    if all_arg:
-        result_df[("watt", "Total")] = result_df["watt"].sum(axis=1)
-        result_df[("watt_hours", "Total")] = result_df["watt_hours"].sum(axis=1)
-        result_df[("watt_hours_cumsum", "Total")] = result_df["watt_hours_cumsum"].sum(
-            axis=1
+        # upsample the output to the requested interval
+        ac_w_period = ac_w_period.with_columns(
+            output.upsample(interval).ac_power.rename({"ac_power": f"watt_{pv_plant}"})
+        )
+        ac_w_period = ac_w_period.with_columns(
+            ac_w_period[f"watt_{pv_plant}"]
+            .cast(pl.Float64)
+            .round(0)
+            .clip(0)
+            .cast(pl.Int64)
         )
 
-    # check if there are any NaN values in the result
-    if result_df.isnull().values.any():
-        raise ValueError(f"NaN values in the result dataframe: \n{result_df}")
+    # horizontally sum the power columns
+    ac_w_period = ac_w_period.select(
+        "datetime",
+        pl.sum_horizontal(pl.exclude("datetime")).cast(pl.Int64).alias("watt"),
+    )
 
-    # round all columns and set all values to int64
-    result_df = result_df.round(0).astype(int)
+    # cumulatively sum the power column
+    ac_w_period = ac_w_period.with_columns(
+        ac_w_period["watt"].cumsum().alias("watt_cumsum")
+    )
+
+    # truncate datetimes to the requested interval
+    ac_w_period = ac_w_period.with_columns(
+        pl.col("datetime").dt.truncate(interval.value)
+    )
+
+    # construct the response dict
     response_dict = {
-        "start": result_df.index[0],
-        "end": result_df.index[-1],
-        "interval": interval,
+        "start": ac_w_period["datetime"].min().strftime(DT_FORMAT),
+        "end": ac_w_period["datetime"].max().strftime(DT_FORMAT),
+        "forecast_type": fc_type,
+        "plant_name": plant_name,
+        "interval": interval.value,
         "timezone": "UTC",
+        "period": ac_w_period.with_columns(
+            pl.col("datetime").dt.strftime(DT_FORMAT)
+        ).to_dicts(),
     }
-
-    # convert the result dataframe to a nested dict
-    result_df = dict(multi_idx_to_nested_dict(result_df.T))
-    response_dict.update({"result": result_df})
     return response_dict
