@@ -8,8 +8,8 @@ general:
     sources:
       - name: HomeAssistant
         type: homeassistant
-        entity_id: weather.forecast_home_hourly
-        url: http://192.168.50.184:8123
+        entity_id: weather.forecast_thuis
+        url: http://192.168.1.217:8123
         token: !secret long_lived_token
       - name: ClearOutside
         type: clearoutside
