@@ -17,6 +17,7 @@ from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
 from pvlib.location import Location
 
+from ..const import DT_FORMAT
 from .const import (
     HISTORICAL_YEAR_MAPPING,
     PVGIS_TMY_END,
@@ -303,9 +304,7 @@ class Clearsky(PowerEstimate):
             raise ValueError("Must provide weather data.")
 
         # convert datetimes to a format that pvlib can handle
-        dt_strings = pd.DatetimeIndex(
-            weather_df["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
-        )
+        dt_strings = pd.DatetimeIndex(weather_df["datetime"].dt.strftime(DT_FORMAT))
         cs = pl.from_pandas(self.location.get_clearsky(dt_strings))
         return weather_df.with_columns([cs["ghi"], cs["dni"], cs["dhi"]])
 

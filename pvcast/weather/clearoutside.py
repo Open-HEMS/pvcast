@@ -96,7 +96,7 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         # rename columns
         raw_data = raw_data.select(
-            pl.col("Total Clouds (% Sky Obscured)").alias("cloud_coverage"),
+            pl.col("Total Clouds (% Sky Obscured)").alias("cloud_cover"),
             pl.col("Wind Speed/Direction (mph)").alias("wind_speed"),
             pl.col("Temperature (°C)").alias("temperature"),
             pl.col("Relative Humidity (%)").alias("humidity"),

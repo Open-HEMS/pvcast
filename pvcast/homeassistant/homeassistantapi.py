@@ -12,7 +12,7 @@ from typing import Dict, Union
 from voluptuous import All, Coerce, MultipleInvalid, Range, Required, Schema
 from websockets.sync.client import Connection, connect  # type: ignore
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("uvicorn")
 
 
 forecast_item_schema = Schema(
@@ -65,7 +65,9 @@ class HomeAssistantAPI:
         if not self.entity_id.startswith("weather."):
             raise ValueError("Only weather entities are supported")
 
-        self._hass_url = f"ws://{host}/api/websocket"
+        # strip http(s):// from host if present and add ws://
+        host_stripped = host.replace("http://", "").replace("https://", "")
+        self._hass_url = f"ws://{host_stripped}/api/websocket"
         _LOGGER.debug("Initializing HA API at %s", self._hass_url)
 
         self._auth_headers = {
@@ -121,6 +123,7 @@ class HomeAssistantAPI:
     @property
     def forecast(self) -> list[dict[str, Union[str, int, float]]]:
         """Get the weather forecast."""
+        _LOGGER.info("Requesting data from %s", self._hass_url)
         with connect(self._hass_url) as websocket:
             self._authenticate(websocket)
             websocket.send(json.dumps(self.data_headers))

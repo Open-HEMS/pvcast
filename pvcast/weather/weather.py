@@ -16,6 +16,7 @@ from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
 from pvlib.location import Location
 from voluptuous import All, Coerce, Datetime, Optional, Range, Required, Schema
 
+from ..const import DT_FORMAT
 from ..util.timestamps import timedelta_to_pl_duration
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,13 +28,11 @@ WEATHER_SCHEMA = Schema(
         Required("interval"): str,
         Required("data"): [
             {
-                Required("datetime"): All(
-                    str, Datetime(format="%Y-%m-%dT%H:%M:%S%z")
-                ),  # RFC 3339
+                Required("datetime"): All(str, Datetime(format=DT_FORMAT)),  # RFC 3339
                 Required("temperature"): All(Coerce(float), Range(min=-100, max=100)),
                 Required("humidity"): All(Coerce(float), Range(min=0, max=100)),
                 Required("wind_speed"): All(Coerce(float), Range(min=0)),
-                Required("cloud_coverage"): All(Coerce(float), Range(min=0, max=100)),
+                Required("cloud_cover"): All(Coerce(float), Range(min=0, max=100)),
                 Optional("ghi"): All(Coerce(float), Range(0, 1400)),
                 Optional("dni"): All(Coerce(float), Range(0, 1400)),
                 Optional("dhi"): All(Coerce(float), Range(0, 1400)),
@@ -192,12 +191,13 @@ class WeatherAPI(ABC):
             raise WeatherAPIError("Processed data contains NaN values.")
 
         # cut off the data that exceeds max_forecast_days
-        processed_data = processed_data.filter(pl.col("datetime") <= self.end_forecast)
+        processed_data = processed_data.filter(pl.col("datetime") < self.end_forecast)
+        _LOGGER.debug("Processed weather data: \n%s", processed_data)
 
         # set data types
         processed_data = processed_data.cast(
             {
-                "cloud_coverage": pl.Float64,
+                "cloud_cover": pl.Float64,
                 "humidity": pl.Int64,
                 "temperature": pl.Float64,
                 "wind_speed": pl.Float64,
@@ -207,14 +207,13 @@ class WeatherAPI(ABC):
         # calculate irradiance from cloud cover
         if calc_irrads:
             _LOGGER.debug("Calculating irradiance from cloud cover.")
-            irrads = self.cloud_cover_to_irradiance(
-                processed_data["cloud_coverage"].to_frame()
+            processed_data = processed_data.with_columns(
+                self.cloud_cover_to_irradiance(processed_data)
             )
-            processed_data = pl.concat([processed_data, irrads], how="horizontal")
 
         # convert datetime column to str
         processed_data = processed_data.with_columns(
-            processed_data["datetime"].dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+            processed_data["datetime"].dt.strftime(DT_FORMAT)
         )
 
         # convert to dictionary and validate schema

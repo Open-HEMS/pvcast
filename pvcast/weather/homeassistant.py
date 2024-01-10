@@ -36,10 +36,11 @@ class WeatherAPIHomeassistant(WeatherAPI):
         :return: Response from the API
         """
         weather_df: pl.DataFrame = pl.from_dicts(self._hass_api.forecast)
+        weather_df = weather_df.rename({"cloud_coverage": "cloud_cover"})
 
         # select relevant columns
         weather_df = weather_df.select(
-            ["datetime", "temperature", "humidity", "wind_speed", "cloud_coverage"]
+            ["datetime", "temperature", "humidity", "wind_speed", "cloud_cover"]
         )
 
         # interpolate NaN values

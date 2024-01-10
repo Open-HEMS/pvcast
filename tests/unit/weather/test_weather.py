@@ -84,7 +84,7 @@ class TestWeatherAPI(CommonWeatherTests):
             "temperature": [0, 0.5, 1],
             "humidity": [0, 0.5, 1],
             "wind_speed": [0, 0.5, 1],
-            "cloud_coverage": [0, 0.5, 1],
+            "cloud_cover": [0, 0.5, 1],
             "datetime": [
                 "2020-01-01T00:00:00+00:00",
                 "2020-01-01T00:30:00+00:00",
@@ -99,7 +99,7 @@ class TestWeatherAPI(CommonWeatherTests):
             "temperature": [None, 0.5, None],
             "humidity": [0, 0.5, 1],
             "wind_speed": [0, 0.5, 1],
-            "cloud_coverage": [0, 0.5, 1],
+            "cloud_cover": [0, 0.5, 1],
             "datetime": [
                 "2020-01-01T00:00:00+00:00",
                 "2020-01-01T00:30:00+00:00",
@@ -114,7 +114,7 @@ class TestWeatherAPI(CommonWeatherTests):
             "temperature": [0, 0.5, 1],
             "humidity": [0, 0.5, 1],
             "wind_speed": [0, 0.5, 1],
-            "cloud_coverage": [0, 0.5, 1],
+            "cloud_cover": [0, 0.5, 1],
             "invalid_column": [0, 0.5, 1],
             "datetime": [
                 "2020-01-01T00:00:00+00:00",
