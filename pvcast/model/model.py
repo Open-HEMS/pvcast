@@ -65,9 +65,10 @@ class PVPlantModel:
         mod_param: pl.LazyFrame,
     ) -> None:
         pv_systems = self._create_pv_systems(config, inv_param, mod_param)
-        self._pv_models = self._build_model_chain(
-            pv_systems, self.location, config["name"]
-        )
+        self._pv_models = [
+            ModelChain(system, self.location, name=config["name"], aoi_model="physical")
+            for system in pv_systems
+        ]
         self.name = config["name"]
 
         # create the forecast objects
@@ -221,6 +222,7 @@ class PVPlantModel:
             # define PV array
             arr = Array(
                 mount=mount,
+                module=array["module"],
                 module_parameters=module_param,
                 temperature_model_parameters=self.temp_param,
                 strings=array["strings"],
@@ -232,26 +234,11 @@ class PVPlantModel:
         # create the PV system
         pv_system = PVSystem(
             arrays=pv_arrays,
+            inverter=list(inv_param.keys())[0],
             inverter_parameters=next(iter(inv_param.values())),
             name=name,
         )
-
         return [pv_system]
-
-    def _build_model_chain(
-        self, pv_systems: list[PVSystem], location: Location, name: str
-    ) -> list[ModelChain]:
-        """Build the model chains for the list of PV systems.
-
-        :param pv_systems: List of PVSystem objects.
-        :param name: The name of the PV plant.
-        :param location: The location of the PV plant.
-        :return: List of model chains.
-        """
-        return [
-            ModelChain(system, location, name=name, aoi_model="physical")
-            for system in pv_systems
-        ]
 
 
 @dataclass
