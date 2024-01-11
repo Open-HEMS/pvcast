@@ -19,7 +19,10 @@ from pvlib.location import Location
 
 from ..const import DT_FORMAT
 from .const import (
+    CLEARSKY_MODEL_ATTRS,
+    HISTORICAL_MODEL_ATTRS,
     HISTORICAL_YEAR_MAPPING,
+    LIVE_MODEL_ATTRS,
     PVGIS_TMY_END,
     PVGIS_TMY_START,
     SECONDS_PER_HOUR,
@@ -40,6 +43,13 @@ class ForecastType(str, Enum):
     LIVE = "live"
     CLEARSKY = "clearsky"
     HISTORICAL = "historical"
+
+
+MODEL_ATTRS = {
+    ForecastType.LIVE: LIVE_MODEL_ATTRS,
+    ForecastType.CLEARSKY: CLEARSKY_MODEL_ATTRS,
+    ForecastType.HISTORICAL: HISTORICAL_MODEL_ATTRS,
+}
 
 
 @dataclass
@@ -189,6 +199,10 @@ class PowerEstimate(ABC):
     pv_plant: PVPlantModel = field(repr=False)
     type: ForecastType = field(default=ForecastType.LIVE)
     _result: ForecastResult | None = field(repr=False, default=None)
+    _model_attrs: dict[str, str] = field(repr=False, default_factory=dict, init=False)
+
+    def __post_init__(self) -> None:
+        self._model_attrs = MODEL_ATTRS[self.type]
 
     def run(self, weather_df: pl.DataFrame | None = None) -> ForecastResult:
         """Run power estimate and store results.
@@ -196,15 +210,19 @@ class PowerEstimate(ABC):
         :param weather_df: The weather data or datetimes to forecast for.
         :return: A ForecastResult object containing the results of the power estimate.
         """
-        weather_df = self._prepare_weather(weather_df)
+        weather_df_pd = (
+            self._prepare_weather(weather_df).to_pandas().set_index("datetime")
+        )
 
         # run the forecast for each model chain
         result_df = pl.DataFrame(weather_df["datetime"])
         for model_chain in self.pv_plant.models:
             # set the model chain attributes to the values specified in the subclass
-            for attr, val in self.model_chain_attrs.items():
+            for attr, val in self._model_attrs.items():
                 setattr(model_chain, attr, val)
-            model_chain.run_model(weather_df.to_pandas().set_index("datetime"))
+
+            # run the model chain
+            model_chain.run_model(weather_df_pd)
 
             # add the results to the results DataFrame
             ac: pl.Series = pl.from_pandas(model_chain.results.ac, include_index=False)
@@ -271,21 +289,12 @@ class PowerEstimate(ABC):
             pl.Series("precipitable_water", precipitable_water)
         )
 
-    @property
-    @abstractmethod
-    def model_chain_attrs(self) -> dict[str, str]:
-        """Return the attributes to set on the model chain."""
-
 
 @dataclass
 class Live(PowerEstimate):
     """Class for PV power forecasts based on live weather data."""
 
     type: ForecastType = field(default=ForecastType.LIVE)
-
-    @property
-    def model_chain_attrs(self) -> dict[str, str]:
-        return {}
 
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
         if weather_df is None:
@@ -307,10 +316,6 @@ class Clearsky(PowerEstimate):
         dt_strings = pd.DatetimeIndex(weather_df["datetime"].dt.strftime(DT_FORMAT))
         cs = pl.from_pandas(self.location.get_clearsky(dt_strings))
         return weather_df.with_columns([cs["ghi"], cs["dni"], cs["dhi"]])
-
-    @property
-    def model_chain_attrs(self) -> dict[str, str]:
-        return {"aoi_model": "physical", "spectral_model": "no_loss"}
 
 
 @dataclass
@@ -354,10 +359,6 @@ class Historical(PowerEstimate):
             .collect()
             .cast({"datetime": pl.Datetime(time_unit="ms", time_zone="UTC")})
         )
-
-    @property
-    def model_chain_attrs(self) -> dict[str, str]:
-        return {}
 
     def _store_pvgis_data_api(self) -> None:
         """Retrieve the PVGIS data using the PVGIS API and store it as a CSV file."""

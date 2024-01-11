@@ -17,3 +17,8 @@ SECONDS_PER_HOUR = 3_600
 HISTORICAL_YEAR_MAPPING = 2021
 PVGIS_TMY_START = 2005
 PVGIS_TMY_END = 2015
+
+# model attribute constants
+CLEARSKY_MODEL_ATTRS = {"aoi_model": "physical", "spectral_model": "no_loss"}
+LIVE_MODEL_ATTRS = {}
+HISTORICAL_MODEL_ATTRS = {}
