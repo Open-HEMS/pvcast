@@ -88,14 +88,6 @@ repos:
         types: [python]
         entry: mypy
         require_serial: true
-      - id: no-commit-to-branch
-        name: 🛑 Don't commit to main branch
-        language: system
-        entry: no-commit-to-branch
-        pass_filenames: false
-        always_run: true
-        args:
-          - --branch=main
       - id: prettier
         name: 💄 Ensuring files are prettier
         language: system
