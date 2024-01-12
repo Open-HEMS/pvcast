@@ -18,6 +18,11 @@
       "matchManagers": ["github-actions"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
     }
   ]
 }
