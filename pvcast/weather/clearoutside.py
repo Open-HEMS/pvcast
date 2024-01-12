@@ -58,7 +58,9 @@ class WeatherAPIClearOutside(WeatherAPI):
             data = data.with_columns(datetimes[day_int * 24 : (day_int + 1) * 24])
 
             # insert the data into the source data bucket
-            weather_df = weather_df.vstack(data)
+            weather_df = weather_df.vstack(
+                data.with_columns(pl.exclude("datetime").cast(pl.Float64))
+            )
 
         # check NaN values distribution
         nan_vals = weather_df.with_columns(pl.all().is_null().cast(int).diff().sum())
