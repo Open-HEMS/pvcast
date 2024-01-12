@@ -52,7 +52,7 @@ test = [
     "pre-commit==3.5.0",
     "pre-commit-hooks==4.5.0",
     "pylint==3.0.3",
-    "safety==2.4.0b1",
+    "safety==2.4.0b2",
     "yamllint==1.33.0",
     "types-requests==2.31.0.10",
     "types-pytz==2023.3.1.1",
