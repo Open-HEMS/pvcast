@@ -144,3 +144,7 @@ pvcast/webserver/favicon.png
 
 # websocket test file
 test_websocket.py
+test_pvlib.py
+
+# ruff cache
+.ruff_cache/
