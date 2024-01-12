@@ -24,7 +24,7 @@ dependencies = [
     "numpy==1.24.3",
     "pandas==2.0.2",
     "polars==0.19.19",
-    "pvlib==0.10.1",
+    "pvlib==0.10.3",
     "pyyaml==6.0.1",
     "beautifulsoup4==4.12.2",
     "voluptuous==0.14.1",
