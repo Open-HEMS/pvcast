@@ -214,6 +214,9 @@ class PowerEstimate(ABC):
             self._prepare_weather(weather_df).to_pandas().set_index("datetime")
         )
 
+        # datatype needs to be datetime64[ns, UTC] for pvlib to not go haywire
+        weather_df_pd.index = weather_df_pd.index.astype("datetime64[ns, UTC]")
+
         # run the forecast for each model chain
         result_df = pl.DataFrame(weather_df["datetime"])
         for model_chain in self.pv_plant.models:
