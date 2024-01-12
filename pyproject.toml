@@ -30,7 +30,7 @@ dependencies = [
     "voluptuous==0.14.1",
     "fastapi==0.103.1",
     "uvicorn==0.23.2",
-    "lxml==4.9.3",
+    "lxml==4.9.4",
     "websockets==12.0",
 ]
 
