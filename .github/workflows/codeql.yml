@@ -1,6 +1,9 @@
 ---
 name: "CodeQL"
 
+permissions:
+  security-events: write
+
 # yamllint disable-line rule:truthy
 on:
   push:
