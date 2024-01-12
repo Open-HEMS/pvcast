@@ -83,8 +83,8 @@ class StartEndRequest(BaseModel):
         hour=0, minute=0, second=0, microsecond=0
     )
     end: Annotated[datetime.datetime, "End time of the returned data."] = (
-        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)
-    ).replace(hour=0, minute=0, second=0, microsecond=0)
+        datetime.datetime.now(datetime.timezone.utc)
+    ).replace(hour=23, minute=59, second=0, microsecond=0)
 
     @validator("start", "end", pre=True)
     def parse_datetime(
