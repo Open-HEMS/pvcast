@@ -218,7 +218,12 @@ class PowerEstimate(ABC):
         weather_df_pd.index = weather_df_pd.index.astype("datetime64[ns, UTC]")
 
         # run the forecast for each model chain
-        result_df = pl.DataFrame(weather_df["datetime"])
+        result_df = pl.DataFrame(
+            weather_df_pd.index.to_numpy(dtype=str),
+            schema=["datetime"],
+        )
+        result_df = result_df.with_columns(pl.col("datetime").str.to_datetime())
+
         for model_chain in self.pv_plant.models:
             # set the model chain attributes to the values specified in the subclass
             for attr, val in self._model_attrs.items():
