@@ -1,10 +1,11 @@
 """Test all configured weather platforms that inherit from WeatherAPI class."""
 from __future__ import annotations
 
-from typing import Any, Generator
+import datetime as dt
+from typing import Generator
 from urllib.parse import urljoin
 
-import pandas as pd
+import polars as pl
 import pytest
 import responses
 from pvlib.location import Location
@@ -13,41 +14,71 @@ from pvcast.weather import API_FACTORY
 from pvcast.weather.homeassistant import WeatherAPIHomeassistant
 from pvcast.weather.weather import WeatherAPI
 
-from ...const import HASS_TEST_TOKEN, HASS_TEST_URL
+from ...const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
+from .test_weather import CommonWeatherTests
 
 
-class TestWeatherPlatform:
+class WeatherPlatform(CommonWeatherTests):
     """Test a weather platform that inherits from WeatherAPI class."""
 
-    weatherapis = API_FACTORY.get_weather_api_list_str()
+    weather_apis = API_FACTORY.get_weather_api_list_str()
     valid_temp_units = ["°C", "°F", "C", "F"]
     valid_speed_units = ["m/s", "km/h", "mi/h", "ft/s", "kn"]
 
-    @pytest.fixture
-    def time_aliases(
-        self, pd_time_aliases: dict[str, list[str]]
-    ) -> dict[str, list[str]]:
-        return pd_time_aliases
+    @pytest.fixture(params=[1, 2, 5, 10])
+    def max_forecast_day(self, request: pytest.FixtureRequest) -> dt.timedelta:
+        return dt.timedelta(days=request.param)
+
+    def test_get_weather(self, weather_api: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        data = weather_api.get_weather()["data"]
+        weather = pl.from_dicts(data)
+        assert isinstance(weather, pl.DataFrame)
+        assert weather.null_count().sum_horizontal().item() == 0
+        assert weather.shape[0] >= 24
+
+    def test_weather_get_weather_max_days(
+        self,
+        weather_api: WeatherAPI,
+        max_forecast_day: dt.timedelta,
+    ) -> None:
+        """Test the get_weather function with a maximum number of days to forecast."""
+        weather_api.max_forecast_days = max_forecast_day
+        data = weather_api.get_weather()["data"]
+        weather = pl.from_dicts(data)
+        print(f"[n_days={max_forecast_day}]:\n{weather}")
+        assert isinstance(weather, pl.DataFrame)
+        assert weather.null_count().sum_horizontal().item() == 0
+        assert weather.shape[0] >= 24
+        assert weather.shape[0] <= max_forecast_day / dt.timedelta(hours=1)
+
+
+class TestHomeAssistantWeather(WeatherPlatform):
+    """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture
     def homeassistant_api_setup(
-        self, location: Location, ha_weather_data: dict[str, Any]
+        self, location: Location
     ) -> Generator[WeatherAPIHomeassistant, None, None]:
         """Setup the Home Assistant API."""
-        with responses.RequestsMock() as rsps:
-            rsps.add(
-                responses.GET,
-                urljoin(HASS_TEST_URL, f"/api/states/{ha_weather_data['entity_id']}"),
-                json=ha_weather_data,
-                status=200,
-            )
-            api = WeatherAPIHomeassistant(
-                entity_id=ha_weather_data["entity_id"],
-                url=HASS_TEST_URL,
-                token=HASS_TEST_TOKEN,
-                location=location,
-            )
-            yield api
+        api = WeatherAPIHomeassistant(
+            location=location,
+            url=HASS_TEST_URL,
+            token=HASS_TEST_TOKEN,
+            entity_id=HASS_WEATHER_ENTITY_ID,
+        )
+        yield api
+
+    @pytest.fixture
+    def weather_api(
+        self, homeassistant_api_setup: WeatherAPIHomeassistant
+    ) -> WeatherAPI:
+        """Return the weather api."""
+        return homeassistant_api_setup
+
+
+class TestClearOutsideWeather(WeatherPlatform):
+    """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture
     def clearoutside_api_setup(
@@ -68,102 +99,7 @@ class TestWeatherPlatform:
             api = API_FACTORY.get_weather_api("clearoutside", location=location)
             yield api
 
-    @pytest.fixture(params=weatherapis)
-    def weatherapi(
-        self, request: pytest.FixtureRequest, location: Location
-    ) -> WeatherAPI:
-        """Fixture that creates a weather API interface."""
-        fixt_val = request.getfixturevalue(f"{request.param}_api_setup")
-        if isinstance(fixt_val, WeatherAPI):
-            return fixt_val
-        else:
-            raise ValueError(f"Fixture {request.param}_api_setup not found.")
-
-    @pytest.fixture(params=[1, 2, 5, 10])
-    def max_forecast_day(self, request: pytest.FixtureRequest) -> pd.Timedelta:
-        return pd.Timedelta(days=request.param)
-
-    def convert_to_df(self, weather: dict[str, Any]) -> pd.DataFrame:
-        """Convert the weather data to a pd.DataFrame."""
-        weather_df: pd.DataFrame = pd.DataFrame.from_dict(weather["data"])
-        weather_df.set_index("datetime", inplace=True)
-        weather_df.index = pd.to_datetime(weather_df.index)
-        return weather_df
-
-    def test_weather_get_weather(self, weatherapi: WeatherAPI) -> None:
-        """Test the get_weather function."""
-        weather = weatherapi.get_weather()
-        assert isinstance(weather, dict)
-        weather = self.convert_to_df(weather)
-        assert isinstance(weather, pd.DataFrame)
-        # assert pd.infer_freq(weather.index) == "H"
-        assert not weather.isna().values.any()
-        assert weather.shape[0] >= 24
-
-    @pytest.mark.parametrize("freq", ["1H", "30Min", "15Min"])
-    def test_weather_get_weather_freq(
-        self, weatherapi: WeatherAPI, freq: str, time_aliases: dict[str, list[str]]
-    ) -> None:
-        """Test the get_weather function with a number of higher data frequencies."""
-        weatherapi.freq_output = freq
-        weather = weatherapi.get_weather()
-        assert isinstance(weather, dict)
-        weather = self.convert_to_df(weather)
-        assert isinstance(weather, pd.DataFrame)
-        assert pd.infer_freq(weather.index) in time_aliases[freq]
-        assert not weather.isna().values.any()
-        assert weather.shape[0] >= 24
-
-    def test_weather_get_weather_max_days(
-        self,
-        weatherapi: WeatherAPI,
-        max_forecast_day: pd.Timedelta,
-        time_aliases: dict[str, list[str]],
-    ) -> None:
-        """Test the get_weather function with a number of higher data frequencies."""
-        freq = "1H"
-        weatherapi.freq_output = freq
-        weatherapi.max_forecast_days = max_forecast_day
-        weather = weatherapi.get_weather()
-        assert isinstance(weather, dict)
-        weather = self.convert_to_df(weather)
-        assert isinstance(weather, pd.DataFrame)
-        assert pd.infer_freq(weather.index) in time_aliases[freq]
-        assert not weather.isna().values.any()
-        assert weather.shape[0] >= 24
-        assert weather.shape[0] <= max_forecast_day / pd.Timedelta(freq)
-
-    def test_weather_data_cache(self, weatherapi: WeatherAPI) -> None:
-        """Test the get_weather function."""
-        # get first weather data object
-        weather1 = weatherapi.get_weather()
-        assert isinstance(weather1, dict)
-        weather1 = self.convert_to_df(weather1)
-        assert isinstance(weather1, pd.DataFrame)
-        last_update1 = weatherapi._last_update
-
-        # get second weather data object, should see that it is cached data
-        weather2 = weatherapi.get_weather()
-        assert isinstance(weather2, dict)
-        weather2 = self.convert_to_df(weather2)
-        assert isinstance(weather2, pd.DataFrame)
-        last_update2 = weatherapi._last_update
-        assert last_update1 == last_update2
-
-    def test_weather_data_live(self, weatherapi: WeatherAPI) -> None:
-        """Test the get_weather function."""
-
-        # get first weather data object
-        weather1 = weatherapi.get_weather()
-        assert isinstance(weather1, dict)
-        weather1 = self.convert_to_df(weather1)
-        assert isinstance(weather1, pd.DataFrame)
-        last_update1 = weatherapi._last_update
-
-        # get second weather data object, should see that it is live data
-        weather2 = weatherapi.get_weather(live=True)
-        assert isinstance(weather2, dict)
-        weather2 = self.convert_to_df(weather2)
-        assert isinstance(weather2, pd.DataFrame)
-        last_update2 = weatherapi._last_update
-        assert last_update1 != last_update2
+    @pytest.fixture
+    def weather_api(self, clearoutside_api_setup: WeatherAPI) -> WeatherAPI:
+        """Return the weather api."""
+        return clearoutside_api_setup

@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 from pytz import UnknownTimeZoneError
-from yaml import YAMLError
+from yaml import ScalarNode, SequenceNode, YAMLError
+from yaml.loader import SafeLoader
 
 from pvcast.config.configreader import ConfigReader
 
@@ -46,6 +47,13 @@ class TestConfigReader:
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
+    def test_configreader_load_secrets_none(self) -> None:
+        """Test the _load_secrets_file method with None as secrets file path."""
+        configreader = ConfigReader(TEST_CONF_PATH_NO_SEC, None)
+        # raise ValueError("Secrets file path is not set.")
+        with pytest.raises(ValueError, match="Secrets file path is not set."):
+            configreader._load_secrets_file()
+
     def test_configreader_secrets(
         self, configreader_secfile_sectags: ConfigReader
     ) -> None:
@@ -80,3 +88,22 @@ class TestConfigReader:
         """Test the configreader with an invalid timezone."""
         with pytest.raises(UnknownTimeZoneError):
             _ = ConfigReader(config_file_path=TEST_CONF_PATH_ERROR)
+
+    def test_yaml_secrets_loader_scalar_node(
+        self, configreader_secfile_sectags: ConfigReader
+    ) -> None:
+        """Test the _yaml_secrets_loader method with a ScalarNode."""
+        loader = SafeLoader("")
+        node = ScalarNode(tag="tag:yaml.org,2002:str", value="test_key")
+        configreader_secfile_sectags._secrets = {"test_key": "test_value"}
+        secret = configreader_secfile_sectags._yaml_secrets_loader(loader, node)
+        assert secret == "test_value"
+
+    def test_yaml_secrets_loader_non_scalar_node(
+        self, configreader_secfile_sectags: ConfigReader
+    ) -> None:
+        """Test the _yaml_secrets_loader method with a non-ScalarNode."""
+        loader = SafeLoader("")
+        node = SequenceNode(tag="tag:yaml.org,2002:seq", value=[])
+        with pytest.raises(ValueError, match="Expected a ScalarNode"):
+            configreader_secfile_sectags._yaml_secrets_loader(loader, node)

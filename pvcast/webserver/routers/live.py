@@ -4,13 +4,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pandas as pd
+import polars as pl
 from fastapi import APIRouter, Depends
-from typing_extensions import Annotated
+from typing_extensions import Annotated, Optional
 
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI
-from ..models.base import Interval, PVPlantNames
+from ..models.base import Interval, PVPlantNames, StartEndRequest
 from ..models.live import LiveModel, WeatherSources
 from ..routers.dependencies import get_pv_system_mngr, get_weather_sources
 from .helpers import get_forecast_result_dict
@@ -26,6 +26,7 @@ def post(
     weather_source: WeatherSources,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
     weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
+    start_end: Optional[StartEndRequest] | None = None,
     interval: Interval = Interval.H1,
 ) -> LiveModel:
     """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
@@ -55,9 +56,17 @@ def post(
     # get the weather data
     weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)
 
-    # convert to dataframe with datetime index
-    weather_df = pd.DataFrame(weather_dict["data"])
-    weather_df.index = pd.to_datetime(weather_df["datetime"])
+    # convert dict to dataframe
+    weather_df = pl.DataFrame(weather_dict["data"]).with_columns(
+        pl.col("datetime").str.to_datetime()
+    )
+
+    # filter weather data between start and end timestamps
+    if start_end is not None:
+        weather_df = weather_df.filter(
+            (weather_df["datetime"] >= start_end.start)
+            & (weather_df["datetime"] <= start_end.end)
+        )
 
     # get the PV power output
     response_dict = get_forecast_result_dict(

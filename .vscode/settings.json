@@ -17,4 +17,7 @@
     "black-formatter.args": [
         "--config=pyproject.toml"
     ],
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
 }

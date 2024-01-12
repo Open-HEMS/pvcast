@@ -1,10 +1,10 @@
 """Dependencies for the webserver."""
 from __future__ import annotations
 
+import datetime as dt
 from functools import lru_cache
 from pathlib import Path
 
-import pandas as pd
 from pvlib.location import Location
 
 from ...config.configreader import ConfigReader
@@ -35,7 +35,7 @@ def get_weather_sources() -> tuple[WeatherAPI, ...]:
     # all sources of weather data must be listed in the config file
     weather_data_sources = _config_reader.config["general"]["weather"]["sources"]
 
-    max_forecast_days = pd.Timedelta(
+    max_forecast_days = dt.timedelta(
         days=int(_config_reader.config["general"]["weather"]["max_forecast_days"])
     )
 

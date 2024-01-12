@@ -1,9 +1,10 @@
 """This module contains the FastAPI router for the /clearsky endpoint."""
 from __future__ import annotations
 
+import datetime as dt
 import logging
 
-import pandas as pd
+import polars as pl
 from fastapi import APIRouter, Depends
 from typing_extensions import Annotated, Optional
 
@@ -45,6 +46,7 @@ def post(
     """
     # for clearsky we don't care which weather API is used, so just use the first one
     weather_api = weather_apis[0]
+    delta_t = dt.timedelta(hours=1)
 
     # build the datetime index
     if start_end is None:
@@ -52,15 +54,15 @@ def post(
             "No start and end timestamps provided, using current time and interval"
         )
         datetimes = weather_api.get_source_dates(
-            weather_api.start_forecast, weather_api.end_forecast, interval
+            weather_api.start_forecast, weather_api.end_forecast, delta_t
         )
     else:
         datetimes = weather_api.get_source_dates(
-            start_end.start, start_end.end, interval
+            start_end.start, start_end.end, delta_t
         )
 
     # convert datetimes to dataframe
-    weather_df = pd.DataFrame(index=datetimes)
+    weather_df = pl.DataFrame(datetimes.alias("datetime"))
 
     # get the PV power output
     response_dict = get_forecast_result_dict(

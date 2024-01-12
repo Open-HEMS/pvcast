@@ -12,94 +12,42 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 
 from __future__ import annotations
 
-import json
+import datetime as dt
 from types import MappingProxyType
 from typing import Any
 
-import pandas as pd
+import numpy as np
+import polars as pl
 import pytest
 from pvlib.location import Location
 
-from pvcast.model.model import PVSystemManager
+from pvcast.model.model import PVPlantModel, PVSystemManager
 
 from .const import LOC_AUS, LOC_EUW, LOC_USW
 
 
 @pytest.fixture()
-def weather_df() -> pd.DataFrame:
+def weather_df() -> pl.DataFrame:
     """Fixture for a basic pvlib input weather dataframe."""
-    # fmt: off
-    data = {
-        'datetime': [
-            '2023-06-17 00:00:00+00:00', '2023-06-17 01:00:00+00:00', '2023-06-17 02:00:00+00:00',
-            '2023-06-17 03:00:00+00:00', '2023-06-17 04:00:00+00:00', '2023-06-17 05:00:00+00:00',
-            '2023-06-17 06:00:00+00:00', '2023-06-17 07:00:00+00:00', '2023-06-17 08:00:00+00:00',
-            '2023-06-17 09:00:00+00:00', '2023-06-17 10:00:00+00:00', '2023-06-17 11:00:00+00:00',
-            '2023-06-17 12:00:00+00:00', '2023-06-17 13:00:00+00:00', '2023-06-17 14:00:00+00:00',
-            '2023-06-17 15:00:00+00:00', '2023-06-17 16:00:00+00:00', '2023-06-17 17:00:00+00:00',
-            '2023-06-17 18:00:00+00:00', '2023-06-17 19:00:00+00:00', '2023-06-17 20:00:00+00:00',
-            '2023-06-17 21:00:00+00:00', '2023-06-17 22:00:00+00:00', '2023-06-17 23:00:00+00:00',
-            '2023-06-18 00:00:00+00:00'
-        ],
-        'cloud_cover': [
-            38.0, 35.0, 27.0, 39.0, 49.0, 83.0, 50.0, 7.0, 14.0, 28.0, 0.0, 3.0, 0.0,
-            5.0, 25.0, 10.0, 46.0, 56.0, 45.0, 51.0, 95.0, 94.0, 89.0, 91.0, 91.0
-        ],
-        'wind_speed': [
-            4.91744, 4.47040, 4.47040, 4.02336, 4.91744, 4.47040, 4.02336, 3.57632,
-            3.57632, 3.57632, 3.57632, 3.57632, 3.57632, 3.57632, 4.02336, 4.02336,
-            4.47040, 4.47040, 4.02336, 3.57632, 3.12928, 3.12928, 2.68224, 2.68224, 2.68224
-        ],
-        'temperature': [
-            28.0, 23.0, 22.0, 20.0, 21.0, 20.0, 20.0, 19.0, 19.0, 18.0, 18.0, 17.0,
-            17.0, 17.0, 17.0, 18.0, 20.0, 21.0, 23.0, 24.0, 25.0, 25.0, 25.0, 25.0, 25.0
-        ],
-        'humidity': [
-            28.0, 23.0, 30.0, 36.0, 44.0, 49.0, 49.0, 48.0, 51.0, 52.0, 56.0, 61.0,
-            64.0, 65.0, 64.0, 61.0, 55.0, 52.0, 45.0, 39.0, 34.0, 34.0, 36.0, 36.0, 36.0
-        ],
-        'dni': [
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0,
-            51.0, 55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0
-        ],
-        'dhi': [
-            0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0, 51.0,
-            55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0, 33.0
-        ],
-        'ghi': [
-            0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 8.0, 16.0, 25.0, 33.0, 40.0, 46.0, 51.0,
-            55.0, 58.0, 60.0, 61.0, 61.0, 60.0, 58.0, 55.0, 51.0, 46.0, 40.0, 33.0
-        ],
-    }
-    # fmt: on
-
-    df = pd.DataFrame(data)
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.set_index("datetime")
-    return df
-
-
-@pytest.fixture(scope="session")
-def pd_time_aliases() -> dict[str, list[str]]:
-    """Fixture for pandas time aliases."""
-    return {
-        "1H": ["H"],
-        "30Min": ["30T"],
-        "15Min": ["15T"],
-        "1W": ["W"],
-    }
-
-
-@pytest.fixture(scope="function")
-def ha_weather_data() -> dict[str, Any]:
-    """Load the weather test data."""
-    with open("tests/ha_weather_data.json") as json_file:
-        weather_data: dict[str, Any] = json.load(json_file)
-        # set to 1 to easily test if the data is correctly converted
-        for forecast in weather_data["attributes"]["forecast"]:
-            forecast["wind_speed"] = 1.0
-            forecast["temperature"] = 1.0
-        return weather_data
+    n_points = int(dt.timedelta(days=2) / dt.timedelta(hours=1))
+    return pl.DataFrame(
+        {
+            "datetime": pl.datetime_range(
+                dt.date(2022, 1, 1),
+                dt.date(2022, 1, 3),
+                "1h",
+                eager=True,
+                time_zone="UTC",
+            )[0:n_points],
+            "cloud_cover": list(np.linspace(20, 60, n_points)),
+            "wind_speed": list(np.linspace(0, 10, n_points)),
+            "temperature": list(np.linspace(10, 25, n_points)),
+            "humidity": list(np.linspace(0, 100, n_points)),
+            "dni": list(np.linspace(0, 1000, n_points)),
+            "dhi": list(np.linspace(0, 1000, n_points)),
+            "ghi": list(np.linspace(0, 1000, n_points)),
+        }
+    )
 
 
 @pytest.fixture(scope="session")
@@ -216,3 +164,75 @@ def pv_sys_mngr(
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
     )
+
+
+@pytest.fixture
+def pv_plant_model(
+    basic_config: list[MappingProxyType[str, Any]], location: Location
+) -> PVPlantModel:
+    inv_params = {
+        "index": basic_config[0]["inverter"],
+        "Vac": 240,
+        "Pso": 1.235644,
+        "Paco": 315.0,
+        "Pdco": 322.960602,
+        "Vdco": 60.0,
+        "C0": -2.8e-05,
+        "C1": -1.6e-05,
+        "C2": 0.003418,
+        "C3": -0.036432,
+        "Pnt": 0.0945,
+        "Vdcmax": 64.0,
+        "Idcmax": 5.382677,
+        "Mppt_low": 53.0,
+        "Mppt_high": 64.0,
+        "CEC_Date": "10/15/2018",
+        "CEC_Type": "Utility Interactive",
+        "CEC_hybrid": None,
+    }
+
+    mod_params = {
+        "index": basic_config[0]["arrays"][0]["module"],
+        "Technology": "Mono-c-Si",
+        "Bifacial": 0,
+        "STC": 385.1724,
+        "PTC": 357.9,
+        "A_c": 1.88,
+        "Length": None,
+        "Width": None,
+        "N_s": 72,
+        "I_sc_ref": 10.11,
+        "V_oc_ref": 48.98,
+        "I_mp_ref": 9.56,
+        "V_mp_ref": 40.29,
+        "alpha_sc": 0.004246,
+        "beta_oc": -0.132246,
+        "T_NOCT": 44.91,
+        "a_ref": 1.849046,
+        "I_L_ref": 10.116335,
+        "I_o_ref": 3.138217e-11,
+        "R_s": 0.317577,
+        "R_sh_ref": 506.821045,
+        "Adjust": 10.237704,
+        "gamma_r": -0.369,
+        "BIPV": "N",
+        "Version": "SAM 2018.11.11 r2",
+        "Date": "1/3/2019",
+        "Manufacturer": None,
+    }
+
+    return PVPlantModel(
+        basic_config[0],
+        location=location,
+        inv_param=pl.LazyFrame(inv_params),
+        mod_param=pl.LazyFrame(mod_params),
+    )
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    """
+    Add integration marker to all tests that use the homeassistant_api_setup fixture.
+    """
+    for item in items:
+        if "homeassistant_api_setup" in getattr(item, "fixturenames", ()):
+            item.add_marker("integration")

@@ -24,7 +24,8 @@
 				"ryanluker.vscode-coverage-gutters",
 				"tamasfe.even-better-toml",
 				"ms-python.black-formatter",
-				"mcu-debug.debug-tracker-vscode"
+				"mcu-debug.debug-tracker-vscode",
+				"mechatroner.rainbow-csv"
 			],
 			"settings": {
 				"[python]": {
@@ -50,8 +51,7 @@
 				"python.testing.pytestArgs": [
 					"--cov-report=xml"
 				],
-				"python.testing.pytestEnabled": true,
-				"terminal.integrated.defaultProfile.linux": "zsh"
+				"python.testing.pytestEnabled": true
 			}
 		}
 	},
@@ -63,8 +63,5 @@
 		"--network=host"
 	],
 	"name": "PVCast Photovoltaic forecasting",
-	"postAttachCommand": "pre-commit install --install-hooks",
-	"mounts": [
-		"source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=ro"
-	]
+	"postAttachCommand": "pre-commit install --install-hooks"
 }
