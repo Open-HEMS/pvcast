@@ -38,7 +38,7 @@ mypy-extensions==1.0.0
 nodeenv==1.8.0
 numpy==1.26.3
 packaging==23.2
-pandas==2.0.2
+pandas==2.1.4
 pathspec==0.12.1
 pep517==0.13.1
 pip-api==0.0.30
