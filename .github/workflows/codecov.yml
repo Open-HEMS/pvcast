@@ -6,17 +6,20 @@ on:
     branches: [main]
 jobs:
   run:
+    name: Python ${{ matrix.python }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.11", "3.12"]
     steps:
-      - name: Checkout
+      - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
         with:
-          ref: "dev"
-          lfs: "true"
-      - name: Set up Python 3.11
+          lfs: true
+      - name: 🏗 🏗 Set up Python ${{ matrix.python }}
         uses: actions/setup-python@v4.8.0
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
           cache: "pip"
       - name: Install dependencies
         run: |
