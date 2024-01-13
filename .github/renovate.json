@@ -26,7 +26,6 @@
     {
       "matchManagers": ["pip_requirements"],
       "addLabels": ["requirements.txt"],
-      "groupName": "requirementstxt",
       "matchUpdateTypes": ["minor", "patch", "pin"],
       "automerge": true
     },
