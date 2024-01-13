@@ -12,16 +12,19 @@
     {
       "matchManagers": ["github-actions"],
       "addLabels": ["github_actions"],
-      "rangeStrategy": "pin"
-    },
-    {
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
+      "rangeStrategy": "pin",
+      "extractVersion": "^(?<version>v\\d+\\.\\d+\\.\\d+)$",
+      "versioning": "regex:^v(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$"
     },
     {
       "matchManagers": ["pep621"],
       "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchDepTypes": ["optional-dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "optional-dependencies",       
       "automerge": true
     }
   ]
