@@ -203,7 +203,7 @@ class TestForecastResult:
 
     def test_frequency_missing_datetimes(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result frequency returns -1 with missing datetimes."""
-        forecast_result.ac_power = forecast_result.ac_power.with_row_count(
+        forecast_result.ac_power = forecast_result.ac_power.with_row_index(
             "row_nr"
         ).filter(pl.col("row_nr") != 1)
         with pytest.raises(
@@ -258,7 +258,7 @@ class TestForecastResult:
     ) -> None:
         """Test that forecast result energy calculation fails with invalid AC power frequency."""
         assert forecast_result.ac_power is not None
-        forecast_result.ac_power = forecast_result.ac_power.with_row_count(
+        forecast_result.ac_power = forecast_result.ac_power.with_row_index(
             "row_nr"
         ).filter(pl.col("row_nr") % 2 == 0)
         with pytest.raises(
