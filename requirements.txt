@@ -56,7 +56,7 @@ python-dateutil==2.8.2
 pytz==2023.3.post1
 PyYAML==6.0.1
 requests==2.31.0
-responses==0.23.1
+responses==0.24.1
 ruamel.yaml==0.18.5
 ruamel.yaml.clib==0.2.8
 ruff==0.1.13
