@@ -44,7 +44,7 @@ test = [
     "pytest-mock<3.10.1",
     "pytest-xdist==3.3.1",
     "mock==5.1.0",
-    "responses==0.23.1",
+    "responses==0.24.1",
     "mypy==1.8.0",
     "covdefaults==2.3.0",
     "codespell==2.2.6",
