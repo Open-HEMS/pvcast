@@ -22,9 +22,9 @@
       "automerge": true
     },
     {
-      "matchDepTypes": ["optional-dependencies"],
+      "matchDepTypes": ["dev"],
       "matchUpdateTypes": ["minor", "patch", "pin"],
-      "groupName": "optional-dependencies",       
+      "groupName": "dev",
       "automerge": true
     }
   ]
