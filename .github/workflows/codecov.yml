@@ -8,21 +8,20 @@ jobs:
   run:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
         with:
-          ref: "dev"
           lfs: "true"
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12.1
         uses: actions/setup-python@v4.8.0
         with:
-          python-version: "3.11"
+          python-version: "3.12.1"
           cache: "pip"
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install .[dev]
       - name: Run unit tests and collect coverage
-        run: pytest tests --cov src -n auto
+        run: pytest --cov=pvcast tests/ -n auto
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3.1.4
