@@ -10,7 +10,7 @@ charset-normalizer==3.3.2
 click==8.1.7
 codespell==2.2.6
 covdefaults==2.3.0
-coverage==7.3.2
+coverage==7.4.0
 dill==0.3.7
 distlib==0.3.8
 docopt==0.6.2
