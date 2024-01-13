@@ -19,7 +19,14 @@
     },
     {
       "matchManagers": ["pep621"],
-      "addLabels": ["pep621"],
+      "addLabels": ["pyproject.toml"],
+      "matchUpdateTypes": ["minor", "patch", "pin"],
+      "automerge": true
+    },
+    {
+      "matchManagers": ["pip_requirements"],
+      "addLabels": ["requirements.txt"],
+      "groupName": "requirementstxt",
       "matchUpdateTypes": ["minor", "patch", "pin"],
       "automerge": true
     },
@@ -28,7 +35,10 @@
       "addLabels": ["dev-dependencies"],
       "matchUpdateTypes": ["minor", "patch", "pin"],
       "groupName": "dev",
-      "automerge": true
+      "automerge": true,
+      "automergeSchedule": [
+        "before 4am"
+      ]
     }
   ]
 }
