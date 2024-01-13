@@ -18,12 +18,12 @@
     },
     {
       "matchManagers": ["pep621"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["minor", "patch", "pin"],
       "automerge": true
     },
     {
       "matchDepTypes": ["optional-dependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": ["minor", "patch", "pin"],
       "groupName": "optional-dependencies",       
       "automerge": true
     }
