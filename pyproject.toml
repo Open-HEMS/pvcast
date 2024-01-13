@@ -93,6 +93,7 @@ pythonPlatform = "Linux"
 executionEnvironments = [{ root = "pvcast" }]
 
 [tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning:dateutil.*:"]
 addopts = "--cov-report xml:coverage.xml --cov pvcast --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
 pythonpath = ["src"]
 log_cli = true
