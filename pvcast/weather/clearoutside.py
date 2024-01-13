@@ -39,7 +39,7 @@ class WeatherAPIClearOutside(WeatherAPI):
 
         # response (source) data bucket
         weather_df = pl.DataFrame()
-        datetimes = self.source_dates
+
         n_days = int(self.max_forecast_days / dt.timedelta(days=1))
 
         # Parse HTML content once
@@ -49,18 +49,20 @@ class WeatherAPIClearOutside(WeatherAPI):
             # find the table for the day
             result = soup.select(f"#day_{day_int}")
             if len(result) != 1:
-                _LOGGER.warning("No data for day %s.", day_int)
+                _LOGGER.debug("No data for day %s, breaking loop.", day_int)
                 break
 
             # find the elements in the table
             table = result[0]
             data = self._find_elements(table)
-            data = data.with_columns(datetimes[day_int * 24 : (day_int + 1) * 24])
 
             # insert the data into the source data bucket
-            weather_df = weather_df.vstack(
-                data.with_columns(pl.exclude("datetime").cast(pl.Float64))
-            )
+            weather_df = weather_df.vstack(data.with_columns(pl.all().cast(pl.Float64)))
+
+        # add the datetime column
+        weather_df = weather_df.with_columns(
+            self.source_dates.slice(0, len(weather_df)).alias("datetime")
+        )
 
         # check NaN values distribution
         nan_vals = weather_df.with_columns(pl.all().is_null().cast(int).diff().sum())
