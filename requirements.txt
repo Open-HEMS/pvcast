@@ -22,7 +22,7 @@ flit_core==3.9.0
 h11==0.14.0
 h5py==3.10.0
 identify==2.5.33
-idna==3.4
+idna==3.6
 iniconfig==2.0.0
 isort==5.13.2
 Jinja2==3.1.3
