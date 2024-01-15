@@ -89,12 +89,8 @@ class HomeAssistantAPI:
     @property
     def online(self) -> bool:
         """Return whether the Home Assistant API is online."""
-        try:
-            with connect(self.url) as websocket:
-                self._authenticate(websocket)
-                return True
-        except Exception:
-            return False
+        with connect(self.url) as websocket:
+            return self._authenticate(websocket)
 
     @property
     def data_headers(self) -> dict[str, Union[str, int]]:
@@ -106,19 +102,23 @@ class HomeAssistantAPI:
             "forecast_type": "hourly",
         }
 
-    def _authenticate(self, websocket: Connection) -> None:
-        """Authenticate with the Home Assistant API."""
+    def _authenticate(self, websocket: Connection) -> bool:
+        """
+        Authenticate with the Home Assistant API.
+        Returns True if authentication was successful, False otherwise.
+        """
         reply = json.loads(websocket.recv())
-        _LOGGER.debug("Received: %s", reply)
+        _LOGGER.debug("Received auth reply from HA: %s", reply)
         if not reply["type"] == "auth_required":
             _LOGGER.error("Auth failed. Reply: %s", reply)
-            raise ValueError("Authentication failed")
+            return False
         websocket.send(json.dumps(self._auth_headers))
         reply = json.loads(websocket.recv())
         _LOGGER.debug("Received: %s", reply)
         if not reply["type"] == "auth_ok":
             _LOGGER.error("Auth failed. Reply: %s", reply)
-            raise ValueError("Authentication failed")
+            return False
+        return True
 
     @property
     def forecast(self) -> list[dict[str, Union[str, int, float]]]:
@@ -146,7 +146,7 @@ class HomeAssistantAPI:
                 HA_API_WEATHER_DATA(reply)
             except MultipleInvalid as exc:
                 _LOGGER.error("Invalid data received: %s", exc)
-                raise ValueError("Invalid data received")
+                raise ValueError("Invalid data received") from exc
 
             # extract the forecast data from the reply
             forecast = reply["event"]["forecast"]

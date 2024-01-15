@@ -63,19 +63,19 @@ plant:
         modules_per_string: 8
         strings: 1
         module: JA_Solar_JAM72S01_385_PR
-  - name: Thuis
+  - name: home
     inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
     microinverter: false
     arrays:
       - name: NE
-        tilt: 20
+        tilt: 23
         azimuth: 44
-        modules_per_string: 6
+        modules_per_string: 4
         strings: 1
         module: Trina_Solar_TSM_330DD14A_II_
       - name: SW
-        tilt: 20
+        tilt: 23
         azimuth: 224
-        modules_per_string: 6
+        modules_per_string: 8
         strings: 1
         module: Trina_Solar_TSM_330DD14A_II_
