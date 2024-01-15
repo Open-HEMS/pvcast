@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, validator
 from typing_extensions import Annotated
 
-from ...model.model import PVSystemManager
-from ..routers.dependencies import get_pv_system_mngr
+from pvcast.webserver.routers.dependencies import get_pv_system_mngr
+
+if TYPE_CHECKING:
+    from pvcast.model.model import PVSystemManager
 
 res_examp = [
     {
@@ -87,9 +90,7 @@ class StartEndRequest(BaseModel):
     ).replace(hour=23, minute=59, second=0, microsecond=0)
 
     @validator("start", "end", pre=True)
-    def parse_datetime(
-        cls, value: str
-    ) -> datetime.datetime:  # pylint: disable=no-self-argument; # noqa: B902
+    def parse_datetime(cls, value: str) -> datetime.datetime:  # pylint: disable=no-self-argument;
         """Parse datetime."""
         date_time = datetime.datetime.fromisoformat(value)
         if date_time.tzinfo is None:
