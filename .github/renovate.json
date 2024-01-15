@@ -1,8 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "timezone": "Europe/Amsterdam",
   "rebaseWhen": "behind-base-branch",
   "dependencyDashboard": true,
-  "labels": ["dependencies", "no-stale"],
+  "labels": ["dependencies"],
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true
@@ -10,34 +11,30 @@
   "commitMessagePrefix": "⬆️",
   "packageRules": [
     {
+      "matchManagers": ["poetry"],
+      "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["poetry"],
+      "matchDepTypes": ["dev"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "matchManagers": ["poetry"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
       "matchManagers": ["github-actions"],
       "addLabels": ["github_actions"],
       "rangeStrategy": "pin",
       "extractVersion": "^(?<version>v\\d+\\.\\d+\\.\\d+)$",
-      "versioning": "regex:^v(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$",
-      "automerge": true
+      "versioning": "regex:^v(?<major>\\d+)(\\.(?<minor>\\d+)\\.(?<patch>\\d+))?$"
     },
     {
-      "matchManagers": ["pep621"],
-      "addLabels": ["pyproject.toml"],
-      "matchUpdateTypes": ["minor", "patch", "pin"],
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
-    },
-    {
-      "matchManagers": ["pip_requirements"],
-      "addLabels": ["requirements.txt"],
-      "matchUpdateTypes": ["minor", "patch", "pin"],
-      "automerge": true
-    },
-    {
-      "matchDepTypes": ["dev"],
-      "addLabels": ["dev-dependencies"],
-      "matchUpdateTypes": ["minor", "patch", "pin"],
-      "groupName": "dev",
-      "automerge": true,
-      "automergeSchedule": [
-        "before 4am"
-      ]
     }
   ]
 }
