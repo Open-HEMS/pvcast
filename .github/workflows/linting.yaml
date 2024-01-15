@@ -18,7 +18,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
@@ -39,7 +39,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
@@ -62,7 +62,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
@@ -83,7 +83,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
@@ -130,7 +130,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
@@ -151,7 +151,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
       - name: 🏗 Set up Poetry
-        run: pip install poetry
+        run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
         id: python
         uses: actions/setup-python@v5.0.0
