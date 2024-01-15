@@ -71,7 +71,6 @@ repos:
         language: system
         types: [text]
         entry: codespell
-        exclude: '^requirements\.txt$'
       - id: detect-private-key
         name: 🕵️  Detect Private Keys
         language: system
