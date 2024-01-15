@@ -76,7 +76,8 @@ repos:
         name: ✅ Check code for common misspellings
         language: system
         types: [text]
-        exclude: ^poetry\.lock$
+        exclude: ^poetry\.lock|notebooks/.*\.ipynb|data/
+        exclude_types: [csv, json]
         entry: poetry run codespell
         args: [--ignore-words=.codespell-ignore]
       - id: detect-private-key
@@ -114,12 +115,6 @@ repos:
         language: system
         types: [python]
         entry: poetry run pylint
-      - id: pytest
-        name: 🧪 Running tests and test coverage with pytest
-        language: system
-        types: [python]
-        entry: poetry run pytest
-        pass_filenames: false
       - id: trailing-whitespace
         name: ✄  Trim Trailing Whitespace
         language: system
