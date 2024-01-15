@@ -13,12 +13,15 @@ SECONDS_PER_HOUR = 3_600
 
 # PVGIS TMY (typical meteorological year) data uses a typical month of a typical year.
 # Thus one 'year' of data can consist of dates such as: [Jan 2015, Feb 2008, Mar 2013, ...]
-# This is very inconvenient for our purposes, so we will mapp all of it to a single year of data instead.
+# This is very inconvenient for our purposes, so we will map all of it to a single year of data instead.
 HISTORICAL_YEAR_MAPPING = 2021
 PVGIS_TMY_START = 2005
 PVGIS_TMY_END = 2015
 
 # model attribute constants
-CLEARSKY_MODEL_ATTRS = {"aoi_model": "physical", "spectral_model": "no_loss"}
-LIVE_MODEL_ATTRS = {}
-HISTORICAL_MODEL_ATTRS = {}
+CLEARSKY_MODEL_ATTRS: dict[str, str] = {
+    "aoi_model": "physical",
+    "spectral_model": "no_loss",
+}
+LIVE_MODEL_ATTRS: dict[str, str] = {}
+HISTORICAL_MODEL_ATTRS: dict[str, str] = {}
