@@ -81,3 +81,4 @@ voluptuous==0.14.1
 websockets==12.0
 wheel==0.42.0
 yamllint==1.33.0
+watchfiles==0.21.0
