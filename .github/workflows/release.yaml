@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-python@v5.0.0
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
-          cache: "poetry"
+          cache: "pip"
       - name: 🏗 Install workflow dependencies
         run: poetry config virtualenvs.create false
       - name: 🏗 Install dependencies
