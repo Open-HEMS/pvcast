@@ -1,16 +1,12 @@
 ---
 name: "CodeQL"
 
-permissions:
-  security-events: write
-
 # yamllint disable-line rule:truthy
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
   schedule:
     - cron: "30 1 * * 0"
 
