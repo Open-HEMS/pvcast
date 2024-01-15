@@ -36,6 +36,7 @@ def main() -> None:
         port=PORT,
         reload=True,
         workers=3,
+        reload_includes=["*.yaml", "*.yml"],
     )
 
 
