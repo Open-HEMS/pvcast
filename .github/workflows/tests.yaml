@@ -12,11 +12,13 @@ env:
 
 jobs:
   pytest:
-    name: Python $DEFAULT_PYTHON
+    name: pytest
     runs-on: ubuntu-latest
     steps:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
+        with:
+          lfs: "true"
       - name: 🏗 Set up Poetry
         run: pipx install poetry
       - name: 🏗 Set up Python ${{ env.DEFAULT_PYTHON }}
@@ -46,6 +48,7 @@ jobs:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.1.1
         with:
+          lfs: "true"
           fetch-depth: 0
       - name: ⬇️ Download coverage data
         uses: actions/download-artifact@v4.1.1
