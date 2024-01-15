@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import InitVar, dataclass, field
-from pathlib import Path
-from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-# import pandas as pd
 import polars as pl
 from pvlib.location import Location
 from pvlib.modelchain import ModelChain
@@ -18,14 +15,18 @@ from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 from .const import BASE_CEC_DATA_PATH
 from .forecasting import Clearsky, Historical, Live
 
+if TYPE_CHECKING:
+    from pathlib import Path
+    from types import MappingProxyType
+
 _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
 class PVPlantModel:
-    """
-    Implements the entire PV model chain based on the parameters set in config.yaml. This class is basically a wrapper
-    around pvlib. Each entry in the plant list in config.yaml file should be instantiated as a PVModelChain object.
+    """Implements the entire PV model chain based on the parameters set in config.yaml.
+
+    This class is basically a wrapper around pvlib. Each entry in the plant list in config.yaml file should be instantiated as a PVModelChain object.
     In case of a PV system with microinverters, each microinverter is represented by one PVModelChain object.
 
     For example, if the plant entry in config.yaml is:
@@ -64,6 +65,14 @@ class PVPlantModel:
         inv_param: pl.LazyFrame,
         mod_param: pl.LazyFrame,
     ) -> None:
+        """Perform post-initialization tasks for the PVPlantModel.
+
+        This method creates the PV system models, sets the name, and initializes the forecast objects.
+
+        :param config: The PV plant configuration dictionary.
+        :param inv_param: The inverter parameters.
+        :param mod_param: The module parameters.
+        """
         pv_systems = self._create_pv_systems(config, inv_param, mod_param)
         self._pv_models = [
             ModelChain(system, self.location, name=config["name"], aoi_model="physical")
@@ -102,8 +111,7 @@ class PVPlantModel:
         inv_param: pl.LazyFrame,
         mod_param: pl.LazyFrame,
     ) -> list[PVSystem]:
-        """
-        Create the PV system. This method is called by __post_init__.
+        """Create the PV system. This method is called by __post_init__.
 
         In case of a PV system with microinverters, each microinverter is represented by one PVSystem object.
         """
@@ -116,7 +124,8 @@ class PVPlantModel:
         # get inverter params from the SAM database
         inv_df: pl.DataFrame = inv_param.filter(index=inverter).collect()
         if inv_df.is_empty():
-            raise KeyError(f"Device {inverter} not found in the database.")
+            msg = f"Device {inverter} not found in the database."
+            raise KeyError(msg)
         inv_dict = dict(inv_df.rows_by_key(key=["index"], named=True, unique=True))
 
         # get module params from the SAM database
@@ -126,7 +135,8 @@ class PVPlantModel:
         if len(modules) != len(mod_df):
             found_modules = set(mod_df["index"])
             not_found = set(modules) - found_modules
-            raise KeyError(f"One of {not_found} not found in the database.")
+            msg = f"One of {not_found} not found in the database."
+            raise KeyError(msg)
 
         mod_dict = dict(mod_df.rows_by_key(key=["index"], named=True, unique=True))
 

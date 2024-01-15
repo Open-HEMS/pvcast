@@ -2,8 +2,7 @@
 #   Copyright (c) Microsoft Corporation. All rights reserved.
 #   Licensed under the MIT License. See LICENSE in project root for information.
 #   ---------------------------------------------------------------------------------
-"""
-This is a configuration file for pytest containing customizations and fixtures.
+"""This is a configuration file for pytest containing customizations and fixtures.
 
 In VSCode, Code Coverage is recorded in config.xml. Delete this file to reset reporting.
 
@@ -26,7 +25,7 @@ from pvcast.model.model import PVPlantModel, PVSystemManager
 from .const import LOC_AUS, LOC_EUW, LOC_USW
 
 
-@pytest.fixture()
+@pytest.fixture
 def weather_df() -> pl.DataFrame:
     """Fixture for a basic pvlib input weather dataframe."""
     n_points = int(dt.timedelta(days=2) / dt.timedelta(hours=1))
@@ -230,9 +229,7 @@ def pv_plant_model(
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """
-    Add integration marker to all tests that use the homeassistant_api_setup fixture.
-    """
+    """Add integration marker to all tests that use the homeassistant_api_setup fixture."""
     for item in items:
         if "homeassistant_api_setup" in getattr(item, "fixturenames", ()):
             item.add_marker("integration")

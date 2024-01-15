@@ -80,7 +80,6 @@ class WeatherAPIClearOutside(WeatherAPI):
         :param table: The table to search.
         :return: Weather data pl.DataFrame for one day (24 hours).
         """
-
         list_names = table.find_all(class_="fc_detail_label")
         list_tables = table.find_all("ul")[1:]
 

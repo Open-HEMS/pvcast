@@ -21,8 +21,7 @@ def get_forecast_result_dict(
     interval: Interval,
     weather_df: pl.DataFrame = None,
 ) -> dict[str, Any]:
-    """
-    Use the weather data to compute the estimated PV output power in Watts at the \
+    """Use the weather data to compute the estimated PV output power in Watts at the \
     given interval <interval> for the given PV system <name>.
 
     :param plant_name: Name of the PV system

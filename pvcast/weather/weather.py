@@ -131,8 +131,7 @@ class WeatherAPI(ABC):
 
     @abstractmethod
     def retrieve_new_data(self) -> pl.DataFrame:
-        """
-        Retrieve new weather data from the API.
+        """Retrieve new weather data from the API.
 
         :return: Response from the API
         """
@@ -140,8 +139,7 @@ class WeatherAPI(ABC):
     def get_weather(
         self, live: bool = False, calc_irrads: bool = False
     ) -> dict[str, list[dict[str, Any]] | str | None]:
-        """
-        Get weather data from API response. This function will always return data return in UTC.
+        """Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
         :param calc_irrads: Whether to calculate irradiance from cloud cover and add it to the weather data.
@@ -238,8 +236,7 @@ class WeatherAPI(ABC):
     def cloud_cover_to_irradiance(
         self, cloud_cover: pl.DataFrame, how: str = "clearsky_scaling", **kwargs: Any
     ) -> pl.DataFrame:
-        """
-        Convert cloud cover to irradiance. A wrapper method.
+        """Convert cloud cover to irradiance. A wrapper method.
 
         NB: Code copied from pvlib.forecast as the pvlib forecast module is deprecated as of pvlib 0.9.1!
 
@@ -275,8 +272,7 @@ class WeatherAPI(ABC):
     def _cloud_cover_to_irradiance_clearsky_scaling(
         self, cloud_cover: pl.DataFrame, times: pd.DatetimeIndex, **kwargs: Any
     ) -> pl.DataFrame:
-        """
-        Convert cloud cover to irradiance using the clearsky scaling method.
+        """Convert cloud cover to irradiance using the clearsky scaling method.
 
         :param cloud_cover: Cloud cover as a polars pl.Series
         :param **kwargs: Passed to the selected method.
@@ -303,8 +299,7 @@ class WeatherAPI(ABC):
     def _cloud_cover_to_irradiance_campbell_norman(
         self, cloud_cover: pl.DataFrame, times: pd.DatetimeIndex, **kwargs: Any
     ) -> pl.DataFrame:
-        """
-        Convert cloud cover to irradiance using the Campbell and Norman model.
+        """Convert cloud cover to irradiance using the Campbell and Norman model.
 
         :param cloud_cover: Cloud cover in [%] as a polars pl.DataFrame.
         :param **kwargs: Passed to the selected method.
@@ -332,8 +327,7 @@ class WeatherAPI(ABC):
     def _cloud_cover_to_transmittance_linear(
         self, cloud_cover: np.ndarray[float, Any], offset: float = 0.75
     ) -> np.ndarray[float, Any]:
-        """
-        Convert cloud cover (percentage) to atmospheric transmittance
+        """Convert cloud cover (percentage) to atmospheric transmittance
         using a linear model.
 
         :param cloud_cover: Cloud cover in [%] as a polars pl.Series.
@@ -348,8 +342,7 @@ class WeatherAPI(ABC):
         ghi_clear: np.ndarray[float, Any],
         offset: float = 35.0,
     ) -> np.ndarray[float, Any]:
-        """
-        Convert cloud cover to GHI using a linear relationship.
+        """Convert cloud cover to GHI using a linear relationship.
 
         :param cloud_cover: Cloud cover in [%] as a pandas pd.Series.
         :param ghi_clear: Clear sky GHI as a pandas pd.Series.
@@ -410,8 +403,7 @@ class WeatherAPIFactory:
     def register(
         self, api_id: str, weather_api_class: Callable[..., WeatherAPI]
     ) -> None:
-        """
-        Register a new weather API class to the factory.
+        """Register a new weather API class to the factory.
 
         :param api_id: The identifier string of the API which is used in config.yaml.
         :param weather_api_class: The weather API class.
@@ -419,8 +411,7 @@ class WeatherAPIFactory:
         self._apis[api_id] = weather_api_class
 
     def get_weather_api(self, api_id: str, **kwargs: Any) -> WeatherAPI:
-        """
-        Get a weather API instance.
+        """Get a weather API instance.
 
         :param api_id: The identifier string of the API which is used in config.yaml.
         :param **kwargs: Passed to the weather API class.
@@ -434,16 +425,14 @@ class WeatherAPIFactory:
         return weather_api_class(**kwargs)
 
     def get_weather_api_list_obj(self) -> list[Callable[..., WeatherAPI]]:
-        """
-        Get a list of all registered weather API instances.
+        """Get a list of all registered weather API instances.
 
         :return: List of weather API identifiers.
         """
         return list(self._apis.values())
 
     def get_weather_api_list_str(self) -> list[str]:
-        """
-        Get a list of all registered weather API identifiers.
+        """Get a list of all registered weather API identifiers.
 
         :return: List of weather API identifiers.
         """

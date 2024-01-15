@@ -7,7 +7,7 @@ import logging
 import random
 import typing
 from dataclasses import InitVar, dataclass, field
-from typing import Dict, Union
+from typing import Union
 
 from voluptuous import All, Coerce, MultipleInvalid, Range, Required, Schema
 from websockets.sync.client import Connection, connect  # type: ignore
@@ -59,7 +59,6 @@ class HomeAssistantAPI:
 
     def __post_init__(self, host: str, token: str) -> None:
         """Initialize the Home Assistant API interface."""
-
         if not len(self.entity_id.split(".")) == 2:
             raise ValueError("Invalid entity_id: %s. Must use format 'weather.<name>'")
         if not self.entity_id.startswith("weather."):
@@ -103,19 +102,18 @@ class HomeAssistantAPI:
         }
 
     def _authenticate(self, websocket: Connection) -> bool:
-        """
-        Authenticate with the Home Assistant API.
+        """Authenticate with the Home Assistant API.
         Returns True if authentication was successful, False otherwise.
         """
         reply = json.loads(websocket.recv())
         _LOGGER.debug("Received auth reply from HA: %s", reply)
-        if not reply["type"] == "auth_required":
+        if reply["type"] != "auth_required":
             _LOGGER.error("Auth failed. Reply: %s", reply)
             return False
         websocket.send(json.dumps(self._auth_headers))
         reply = json.loads(websocket.recv())
         _LOGGER.debug("Received: %s", reply)
-        if not reply["type"] == "auth_ok":
+        if reply["type"] != "auth_ok":
             _LOGGER.error("Auth failed. Reply: %s", reply)
             return False
         return True
@@ -129,14 +127,14 @@ class HomeAssistantAPI:
             websocket.send(json.dumps(self.data_headers))
 
             # first reply: {..., 'success': True, 'result': None}
-            status: Dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
+            status: dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
             if not status.get("success", False):
                 _LOGGER.error("Data request failed. Reply: %s", status)
                 raise ValueError("Data request failed")
 
             # second reply contains the forecast data, using the format:
             # {..., 'event': {'type': 'hourly', 'forecast': [{x}, {x}, ...]}}
-            reply: Dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
+            reply: dict[str, Union[bool, typing.Any]] = json.loads(websocket.recv())
             if not isinstance(reply, dict):
                 _LOGGER.error("Data request failed. Reply: %s", reply)
                 raise ValueError("Data request failed")

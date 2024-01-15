@@ -57,9 +57,7 @@ class TestHomeAssistantWeather(WeatherPlatform):
     """Test a weather platform that inherits from WeatherAPI class."""
 
     @pytest.fixture
-    def homeassistant_api_setup(
-        self, location: Location
-    ) -> Generator[WeatherAPIHomeassistant, None, None]:
+    def homeassistant_api_setup(self, location: Location) -> WeatherAPIHomeassistant:
         """Setup the Home Assistant API."""
         api = WeatherAPIHomeassistant(
             location=location,
@@ -67,7 +65,7 @@ class TestHomeAssistantWeather(WeatherPlatform):
             token=HASS_TEST_TOKEN,
             entity_id=HASS_WEATHER_ENTITY_ID,
         )
-        yield api
+        return api
 
     @pytest.fixture
     def weather_api(

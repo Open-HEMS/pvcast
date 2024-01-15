@@ -1,5 +1,4 @@
-"""
-Script to retrieve inverter / PV module CSV files from PVLib and System Advisor Model (SAM) and merge
+"""Script to retrieve inverter / PV module CSV files from PVLib and System Advisor Model (SAM) and merge
 them into a single CSV file.
 """
 

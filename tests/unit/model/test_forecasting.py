@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Type, Union
+from typing import Union
 
 import polars as pl
 import pytest
@@ -281,7 +281,7 @@ class TestForecastResult:
         self,
         forecast_result: ForecastResult,
         time_str: str,
-        expected: Union[int, Type[Exception]],
+        expected: Union[int, type[Exception]],
     ) -> None:
         if isinstance(expected, type) and issubclass(expected, Exception):
             with pytest.raises(expected):
@@ -311,7 +311,8 @@ class TestForecastResult:
         self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame
     ) -> None:
         """Test the add_precipitable_water method with precipitable_water already
-        present in weather_df."""
+        present in weather_df.
+        """
         weather_df = weather_df.with_columns(pl.lit(1).alias("precipitable_water"))
         result: ForecastResult = pv_plant_model.live.run(weather_df)
         assert result.type == ForecastType.LIVE

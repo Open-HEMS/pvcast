@@ -35,8 +35,7 @@ class MockWeatherAPI(WeatherAPI):
 
 
 class CommonWeatherTests:
-    """
-    These tests can be run on both the abstract WeatherAPI class and on platforms
+    """These tests can be run on both the abstract WeatherAPI class and on platforms
     that inherit from it. This class should no run platform specific tests.
     """
 

@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends
-from typing_extensions import Annotated, Optional
+from typing_extensions import Annotated
 
 from ...model.model import PVSystemManager
 from ...weather.weather import WeatherAPI

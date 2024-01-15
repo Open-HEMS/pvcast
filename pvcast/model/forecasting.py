@@ -247,8 +247,7 @@ class PowerEstimate(ABC):
 
     @abstractmethod
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
-        """
-        Prepare weather data for the forecast. This method should be implemented by subclasses.
+        """Prepare weather data for the forecast. This method should be implemented by subclasses.
 
         When calling this function it may be optional or mandatory to provide weather
         data or datetimes to forecast for. Datetimes must always be ordered and provided
@@ -263,8 +262,7 @@ class PowerEstimate(ABC):
         temp_col: str = "temperature",
         rh_col: str = "humidity",
     ) -> pl.DataFrame:
-        """
-        Add a precipitable_water column to the weather dataframe.
+        """Add a precipitable_water column to the weather dataframe.
 
         Gueymard94_pw alculates precipitable water (cm) from ambient air temperature (C) and
         relatively humidity (%) using an empirical model. The accuracy of this method is
@@ -359,10 +357,8 @@ class Historical(PowerEstimate):
         upper = weather_df["datetime"].max().replace(year=HISTORICAL_YEAR_MAPPING)
         return (
             tmy_data.filter(
-                (
-                    (pl.col("datetime").str.to_datetime() >= lower)
-                    & (pl.col("datetime").str.to_datetime() <= upper)
-                )
+                (pl.col("datetime").str.to_datetime() >= lower)
+                & (pl.col("datetime").str.to_datetime() <= upper)
             )
             .collect()
             .cast({"datetime": pl.Datetime(time_unit="ms", time_zone="UTC")})

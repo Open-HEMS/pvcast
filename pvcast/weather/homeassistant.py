@@ -30,8 +30,7 @@ class WeatherAPIHomeassistant(WeatherAPI):
         self._hass_api = HomeAssistantAPI(self.url, token, entity_id)
 
     def retrieve_new_data(self) -> pl.DataFrame:
-        """
-        Retrieve new weather data from the API.
+        """Retrieve new weather data from the API.
 
         :return: Response from the API
         """
