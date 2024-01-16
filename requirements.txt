@@ -75,7 +75,7 @@ types-requests==2.31.0.20240106
 typing_extensions==4.9.0
 tzdata==2023.4
 urllib3==2.1.0
-uvicorn==0.25.0
+uvicorn==0.26.0
 virtualenv==20.25.0
 voluptuous==0.14.1
 websockets==12.0
