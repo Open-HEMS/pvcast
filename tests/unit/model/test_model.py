@@ -14,11 +14,14 @@ from pvcast.model.model import PVSystemManager
 
 
 class TestPVModelChain:
+    """Test the PVModelChain class."""
+
     location = (latitude, longitude) = (52.35855344250755, 4.881086336486702)
     altitude = 10.0
 
     @pytest.fixture(scope="class")
     def basic_config_wrong_inv(self) -> dict[str, Any]:
+        """Fixture for a basic config with wrong inverter model."""
         return {
             "name": "EastWest",
             "inverter": "wrong_inverter",
@@ -35,6 +38,7 @@ class TestPVModelChain:
 
     @pytest.fixture(scope="class")
     def basic_config_wrong_mod(self) -> dict[str, Any]:
+        """Fixture for a basic config with wrong module model."""
         return {
             "name": "EastWest",
             "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
@@ -52,6 +56,7 @@ class TestPVModelChain:
     def test_pv_sys_mngr_init(
         self, basic_config: list[dict[str, Any]], pv_sys_mngr: PVSystemManager
     ) -> None:
+        """Test the PVSystemManager class."""
         assert pv_sys_mngr.config == basic_config
         assert isinstance(pv_sys_mngr.location, Location)
         assert isinstance(pv_sys_mngr.location.latitude, float)
@@ -61,6 +66,7 @@ class TestPVModelChain:
         assert set(pv_sys_mngr.plant_names) == {cfg["name"] for cfg in basic_config}
 
     def test_pv_sys_mngr_get_pv_plant(self, pv_sys_mngr: PVSystemManager) -> None:
+        """Test the get_pv_plant function."""
         pv_sys = pv_sys_mngr.get_pv_plant("EastWest")
         assert pv_sys.name == "EastWest"
         with pytest.raises(KeyError):
@@ -97,7 +103,7 @@ class TestPVModelChain:
     ) -> None:
         """Test the init_pv_system function with wrong module model."""
         with pytest.raises(
-            KeyError, match=f"One of {set(['wrong_module'])} not found in the database."
+            KeyError, match=f"One of { {'wrong_module'} } not found in the database."
         ):
             PVSystemManager(
                 [MappingProxyType(basic_config_wrong_mod)],
@@ -108,6 +114,7 @@ class TestPVModelChain:
     def test_aggregate_model_results(
         self, pv_sys_mngr: PVSystemManager, weather_df: pl.DataFrame
     ) -> None:
+        """Test the aggregate_model_results function."""
         pvplant = pv_sys_mngr.get_pv_plant("EastWest")
         cs_result = pvplant.clearsky.run(weather_df)
-        assert cs_result.type == ForecastType.CLEARSKY
+        assert cs_result.fc_type == ForecastType.CLEARSKY
