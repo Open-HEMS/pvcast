@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import typing
 from typing import TYPE_CHECKING, Generator
 from urllib.parse import urljoin
 
@@ -18,13 +17,36 @@ from tests.const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
 from .test_weather import CommonWeatherTests
 
 if TYPE_CHECKING:
+    import typing
+
     from pvcast.weather.weather import WeatherAPI
+    from tests.conftest import Location
 
 
 class WeatherPlatform(CommonWeatherTests):
     """Test a weather platform that inherits from WeatherAPI class."""
 
     valid_temp_units: typing.ClassVar[list[str]] = ["°C", "°F", "C", "F"]
+    valid_speed_units: typing.ClassVar[list[str]] = [
+        "m/s",
+        "km/h",
+        "mi/h",
+        "ft/s",
+        "kn",
+    ]
+
+    @pytest.fixture(params=[1, 2, 5, 10])
+    def max_forecast_day(self, request: pytest.FixtureRequest) -> dt.timedelta:
+        """Fixture that creates a maximum number of days to forecast."""
+        return dt.timedelta(days=request.param)
+
+    def test_get_weather(self, weather_api: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        data = weather_api.get_weather()["data"]
+        weather = pl.from_dicts(data)
+        assert isinstance(weather, pl.DataFrame)
+        assert weather.null_count().sum_horizontal().item() == 0
+        assert weather.shape[0] >= 24
 
     def test_weather_get_weather_max_days(
         self,
@@ -72,12 +94,11 @@ class TestClearOutsideWeather(WeatherPlatform):
         """Set up the Clear Outside API."""
         lat = str(round(location.latitude, 2))
         lon = str(round(location.longitude, 2))
-        alt = str(round(location.altitude, 2))
 
         with responses.RequestsMock() as rsps:
             rsps.add(
                 responses.GET,
-                urljoin("https://clearoutside.com/forecast/", f"{lat}/{lon}/{alt}"),
+                urljoin("https://clearoutside.com/forecast/", f"{lat}/{lon}"),
                 body=clearoutside_html_page,
                 status=200,
             )

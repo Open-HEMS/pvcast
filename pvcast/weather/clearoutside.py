@@ -11,7 +11,7 @@ import polars as pl
 import requests
 from bs4 import BeautifulSoup
 
-from ..weather.weather import WeatherAPI, WeatherAPIErrorTimeout
+from pvcast.weather.weather import WeatherAPI, WeatherAPIErrorTimeout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -25,17 +25,18 @@ class WeatherAPIClearOutside(WeatherAPI):
     _url_base: InitVar[str] = field(default="https://clearoutside.com/forecast/")
 
     def __post_init__(self, _url_base: str) -> None:
+        """Post init function."""
         lat = str(round(self.location.latitude, 2))
         lon = str(round(self.location.longitude, 2))
-        alt = str(round(self.location.altitude, 2))
-        self.url = urljoin(_url_base, f"{lat}/{lon}/{alt}")
+        self.url = urljoin(_url_base, f"{lat}/{lon}")
 
     def retrieve_new_data(self) -> pl.DataFrame:
         """Retrieve weather data by scraping it from the clear outside website."""
         try:
+            print(f"Retrieving weather data from {self.url}")
             response = requests.get(self.url, timeout=int(self.timeout.total_seconds()))
         except requests.exceptions.Timeout as exc:
-            raise WeatherAPIErrorTimeout() from exc
+            raise WeatherAPIErrorTimeout from exc
 
         # response (source) data bucket
         weather_df = pl.DataFrame()
@@ -67,12 +68,12 @@ class WeatherAPIClearOutside(WeatherAPI):
         # check NaN values distribution
         nan_vals = weather_df.with_columns(pl.all().is_null().cast(int).diff().sum())
         if any(col.item() > 1 for col in nan_vals[0]):
-            raise ValueError(f"Found more than one intermediate NaN value: {nan_vals}")
+            msg = f"Found more than one intermediate NaN value: {nan_vals}"
+            raise ValueError(msg)
 
         # interpolate NaN values
         weather_df = weather_df.interpolate()
-        weather_df = weather_df.drop_nulls()
-        return weather_df
+        return weather_df.drop_nulls()
 
     def _find_elements(self, table: BeautifulSoup) -> pl.DataFrame:
         """Find weather data elements in the table.
@@ -106,5 +107,4 @@ class WeatherAPIClearOutside(WeatherAPI):
         )
 
         # convert wind speed to m/s
-        raw_data = raw_data.with_columns(pl.col("wind_speed") * 0.44704)
-        return raw_data
+        return raw_data.with_columns(pl.col("wind_speed") * 0.44704)

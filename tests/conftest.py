@@ -54,6 +54,7 @@ def weather_df() -> pl.DataFrame:
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
     with Path.open("tests/data/clearoutside.txt") as html_file:
+        print(f"Loading {html_file.name}")
         return html_file.read()
 
 
