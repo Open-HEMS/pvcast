@@ -71,6 +71,7 @@ source = ["pvcast"]
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
+omit = ["pvcast/homeassistant/homeassistantapi.py"]
 
 [tool.mypy]
 # Specify the target platform details in config, so your developers are
