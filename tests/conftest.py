@@ -53,7 +53,7 @@ def weather_df() -> pl.DataFrame:
 @pytest.fixture(scope="session")
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
-    with Path.open("tests/clearoutside.txt") as html_file:
+    with Path.open("tests/data/clearoutside.txt") as html_file:
         return html_file.read()
 
 
