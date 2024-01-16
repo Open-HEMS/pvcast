@@ -2,18 +2,24 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Union
+import secrets
+from pathlib import Path
+from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
 import polars as pl
 import pytest
+import responses
 
-from pvcast.model.const import VALID_UPSAMPLE_FREQ
+from pvcast.model.const import PVGIS_TMY_END, PVGIS_TMY_START, VALID_UPSAMPLE_FREQ
 from pvcast.model.forecasting import (
     ForecastResult,
     ForecastType,
     PowerEstimate,
 )
-from pvcast.model.model import PVPlantModel
+
+if TYPE_CHECKING:
+    from pvcast.model.model import PVPlantModel
 
 # test dict for AC power output
 test_ac_power = {
@@ -68,9 +74,24 @@ test_ac_power = {
     "2023-09-21T15:00:00+0000": 1395,
 }
 
+# temporary location only
+PVGIS_TEMP_LOC = Path("tests/data/pvgis_temp")
+
+# actual PVGIS data
+PVGIS_RAW_DATA = Path("tests/data/pvgis_out.txt")
+PVGIS_PROC_CSV = Path("tests/data/pvgis_out.csv")
+
+EU_JRC_URL = "https://re.jrc.ec.europa.eu/api/tmy"
+
 
 class TestForecastResult:
     """Test the ForecastResult class."""
+
+    @pytest.fixture(scope="session")
+    def pvgis_test_data(self) -> str:
+        """Load the PVGIS test data from a text file."""
+        with Path.open(PVGIS_RAW_DATA) as data_file:
+            return data_file.read()
 
     @pytest.fixture
     def forecast_df(self) -> pl.DataFrame:
@@ -87,24 +108,23 @@ class TestForecastResult:
         )
 
         # convert timestamps to datetime
-        ac_series = ac_series.with_columns(
+        return ac_series.with_columns(
             pl.col("datetime").str.to_datetime("%Y-%m-%dT%H:%M:%S%z")
         )
 
         # convert column names
-        return ac_series
 
     @pytest.fixture
     def forecast_result(self, forecast_df: pl.DataFrame) -> ForecastResult:
         """Return a ForecastResult instance."""
         return ForecastResult(
             name="test",
-            type=ForecastType.CLEARSKY,
+            fc_type=ForecastType.CLEARSKY,
             ac_power=forecast_df,
         )
 
     @pytest.mark.parametrize(
-        "ac_power, expected_exception, match",
+        ("ac_power", "expected_exception", "match"),
         [
             (None, ValueError, "Must provide AC power data."),
             (
@@ -148,13 +168,17 @@ class TestForecastResult:
             ),
         ],
     )
-    def test_init_exceptions(self, ac_power, expected_exception, match) -> None:
+    def test_init_exceptions(
+        self, ac_power: pl.DataFrame, expected_exception: type[Exception], match: str
+    ) -> None:
         """Test various exceptions during forecast result initialization."""
         with pytest.raises(expected_exception, match=match):
-            ForecastResult(name="test", type=ForecastType.CLEARSKY, ac_power=ac_power)
+            ForecastResult(
+                name="test", fc_type=ForecastType.CLEARSKY, ac_power=ac_power
+            )
 
     @pytest.mark.parametrize(
-        "frequency, expected",
+        ("frequency", "expected"),
         [
             ("1h", 3600),
             ("60m", 3600),
@@ -199,7 +223,7 @@ class TestForecastResult:
             pl.col("datetime").shuffle(seed=42)
         )
         with pytest.raises(ValueError, match="Datetime column must be sorted"):
-            forecast_result.frequency
+            _ = forecast_result.frequency
 
     def test_frequency_missing_datetimes(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result frequency returns -1 with missing datetimes."""
@@ -209,7 +233,7 @@ class TestForecastResult:
         with pytest.raises(
             ValueError, match="Datetime column must be equidistantly spaced in time."
         ):
-            forecast_result.frequency
+            _ = forecast_result.frequency
 
     def test_upsample_ac_power_none(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result upsampling fails with no AC power data."""
@@ -268,7 +292,7 @@ class TestForecastResult:
             forecast_result.energy("1h")
 
     @pytest.mark.parametrize(
-        "time_str, expected",
+        ("time_str", "expected"),
         [
             ("10s", 10),
             ("10m", 600),
@@ -277,32 +301,33 @@ class TestForecastResult:
             ("10x", ValueError),
         ],
     )
-    def test_time_str_to_seconds(
+    def testtime_str_to_seconds(
         self,
         forecast_result: ForecastResult,
         time_str: str,
-        expected: Union[int, type[Exception]],
+        expected: int | type[Exception],
     ) -> None:
+        """Test that forecast result time_str_to_seconds method works."""
         if isinstance(expected, type) and issubclass(expected, Exception):
             with pytest.raises(expected):
-                forecast_result._time_str_to_seconds(time_str)
+                forecast_result.time_str_to_seconds(time_str)
         else:
-            assert forecast_result._time_str_to_seconds(time_str) == expected
+            assert forecast_result.time_str_to_seconds(time_str) == expected
 
     @pytest.mark.parametrize("drop", [None, "temperature", "humidity"])
     def test_add_precipitable_water(
         self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame, drop: str | None
     ) -> None:
         """Test the add_precipitable_water method with missing data."""
-        weather_df = weather_df.drop(drop) if drop else weather_df
-        print(weather_df)
-        try:
-            result: ForecastResult = pv_plant_model.live.run(weather_df)
-        except ValueError as e:
-            print(f"got error: {e}")
-            assert f"Missing columns: {set([drop])} in weather_df." in str(e)
+        if drop is not None:
+            weather_df = weather_df.drop(drop)
+            with pytest.raises(
+                ValueError, match=f"Missing columns: { {drop} } in weather_df."
+            ):
+                _ = pv_plant_model.live.run(weather_df)
         else:
-            assert result.type == ForecastType.LIVE
+            result: ForecastResult = pv_plant_model.live.run(weather_df)
+            assert result.fc_type == ForecastType.LIVE
             assert result.ac_power is not None
             assert "ac_power" in result.ac_power.columns
             assert result.ac_power["ac_power"].dtype == pl.Int64
@@ -310,18 +335,16 @@ class TestForecastResult:
     def test_add_precipitable_water_already_present(
         self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame
     ) -> None:
-        """Test the add_precipitable_water method with precipitable_water already
-        present in weather_df.
-        """
+        """Test the add_precipitable_water method."""
         weather_df = weather_df.with_columns(pl.lit(1).alias("precipitable_water"))
         result: ForecastResult = pv_plant_model.live.run(weather_df)
-        assert result.type == ForecastType.LIVE
+        assert result.fc_type == ForecastType.LIVE
         assert result.ac_power is not None
         assert "ac_power" in result.ac_power.columns
         assert result.ac_power["ac_power"].dtype == pl.Int64
 
     @pytest.mark.parametrize(
-        "type",
+        "fc_type",
         [
             pytest.param(ForecastType.HISTORICAL, marks=pytest.mark.integration),
             pytest.param(ForecastType.CLEARSKY),
@@ -329,14 +352,93 @@ class TestForecastResult:
         ],
     )
     def test_power_run(
-        self, pv_plant_model: PVPlantModel, weather_df: pl.DataFrame, type: ForecastType
+        self,
+        pv_plant_model: PVPlantModel,
+        weather_df: pl.DataFrame,
+        fc_type: ForecastType,
     ) -> None:
         """Test the power estimate run method."""
-        estimator: PowerEstimate = getattr(pv_plant_model, type.value)
+        estimator: PowerEstimate = getattr(pv_plant_model, fc_type.value)
         result: ForecastResult = estimator.run(weather_df)
         assert isinstance(result, ForecastResult)
         assert result.name == "EastWest"
-        assert result.type == type
+        assert result.fc_type == fc_type
         assert result.ac_power is not None
         assert "ac_power" in result.ac_power.columns
         assert result.ac_power["ac_power"].dtype == pl.Int64
+
+    @pytest.mark.parametrize(
+        "fc_type",
+        [
+            pytest.param(ForecastType.CLEARSKY),
+            pytest.param(ForecastType.LIVE),
+        ],
+    )
+    def test_power_run_weather_df_none(
+        self,
+        pv_plant_model: PVPlantModel,
+        fc_type: ForecastType,
+    ) -> None:
+        """Test the power estimate run method with no weather data."""
+        estimator: PowerEstimate = getattr(pv_plant_model, fc_type.value)
+        with pytest.raises(ValueError, match="Must provide weather data."):
+            _ = estimator.run(None)
+
+    @pytest.mark.parametrize("use_weather_df", [True, False])
+    def test_power_run_historical_data_present(
+        self,
+        pv_plant_model: PVPlantModel,
+        weather_df: pl.DataFrame,
+        *,
+        use_weather_df: bool,
+    ) -> None:
+        """Test the power estimate run method for historical data already present."""
+        pv_plant_model.historical._pvgis_data_path = Path(PVGIS_PROC_CSV)
+        if use_weather_df:
+            result: ForecastResult = pv_plant_model.historical.run(weather_df)
+        else:
+            result: ForecastResult = pv_plant_model.historical.run(None)
+        assert isinstance(result, ForecastResult)
+        assert result.name == "EastWest"
+        assert result.fc_type == ForecastType.HISTORICAL
+        assert result.ac_power is not None
+        assert "ac_power" in result.ac_power.columns
+        assert result.ac_power["ac_power"].dtype == pl.Int64
+
+    def test_power_run_historical_data_missing(
+        self,
+        pv_plant_model: PVPlantModel,
+        pvgis_test_data: str,
+    ) -> None:
+        """Test the power estimate run method when data has to be requested from PVGIS."""
+        lat = str(round(pv_plant_model.location.latitude, 4))
+        lon = str(round(pv_plant_model.location.longitude, 4))
+        pv_plant_model.historical._pvgis_data_path = Path(
+            f"{PVGIS_TEMP_LOC}_{secrets.randbelow(100000)}.csv"
+        )
+
+        with responses.RequestsMock() as rsps:
+            rsps.add(
+                responses.GET,
+                urljoin(
+                    EU_JRC_URL,
+                    f"?lat={lat}&lon={lon}&outputformat=json&startyear={PVGIS_TMY_START}&endyear={PVGIS_TMY_END}",
+                ),
+                body=pvgis_test_data,
+                status=200,
+            )
+            result: ForecastResult = pv_plant_model.historical.run(None)
+            assert isinstance(result, ForecastResult)
+            assert result.name == "EastWest"
+            assert result.fc_type == ForecastType.HISTORICAL
+            assert result.ac_power is not None
+            assert "ac_power" in result.ac_power.columns
+            assert result.ac_power["ac_power"].dtype == pl.Int64
+
+        # test that the data is saved to the correct location
+        assert pv_plant_model.historical._pvgis_data_path.exists()
+        assert pv_plant_model.historical._pvgis_data_path.is_file()
+
+        # clean up data file
+        pv_plant_model.historical._pvgis_data_path.unlink()
+        assert not pv_plant_model.historical._pvgis_data_path.exists()
