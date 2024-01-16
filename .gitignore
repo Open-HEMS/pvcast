@@ -148,3 +148,6 @@ test_pvlib.py
 
 # ruff cache
 .ruff_cache/
+
+# vscode
+.vscode/
