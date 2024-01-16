@@ -2,7 +2,7 @@
 #   Copyright (c) Microsoft Corporation. All rights reserved.
 #   Licensed under the MIT License. See LICENSE in project root for information.
 #   ---------------------------------------------------------------------------------
-"""This is a configuration file for pytest containing customizations and fixtures.
+"""Configuration file for pytest containing customizations and fixtures.
 
 In VSCode, Code Coverage is recorded in config.xml. Delete this file to reset reporting.
 
@@ -12,6 +12,7 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
@@ -52,7 +53,7 @@ def weather_df() -> pl.DataFrame:
 @pytest.fixture(scope="session")
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
-    with open("tests/clearoutside.txt") as html_file:
+    with Path.open("tests/clearoutside.txt") as html_file:
         return html_file.read()
 
 
@@ -150,16 +151,19 @@ micro_system = [
 
 @pytest.fixture(params=[string_system, micro_system])
 def basic_config(request: pytest.FixtureRequest) -> list[MappingProxyType[str, Any]]:
+    """Fixture that creates a basic configuration."""
     var = request.param
     if isinstance(var, list):
         return var
-    raise ValueError("basic_config fixture is not a list")
+    msg = "basic_config fixture is not a list"
+    raise ValueError(msg)
 
 
 @pytest.fixture
 def pv_sys_mngr(
     basic_config: list[MappingProxyType[str, Any]], location: Location, altitude: float
 ) -> PVSystemManager:
+    """Fixture that creates a PVSystemManager."""
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
     )
@@ -169,6 +173,7 @@ def pv_sys_mngr(
 def pv_plant_model(
     basic_config: list[MappingProxyType[str, Any]], location: Location
 ) -> PVPlantModel:
+    """Fixture that creates a PVPlantModel."""
     inv_params = {
         "index": basic_config[0]["inverter"],
         "Vac": 240,
