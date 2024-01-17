@@ -7,16 +7,23 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pvcast.webserver.app import app
-from pvcast.webserver.routers.dependencies import get_weather_sources
+from pvcast.webserver.routers.dependencies import (
+    get_pv_system_mngr,
+    get_weather_sources,
+)
 
 if TYPE_CHECKING:
+    from pvcast.model.model import PVSystemManager
     from pvcast.weather.weather import WeatherAPI
 
 
 @pytest.fixture
-def client_weather(weather_api_fix_loc: WeatherAPI) -> TestClient:
+def client_weather(
+    weather_api_fix_loc: WeatherAPI, pv_sys_mngr: PVSystemManager
+) -> TestClient:
     """Overwrite the weather sources dependency with a mock."""
     app.dependency_overrides[get_weather_sources] = lambda: (weather_api_fix_loc,)
+    app.dependency_overrides[get_pv_system_mngr] = lambda: pv_sys_mngr
     return TestClient(app)
 
 

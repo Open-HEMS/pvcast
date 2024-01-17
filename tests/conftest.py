@@ -152,7 +152,24 @@ micro_system = [
                 },
             ],
         }
-    )
+    ),
+    MappingProxyType(
+        {
+            "name": "South",
+            "inverter": "Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_",
+            "microinverter": True,
+            "arrays": [
+                {
+                    "name": "zone_1_schuin",
+                    "tilt": 30,
+                    "azimuth": 180,
+                    "modules_per_string": 8,
+                    "strings": 1,
+                    "module": "JA_Solar_JAM72S01_385_PR",
+                }
+            ],
+        }
+    ),
 ]
 
 
