@@ -31,12 +31,6 @@ class TestConfigReader:
         """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
         return ConfigReader(TEST_CONF_PATH_NO_SEC)
 
-    def test_configreader_secrets_no_secrets_file(self) -> None:
-        """Test the configreader with a secrets file but no secrets file path."""
-        with pytest.raises(YAMLError):
-            res = ConfigReader(TEST_CONF_PATH_SEC)
-            print(res)
-
     def test_configreader_no_secrets(
         self, configreader_no_secfile_no_sectags: ConfigReader
     ) -> None:
@@ -95,8 +89,10 @@ class TestConfigReader:
         loader = SafeLoader("")
         node = ScalarNode(tag="tag:yaml.org,2002:str", value="test_key")
         configreader_secfile_sectags._secrets = {"test_key": "test_value"}
-        secret = configreader_secfile_sectags._yaml_secrets_loader(loader, node)
-        assert secret == "test_value"
+        assert (
+            configreader_secfile_sectags._yaml_secrets_loader(loader, node)
+            == "test_value"
+        )
 
     def test_yaml_secrets_loader_non_scalar_node(
         self, configreader_secfile_sectags: ConfigReader

@@ -5,7 +5,8 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from ..routers.dependencies import get_weather_sources
+from pvcast.webserver.routers.dependencies import get_weather_sources
+
 from .base import BaseDataModel
 
 

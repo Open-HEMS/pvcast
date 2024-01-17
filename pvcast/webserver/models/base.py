@@ -5,7 +5,7 @@ import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 from typing_extensions import Annotated
 
 from pvcast.webserver.routers.dependencies import get_pv_system_mngr
@@ -89,14 +89,15 @@ class StartEndRequest(BaseModel):
         datetime.datetime.now(datetime.timezone.utc)
     ).replace(hour=23, minute=59, second=0, microsecond=0)
 
-    @validator("start", "end", pre=True)
-    def parse_datetime(cls, value: str) -> datetime.datetime:  # pylint: disable=no-self-argument;
+    @field_validator("start", "end", mode="before")
+    @classmethod
+    def parse_datetime(cls: type[StartEndRequest], value: str) -> datetime.datetime:
         """Parse datetime."""
         date_time = datetime.datetime.fromisoformat(value)
         if date_time.tzinfo is None:
-            raise ValueError("Timezone must be specified.")
-        dt_in_tz = date_time.astimezone(datetime.timezone.utc)
-        return dt_in_tz
+            msg = "Timezone must be specified."
+            raise ValueError(msg)
+        return date_time.astimezone(datetime.timezone.utc)
 
 
 # create enum of pv plant names

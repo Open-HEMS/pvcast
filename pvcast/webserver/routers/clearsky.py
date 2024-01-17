@@ -1,9 +1,8 @@
-"""This module contains the FastAPI router for the /clearsky endpoint."""
+"""FastAPI router for the /clearsky endpoint."""
 from __future__ import annotations
 
 import datetime as dt
 import logging
-from typing import Optional
 
 import polars as pl
 from fastapi import APIRouter, Depends
@@ -26,11 +25,12 @@ def post(
     plant_name: PVPlantNames,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
     weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
-    start_end: Optional[StartEndRequest] | None = None,
+    start_end: StartEndRequest | None = None,
     interval: Interval = Interval.H1,
 ) -> ClearskyModel:
-    """Get the estimated PV output power in Watts and energy in Wh at the given interval <interval> \
-    for the given PV system <name>.
+    """Get the estimated PV output power in Watts.
+
+    Forecast is provided at interval <interval> for the given PV system <name>.
 
     POST: This will force a recalculation of the power output using the latest available weather data,\
     which may take some time.

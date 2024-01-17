@@ -76,7 +76,7 @@ def get_forecast_result_dict(
 
     # cumulatively sum the power column
     ac_w_period = ac_w_period.with_columns(
-        ac_w_period["watt"].cumsum().alias("watt_cumsum")
+        ac_w_period["watt"].cum_sum().alias("watt_cumsum")
     )
 
     # truncate datetimes to the requested interval
