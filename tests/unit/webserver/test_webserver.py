@@ -23,16 +23,25 @@ mock_data_cs = pl.DataFrame(
 )
 
 
+@pytest.mark.parametrize("weather_api_fix_loc", mock_data_cs, indirect=True)
 class TestWebserver:
     """Test base functions of the webserver."""
 
-    def test_get_favicon(self, client: TestClient) -> None:
+    def test_get_favicon(
+        self,
+        client: TestClient,
+        weather_api_fix_loc: WeatherAPI,  # noqa: ARG002
+    ) -> None:
         """Test getting the favicon."""
         response = client.get("/favicon.ico")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
 
-    def test_get_docs(self, client: TestClient) -> None:
+    def test_get_docs(
+        self,
+        client: TestClient,
+        weather_api_fix_loc: WeatherAPI,  # noqa: ARG002
+    ) -> None:
         """Test getting the docs."""
         response = client.get("/")
         assert response.status_code == 200
@@ -48,13 +57,13 @@ class TestClearsky:
 
     def test_get_clearsky(
         self,
-        client_weather: TestClient,
+        client: TestClient,
         interval: str,
         plant_name: str,
         weather_api_fix_loc: WeatherAPI,  # noqa: ARG002
     ) -> None:
         """Test getting the clearsky forecast."""
-        response = client_weather.post(f"/clearsky/{plant_name}/{interval}")
+        response = client.post(f"/clearsky/{plant_name}/{interval}")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         response_dict = response.json()
@@ -87,7 +96,7 @@ class TestClearsky:
     )
     def test_get_clearsky_start_end(
         self,
-        client_weather: TestClient,
+        client: TestClient,
         start: dt.datetime | None,
         end: dt.datetime | None,
         interval: str,
@@ -98,9 +107,7 @@ class TestClearsky:
         start_end = {}
         start_end.update({"start": start.isoformat()}) if start else None
         start_end.update({"end": end.isoformat()}) if end else None
-        response = client_weather.post(
-            f"/clearsky/{plant_name}/{interval}", json=start_end
-        )
+        response = client.post(f"/clearsky/{plant_name}/{interval}", json=start_end)
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         response_dict = response.json()

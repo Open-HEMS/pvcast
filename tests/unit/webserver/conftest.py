@@ -6,11 +6,14 @@ from typing import TYPE_CHECKING
 import pytest
 from fastapi.testclient import TestClient
 
+from pvcast.config.configreader import ConfigReader
 from pvcast.webserver.app import app
 from pvcast.webserver.routers.dependencies import (
+    get_config_reader,
     get_pv_system_mngr,
     get_weather_sources,
 )
+from tests.const import TEST_CONF_PATH_NO_SEC
 
 if TYPE_CHECKING:
     from pvcast.model.model import PVSystemManager
@@ -18,18 +21,13 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def client_weather(
-    weather_api_fix_loc: WeatherAPI, pv_sys_mngr: PVSystemManager
-) -> TestClient:
+def client(weather_api_fix_loc: WeatherAPI, pv_sys_mngr: PVSystemManager) -> TestClient:
     """Overwrite the weather sources dependency with a mock."""
     app.dependency_overrides[get_weather_sources] = lambda: (weather_api_fix_loc,)
     app.dependency_overrides[get_pv_system_mngr] = lambda: pv_sys_mngr
-    return TestClient(app)
-
-
-@pytest.fixture
-def client() -> TestClient:
-    """Get the base test client."""
+    app.dependency_overrides[get_config_reader] = lambda: ConfigReader(
+        TEST_CONF_PATH_NO_SEC
+    )
     return TestClient(app)
 
 
