@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import typing
 
 import numpy as np
 import polars as pl
@@ -9,35 +10,22 @@ import pytest
 from pvlib.location import Location
 
 from pvcast.weather.weather import WeatherAPI, WeatherAPIError, WeatherAPIFactory
-
-TEST_URL = "http://fakeurl.com/status/"
-
-
-@pytest.fixture
-def weather_api(location: Location, data: pl.DataFrame) -> WeatherAPI:
-    """Get a weather API object."""
-    return MockWeatherAPI(location=location, url=TEST_URL, data=data)
-
-
-# mock for WeatherAPI class
-class MockWeatherAPI(WeatherAPI):
-    """Mock the WeatherAPI class."""
-
-    def __init__(self, location: Location, url: str, data: pl.DataFrame) -> None:
-        """Initialize the mock class."""
-        super().__init__(location, url, freq_source=dt.timedelta(minutes=30))
-        self.url = url
-        self.data = data
-
-    def retrieve_new_data(self) -> pl.DataFrame:
-        """Retrieve new data from the API."""
-        return self.data
+from tests.conftest import MockWeatherAPI
 
 
 class CommonWeatherTests:
-    """These tests can be run on both the abstract WeatherAPI class and on platforms
+    """Test common weather API functionality.
+
+    These tests can be run on both the abstract WeatherAPI class and on platforms
     that inherit from it. This class should no run platform specific tests.
     """
+
+    common_data: typing.ClassVar[dict[str, list[float]]] = {
+        "temperature": [0, 0.5, 1],
+        "humidity": [0, 0.5, 1],
+        "wind_speed": [0, 0.5, 1],
+        "cloud_cover": [0, 0.5, 1],
+    }
 
     def test_weather_data_cache(self, weather_api: WeatherAPI) -> None:
         """Test the get_weather function."""
@@ -73,6 +61,70 @@ class CommonWeatherTests:
         last_update2 = weather_api._last_update
         assert last_update2 > last_update1
 
+    def test_weather_data_calc_irrads(self, weather_api: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        weather = weather_api.get_weather(calc_irrads=True)
+        assert isinstance(weather, dict)
+        for datapoint in weather["data"]:
+            assert "ghi" in datapoint
+            assert "dni" in datapoint
+            assert "dhi" in datapoint
+
+    # indirect parametrization of data
+    @pytest.mark.parametrize("weather_api_dt_missing", [common_data], indirect=True)
+    def test_weather_data_no_datetime(self, weather_api_dt_missing: WeatherAPI) -> None:
+        """Test the get_weather function."""
+        with pytest.raises(
+            WeatherAPIError, match="Processed data does not have a datetime column."
+        ):
+            _ = weather_api_dt_missing.get_weather()
+
+    @pytest.mark.parametrize(
+        ("data", "error_message"),
+        [
+            (
+                {
+                    **common_data,
+                    "datetime": [
+                        "2020-01-01T00:00:00+00:00",
+                        "2020-01-01T00:00:00+00:00",
+                        "2020-01-01T01:00:00+00:00",
+                    ],
+                },
+                "Processed data contains duplicate",
+            ),
+            (
+                {
+                    **common_data,
+                    "datetime": [
+                        "2020-01-01T02:00:00+00:00",
+                        "2020-01-01T01:00:00+00:00",
+                        "2020-01-01T03:00:00+00:00",
+                    ],
+                },
+                "Processed data is not sorted.",
+            ),
+            (
+                {
+                    **common_data,
+                    "datetime": [
+                        "2020-01-01T00:00:00+00:00",
+                        "2020-01-01T01:00:00+00:00",
+                        "2020-01-01T03:00:00+00:00",
+                    ],
+                },
+                "Processed data contains gaps.",
+            ),
+        ],
+    )
+    def test_weather_data_processing(
+        self, weather_api_fix_loc: WeatherAPI, data: pl.DataFrame, error_message: str
+    ) -> None:
+        """Test the get_weather function with different data scenarios."""
+        weather_api_fix_loc.data = pl.DataFrame(data)
+        with pytest.raises(WeatherAPIError, match=error_message):
+            _ = weather_api_fix_loc.get_weather()
+
 
 class TestWeatherAPI(CommonWeatherTests):
     """These tests are run on the abstract WeatherAPI class only."""
@@ -93,7 +145,7 @@ class TestWeatherAPI(CommonWeatherTests):
     )
 
     # test data with NaN values
-    mock_data_NaN = pl.DataFrame(
+    mock_data_nan = pl.DataFrame(
         {
             "temperature": [None, 0.5, None],
             "humidity": [0, 0.5, 1],
@@ -146,38 +198,33 @@ class TestWeatherAPI(CommonWeatherTests):
         assert t_now - weather_api._last_update < dt.timedelta(seconds=1)
 
     @pytest.mark.parametrize(
-        "data, error_match",
+        ("data", "error_match"),
         [
-            (mock_data_NaN, "Processed data contains NaN values."),
+            (mock_data_nan, "Processed data contains NaN values."),
             (mock_data_invalid, "Error validating weather data:"),
         ],
         indirect=["data"],
     )
     def test_get_weather(
-        self, weather_api: WeatherAPI, data: pl.DataFrame, error_match: str
+        self,
+        weather_api: WeatherAPI,
+        data: pl.DataFrame,  # noqa: ARG002
+        error_match: str,
     ) -> None:
         """Test the get_weather function with different input data."""
         with pytest.raises(WeatherAPIError, match=error_match):
             weather_api.get_weather()
 
-    # test cloud_cover_to_irradiance with proper data
     @pytest.mark.parametrize("how", ["clearsky_scaling", "campbell_norman"])
-    @pytest.mark.parametrize(
-        "interval",
-        [
-            dt.timedelta(minutes=1),
-            dt.timedelta(minutes=5),
-            dt.timedelta(minutes=15),
-            dt.timedelta(minutes=30),
-            dt.timedelta(hours=1),
-        ],
-    )
+    @pytest.mark.parametrize("interval_min", [1, 2, 5, 10, 15, 30, 60])
     def test_cloud_cover_to_irradiance(
-        self, weather_api: WeatherAPI, how: str, interval: dt.timedelta
+        self, weather_api_fix_loc: WeatherAPI, how: str, interval_min: int
     ) -> None:
         """Test the cloud_cover_to_irradiance function."""
+        interval = dt.timedelta(minutes=interval_min)
+
         # set frequency of source data
-        weather_api.freq_source = interval
+        weather_api_fix_loc.freq_source = interval
         n_points = int(dt.timedelta(days=2) / interval)
 
         # construct dataframe
@@ -196,7 +243,7 @@ class TestWeatherAPI(CommonWeatherTests):
 
         assert isinstance(cloud_cover, pl.DataFrame)
         assert cloud_cover["cloud_cover"].dtype == pl.Float64
-        irrads = weather_api.cloud_cover_to_irradiance(cloud_cover, how=how)
+        irrads = weather_api_fix_loc.cloud_cover_to_irradiance(cloud_cover, how=how)
         assert isinstance(irrads, pl.DataFrame)
         for irr in ["ghi", "dni", "dhi"]:
             assert irr in irrads.columns
@@ -207,6 +254,16 @@ class TestWeatherAPI(CommonWeatherTests):
             assert irrads[irr].is_null().sum() == 0
             assert irrads[irr].is_nan().sum() == 0
 
+    def test_cloud_cover_to_irradiance_invalid_how(
+        self, weather_api_fix_loc: WeatherAPI
+    ) -> None:
+        """Test the cloud_cover_to_irradiance function with invalid how argument."""
+        with pytest.raises(ValueError, match="Invalid how argument"):
+            _ = weather_api_fix_loc.cloud_cover_to_irradiance(
+                pl.DataFrame({"cloud_cover": [0], "datetime": ["2020-01-01"]}),
+                how="invalid",
+            )
+
 
 class TestWeatherFactory:
     """Test the weather factory module."""
@@ -216,27 +273,29 @@ class TestWeatherFactory:
     @pytest.fixture
     def weather_api_factory(self) -> WeatherAPIFactory:
         """Get a weather API factory."""
-        API_FACTORY_TEST = WeatherAPIFactory()
-        API_FACTORY_TEST.register("mock", MockWeatherAPI)
-        return API_FACTORY_TEST
+        api_factory_test = WeatherAPIFactory()
+        api_factory_test.register("mock", MockWeatherAPI)
+        return api_factory_test
 
-    def test_get_weather_api(self, weather_api_factory: WeatherAPIFactory) -> None:
+    def test_get_weather_api(
+        self, weather_api_factory: WeatherAPIFactory, test_url: str
+    ) -> None:
         """Test the get_weather_api function."""
         assert isinstance(weather_api_factory, WeatherAPIFactory)
         assert isinstance(
             weather_api_factory.get_weather_api(
                 "mock",
                 location=Location(0, 0, "UTC", 0),
-                url=TEST_URL,
+                url=test_url,
                 data=TestWeatherAPI.mock_data,
             ),
             MockWeatherAPI,
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Unknown weather API"):
             weather_api_factory.get_weather_api(
                 "wrong_api",
                 location=Location(0, 0, "UTC", 0),
-                url=TEST_URL,
+                url=test_url,
                 data=TestWeatherAPI.mock_data,
             )
 

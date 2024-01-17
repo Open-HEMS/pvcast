@@ -12,6 +12,7 @@ from pvlib.location import Location
 
 from pvcast.weather import API_FACTORY
 from pvcast.weather.homeassistant import WeatherAPIHomeassistant
+from pvcast.weather.weather import WeatherAPI
 from tests.const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
 
 from .test_weather import CommonWeatherTests
@@ -85,7 +86,7 @@ class TestHomeAssistantWeather(WeatherPlatform):
 
 
 class TestClearOutsideWeather(WeatherPlatform):
-    """Test a weather platform that inherits from WeatherAPI class."""
+    """Clearoutside specific weather API setup and tests."""
 
     @pytest.fixture
     def clearoutside_api_setup(

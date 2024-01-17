@@ -11,7 +11,7 @@ import polars as pl
 import requests
 from bs4 import BeautifulSoup
 
-from pvcast.weather.weather import WeatherAPI, WeatherAPIErrorTimeout
+from pvcast.weather.weather import WeatherAPI
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,11 +32,7 @@ class WeatherAPIClearOutside(WeatherAPI):
 
     def retrieve_new_data(self) -> pl.DataFrame:
         """Retrieve weather data by scraping it from the clear outside website."""
-        try:
-            print(f"Retrieving weather data from {self.url}")
-            response = requests.get(self.url, timeout=int(self.timeout.total_seconds()))
-        except requests.exceptions.Timeout as exc:
-            raise WeatherAPIErrorTimeout from exc
+        response = requests.get(self.url, timeout=int(self.timeout.total_seconds()))
 
         # response (source) data bucket
         weather_df = pl.DataFrame()
@@ -64,12 +60,6 @@ class WeatherAPIClearOutside(WeatherAPI):
         weather_df = weather_df.with_columns(
             self.source_dates.slice(0, len(weather_df)).alias("datetime")
         )
-
-        # check NaN values distribution
-        nan_vals = weather_df.with_columns(pl.all().is_null().cast(int).diff().sum())
-        if any(col.item() > 1 for col in nan_vals[0]):
-            msg = f"Found more than one intermediate NaN value: {nan_vals}"
-            raise ValueError(msg)
 
         # interpolate NaN values
         weather_df = weather_df.interpolate()

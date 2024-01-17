@@ -22,8 +22,15 @@ import pytest
 from pvlib.location import Location
 
 from pvcast.model.model import PVPlantModel, PVSystemManager
+from pvcast.weather.weather import WeatherAPI
 
 from .const import LOC_AUS, LOC_EUW, LOC_USW
+
+
+@pytest.fixture(scope="session")
+def test_url() -> str:
+    """Fixture for a test url."""
+    return "http://fakeurl.com/"
 
 
 @pytest.fixture
@@ -54,7 +61,6 @@ def weather_df() -> pl.DataFrame:
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
     with Path.open("tests/data/clearoutside.txt") as html_file:
-        print(f"Loading {html_file.name}")
         return html_file.read()
 
 
@@ -239,3 +245,42 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if "homeassistant_api_setup" in getattr(item, "fixturenames", ()):
             item.add_marker("integration")
+
+
+# mock for WeatherAPI class
+class MockWeatherAPI(WeatherAPI):
+    """Mock the WeatherAPI class."""
+
+    def __init__(self, location: Location, url: str, data: pl.DataFrame) -> None:
+        """Initialize the mock class."""
+        super().__init__(location, url, freq_source=dt.timedelta(minutes=30))
+        self.url = url
+        self.data = data
+
+    def retrieve_new_data(self) -> pl.DataFrame:
+        """Retrieve new data from the API."""
+        return self.data
+
+
+@pytest.fixture
+def weather_api(location: Location, data: pl.DataFrame, test_url: str) -> WeatherAPI:
+    """Get a weather API object."""
+    return MockWeatherAPI(location=location, url=test_url, data=data)
+
+
+@pytest.fixture
+def weather_api_fix_loc(data: pl.DataFrame, test_url: str) -> WeatherAPI:
+    """Get a weather API object."""
+    return MockWeatherAPI(
+        location=Location(51.2, 6.1, "UTC", 0), url=test_url, data=data
+    )
+
+
+@pytest.fixture
+def weather_api_dt_missing(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
+    """Get a weather API object."""
+    return MockWeatherAPI(
+        location=Location(51.2, 6.1, "UTC", 0),
+        url=test_url,
+        data=pl.DataFrame(request.param),
+    )

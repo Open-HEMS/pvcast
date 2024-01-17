@@ -42,18 +42,18 @@ def convert_unit(data: pl.Series, from_unit: str, to_unit: str) -> pl.Series:
     :return: Data with applied unit conversion.
     """
     if not isinstance(data, pl.Series):
-        raise TypeError("Data must be a pl.Series.")
+        msg = "Data must be a pl.Series."
+        raise TypeError(msg)
 
     # remove degree symbol from units if present
     from_unit = from_unit.replace("°", "")
     to_unit = to_unit.replace("°", "")
 
-    if from_unit not in CONV_DICT:
-        raise ValueError(f"Conversion from unit [{from_unit}] not supported.")
+    if from_unit not in CONV_DICT or to_unit not in CONV_DICT[from_unit]:
+        msg = f"Conversion from [{from_unit}] to [{to_unit}] not supported."
+        raise ValueError(msg)
     if from_unit == to_unit:
         return data
-    if to_unit not in CONV_DICT[from_unit]:
-        raise ValueError(f"Conversion from [{from_unit}] to [{to_unit}] not supported.")
 
     # do unit conversion
     return CONV_DICT[from_unit][to_unit](data)

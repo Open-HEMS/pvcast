@@ -28,5 +28,6 @@ class TestUtilTimestamps:
         ],
     )
     def test_timedelta_to_pl_duration(self, td: timedelta, expected: str) -> None:
+        """Test timedelta_to_pl_duration function."""
         out = timedelta_to_pl_duration(td)
         assert out == expected

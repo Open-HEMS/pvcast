@@ -7,35 +7,47 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import timezone as tz
-from typing import Any, Callable, Union
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 import pandas as pd
 import polars as pl
+import voluptuous as vol
 from pvlib.irradiance import campbell_norman, disc, get_extra_radiation
-from pvlib.location import Location
-from voluptuous import All, Coerce, Datetime, Optional, Range, Required, Schema
 
-from ..const import DT_FORMAT
-from ..util.timestamps import timedelta_to_pl_duration
+from pvcast.const import DT_FORMAT
+from pvcast.util.timestamps import timedelta_to_pl_duration
+
+if TYPE_CHECKING:
+    from pvlib.location import Location
 
 _LOGGER = logging.getLogger(__name__)
 
 # schema for weather data
-WEATHER_SCHEMA = Schema(
+WEATHER_SCHEMA = vol.Schema(
     {
-        Required("source"): str,
-        Required("interval"): str,
-        Required("data"): [
+        vol.Required("source"): str,
+        vol.Required("interval"): str,
+        vol.Required("data"): [
             {
-                Required("datetime"): All(str, Datetime(format=DT_FORMAT)),  # RFC 3339
-                Required("temperature"): All(Coerce(float), Range(min=-100, max=100)),
-                Required("humidity"): All(Coerce(float), Range(min=0, max=100)),
-                Required("wind_speed"): All(Coerce(float), Range(min=0)),
-                Required("cloud_cover"): All(Coerce(float), Range(min=0, max=100)),
-                Optional("ghi"): All(Coerce(float), Range(0, 1400)),
-                Optional("dni"): All(Coerce(float), Range(0, 1400)),
-                Optional("dhi"): All(Coerce(float), Range(0, 1400)),
+                vol.Required("datetime"): vol.All(
+                    str, vol.Datetime(format=DT_FORMAT)
+                ),  # RFC 3339
+                vol.Required("temperature"): vol.All(
+                    vol.Coerce(float), vol.Range(min=-100, max=100)
+                ),
+                vol.Required("humidity"): vol.All(
+                    vol.Coerce(float), vol.Range(min=0, max=100)
+                ),
+                vol.Required("wind_speed"): vol.All(
+                    vol.Coerce(float), vol.Range(min=0)
+                ),
+                vol.Required("cloud_cover"): vol.All(
+                    vol.Coerce(float), vol.Range(min=0, max=100)
+                ),
+                vol.Optional("ghi"): vol.All(vol.Coerce(float), vol.Range(0, 1400)),
+                vol.Optional("dni"): vol.All(vol.Coerce(float), vol.Range(0, 1400)),
+                vol.Optional("dhi"): vol.All(vol.Coerce(float), vol.Range(0, 1400)),
             }
         ],
     }
@@ -48,7 +60,7 @@ class WeatherAPI(ABC):
 
     Source datetime strings source_dates should be created in the format "%Y-%m-%dT%H:%M:%S+00:00" (RFC 3339).
 
-    All datetime dependent internal computations are performed with UTC timezone as reference.
+    vol.All datetime dependent internal computations are performed with UTC timezone as reference.
     We assume the start time of the forecast is floor(current time) to the neareast hour 1H. The end time is then:
     start time + max_forecast_days - freq. For example, if the current time in CET is 19:30, the frequency is 1 hour and
     we forecast for one day the start time is then 17:00 UTC and the end time is 16:00 UTC tomorrow.
@@ -137,7 +149,7 @@ class WeatherAPI(ABC):
         """
 
     def get_weather(
-        self, live: bool = False, calc_irrads: bool = False
+        self, *, live: bool = False, calc_irrads: bool = False
     ) -> dict[str, list[dict[str, Any]] | str | None]:
         """Get weather data from API response. This function will always return data return in UTC.
 
@@ -152,41 +164,31 @@ class WeatherAPI(ABC):
 
         # no cached data available, retrieve new data
         _LOGGER.debug("Retrieving new weather data.")
-        try:
-            processed_data = self.retrieve_new_data()
-            self._last_update = dt.datetime.now(tz.utc)
-        except WeatherAPIErrorNoData as exc:
-            raise WeatherAPIErrorNoData.from_date(self.start_forecast) from exc
+        processed_data = self.retrieve_new_data()
+        self._last_update = dt.datetime.now(tz.utc)
 
         # verify that data has a "datetime" column, all data is unique and sorted
         if "datetime" not in processed_data.columns:
-            raise WeatherAPIError("Processed data does not have a datetime column.")
+            msg = "Processed data does not have a datetime column."
+            raise WeatherAPIError(msg)
         if not all(processed_data["datetime"].is_unique()):
-            raise WeatherAPIError("Processed data contains duplicate datetimes.")
+            msg = "Processed data contains duplicate datetimes."
+            raise WeatherAPIError(msg)
         if not processed_data["datetime"].is_sorted():
-            raise WeatherAPIError("Processed data is not sorted.")
+            msg = "Processed data is not sorted."
+            raise WeatherAPIError(msg)
         if processed_data["datetime"].dtype != pl.Datetime:
-            try:
-                processed_data = processed_data.with_columns(
-                    pl.col("datetime").str.to_datetime()
-                )
-            except Exception:
-                raise WeatherAPIError(
-                    f"Datetime type should be pl.Datetime, is {processed_data['datetime'].dtype}."
-                )
-
-        # check if datetime is in UTC
-        dt_type: pl.Datetime = processed_data["datetime"].dtype  # type: ignore
-        if dt_type.time_zone != str(dt.timezone.utc):
-            raise WeatherAPIError(
-                f"Datetime column is not in UTC, is {dt_type.time_zone}."
+            processed_data = processed_data.with_columns(
+                pl.col("datetime").str.to_datetime()
             )
 
         # check for gaps and NaN values
         if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
-            raise WeatherAPIError("Processed data contains gaps.")
+            msg = "Processed data contains gaps."
+            raise WeatherAPIError(msg)
         if any(col.has_validity() for col in processed_data):
-            raise WeatherAPIError("Processed data contains NaN values.")
+            msg = "Processed data contains NaN values."
+            raise WeatherAPIError(msg)
 
         # cut off the data that exceeds max_forecast_days
         processed_data = processed_data.filter(pl.col("datetime") < self.end_forecast)
@@ -224,10 +226,9 @@ class WeatherAPI(ABC):
                 "data": data_list,
             }
             WEATHER_SCHEMA(validated_data)
-        except Exception as exc:
-            raise WeatherAPIError(
-                f"Error validating weather data: {validated_data}"
-            ) from exc
+        except vol.Invalid as exc:
+            msg = f"Error validating weather data: {validated_data}"
+            raise WeatherAPIError(msg) from exc
 
         # cache data
         self._weather_data = validated_data
@@ -263,7 +264,8 @@ class WeatherAPI(ABC):
                 cloud_cover, times, **kwargs
             )
         else:
-            raise ValueError(f"Invalid how argument: {how}")
+            msg = f"Invalid how argument: {how}"
+            raise ValueError(msg)
         _LOGGER.debug(
             "Converted cloud cover to irradiance using %s. Result: \n%s", how, irrads
         )
@@ -327,8 +329,7 @@ class WeatherAPI(ABC):
     def _cloud_cover_to_transmittance_linear(
         self, cloud_cover: np.ndarray[float, Any], offset: float = 0.75
     ) -> np.ndarray[float, Any]:
-        """Convert cloud cover (percentage) to atmospheric transmittance
-        using a linear model.
+        """Convert cloud cover (percentage) to atmospheric transmittance using a linear model.
 
         :param cloud_cover: Cloud cover in [%] as a polars pl.Series.
         :param offset: Determines the maximum transmittance for the linear model.
@@ -364,37 +365,6 @@ class WeatherAPIError(Exception):
 
 
 @dataclass(frozen=True)
-class WeatherAPIErrorNoData(WeatherAPIError):
-    """Exception class for weather API errors."""
-
-    message: str = field(default="No weather data available")
-
-    @classmethod
-    def from_date(cls, date: Union[str, dt.datetime]) -> WeatherAPIErrorNoData:
-        """Create an exception for a specific date.
-
-        :param date: The date for which no weather data is available.
-        :return: The exception.
-        """
-        return cls(f"No weather data available for {date}")
-
-
-@dataclass(frozen=True)
-class WeatherAPIErrorTimeout(WeatherAPIError):
-    """Exception error 408, timeout."""
-
-    message: str = field(default="API timeout")
-    error: int = field(default=408)
-
-
-@dataclass(frozen=True)
-class WeatherAPIErrorNoLocation(WeatherAPIError):
-    """No data for location available."""
-
-    message: str = field(default="No data for location available")
-
-
-@dataclass(frozen=True)
 class WeatherAPIFactory:
     """Factory class for weather APIs."""
 
@@ -420,7 +390,8 @@ class WeatherAPIFactory:
         try:
             weather_api_class: Callable[..., WeatherAPI] = self._apis[api_id]
         except KeyError as exc:
-            raise ValueError(f"Unknown weather API: {api_id}") from exc
+            msg = f"Unknown weather API: {api_id}"
+            raise ValueError(msg) from exc
 
         return weather_api_class(**kwargs)
 
