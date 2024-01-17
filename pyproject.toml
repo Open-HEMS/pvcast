@@ -71,7 +71,11 @@ source = ["pvcast"]
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
-omit = ["pvcast/homeassistant/homeassistantapi.py"]
+# these files are covered by locally run integration tests
+omit = [
+    "pvcast/homeassistant/homeassistantapi.py",
+    "pvcast/weather/homeassistant.py",
+]
 
 [tool.mypy]
 # Specify the target platform details in config, so your developers are
