@@ -9,8 +9,7 @@ from yaml import ScalarNode, SequenceNode, YAMLError
 from yaml.loader import SafeLoader
 
 from pvcast.config.configreader import ConfigReader
-
-from ...const import (
+from tests.const import (
     TEST_CONF_PATH_ERROR,
     TEST_CONF_PATH_MISSING_SEC,
     TEST_CONF_PATH_NO_SEC,
@@ -30,12 +29,13 @@ class TestConfigReader:
     @pytest.fixture
     def configreader_no_secfile_no_sectags(self) -> ConfigReader:
         """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
-        return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
+        return ConfigReader(TEST_CONF_PATH_NO_SEC)
 
     def test_configreader_secrets_no_secrets_file(self) -> None:
         """Test the configreader with a secrets file but no secrets file path."""
         with pytest.raises(YAMLError):
-            _ = ConfigReader(TEST_CONF_PATH_SEC).config
+            res = ConfigReader(TEST_CONF_PATH_SEC)
+            print(res)
 
     def test_configreader_no_secrets(
         self, configreader_no_secfile_no_sectags: ConfigReader
@@ -50,7 +50,6 @@ class TestConfigReader:
     def test_configreader_load_secrets_none(self) -> None:
         """Test the _load_secrets_file method with None as secrets file path."""
         configreader = ConfigReader(TEST_CONF_PATH_NO_SEC, None)
-        # raise ValueError("Secrets file path is not set.")
         with pytest.raises(ValueError, match="Secrets file path is not set."):
             configreader._load_secrets_file()
 
@@ -77,12 +76,12 @@ class TestConfigReader:
     def test_configreader_wrong_config_file(self) -> None:
         """Test the configreader with a wrong config file."""
         with pytest.raises(FileNotFoundError):
-            ConfigReader(Path("wrongfile.yaml")).config
+            ConfigReader(Path("wrongfile.yaml"))
 
     def test_configreader_wrong_secrets_file(self) -> None:
         """Test the configreader with a wrong secrets file."""
         with pytest.raises(FileNotFoundError):
-            ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml")).config
+            ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml"))
 
     def test_invalid_timezone(self) -> None:
         """Test the configreader with an invalid timezone."""

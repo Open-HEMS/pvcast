@@ -263,24 +263,16 @@ class MockWeatherAPI(WeatherAPI):
 
 
 @pytest.fixture
-def weather_api(location: Location, data: pl.DataFrame, test_url: str) -> WeatherAPI:
+def weather_api(
+    location: Location, request: pytest.FixtureRequest, test_url: str
+) -> WeatherAPI:
     """Get a weather API object."""
-    return MockWeatherAPI(location=location, url=test_url, data=data)
+    return MockWeatherAPI(location=location, url=test_url, data=request.param)
 
 
 @pytest.fixture
-def weather_api_fix_loc(data: pl.DataFrame, test_url: str) -> WeatherAPI:
+def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
     """Get a weather API object."""
     return MockWeatherAPI(
-        location=Location(51.2, 6.1, "UTC", 0), url=test_url, data=data
-    )
-
-
-@pytest.fixture
-def weather_api_dt_missing(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
-    """Get a weather API object."""
-    return MockWeatherAPI(
-        location=Location(51.2, 6.1, "UTC", 0),
-        url=test_url,
-        data=pl.DataFrame(request.param),
+        location=Location(51.2, 6.1, "UTC", 0), url=test_url, data=request.param
     )
