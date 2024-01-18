@@ -221,7 +221,7 @@ class WeatherAPI(ABC):
         data_list = [dict(zip(data_dict, t)) for t in zip(*data_dict.values())]
         try:
             validated_data = {
-                "source": self.__class__.__name__,
+                "source": self.name,
                 "interval": timedelta_to_pl_duration(self.freq_source),
                 "data": data_list,
             }

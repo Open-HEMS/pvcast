@@ -20,6 +20,12 @@ if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
 
+@pytest.fixture(scope="session")
+def client_base() -> TestClient:
+    """Return basic test client."""
+    return TestClient(app)
+
+
 @pytest.fixture
 def client(weather_api_fix_loc: WeatherAPI, pv_sys_mngr: PVSystemManager) -> TestClient:
     """Overwrite the weather sources dependency with a mock."""

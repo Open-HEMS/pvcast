@@ -24,8 +24,7 @@ def init_logger() -> None:
 
 
 def main() -> None:
-    """Entry point for the application script"""
-    # initialize logger
+    """Entry point for the application script."""
     init_logger()
     _LOGGER.info("Starting pvcast webserver")
 
@@ -37,6 +36,7 @@ def main() -> None:
         reload=True,
         workers=3,
         reload_includes=["*.yaml", "*.yml"],
+        reload_excludes=["*.pyc", "*.pyo", "__pycache__"],
     )
 
 

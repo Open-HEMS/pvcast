@@ -26,7 +26,7 @@ from pvcast.const import SECRETS_FILE_PATH
 from pvcast.model.model import PVPlantModel, PVSystemManager
 from pvcast.weather.weather import WeatherAPI
 
-from .const import LOC_AUS, LOC_EUW, LOC_USW
+from .const import LOC_AUS, LOC_EUW, LOC_USW, MOCK_WEATHER_API
 
 
 @pytest.fixture(scope="session")
@@ -270,9 +270,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 class MockWeatherAPI(WeatherAPI):
     """Mock the WeatherAPI class."""
 
-    def __init__(self, location: Location, url: str, data: pl.DataFrame) -> None:
+    def __init__(
+        self, location: Location, url: str, data: pl.DataFrame, **kwargs: Any
+    ) -> None:
         """Initialize the mock class."""
-        super().__init__(location, url, freq_source=dt.timedelta(minutes=30))
+        super().__init__(location, url, freq_source=dt.timedelta(minutes=60), **kwargs)
         self.url = url
         self.data = data
 
@@ -286,15 +288,19 @@ def weather_api(
     location: Location, request: pytest.FixtureRequest, test_url: str
 ) -> WeatherAPI:
     """Get a weather API object."""
-    return MockWeatherAPI(location=location, url=test_url, data=request.param)
+    return MockWeatherAPI(
+        location=location, url=test_url, data=request.param, name=MOCK_WEATHER_API
+    )
 
 
 @pytest.fixture
 def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
     """Get a weather API object."""
-    print(f"request.param: {request.param}")
     return MockWeatherAPI(
-        location=Location(51.2, 6.1, "UTC", 0), url=test_url, data=request.param
+        location=Location(51.2, 6.1, "UTC", 0),
+        url=test_url,
+        data=request.param,
+        name=MOCK_WEATHER_API,
     )
 
 

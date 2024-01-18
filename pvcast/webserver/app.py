@@ -10,6 +10,7 @@ from .const import API_VERSION
 from .routers.clearsky import router as clearsky_router
 from .routers.historical import router as historical_router
 from .routers.live import router as live_router
+from .routers.utils import router as utils_router
 
 _LOGGER = logging.getLogger("uvicorn")
 FAV_ICON_PATH = "pvcast/webserver/favicon.png"
@@ -25,6 +26,7 @@ app = FastAPI(
 app.include_router(clearsky_router, prefix="/clearsky", tags=["clearsky"])
 app.include_router(historical_router, prefix="/historical", tags=["historical"])
 app.include_router(live_router, prefix="/live", tags=["live"])
+app.include_router(utils_router, prefix="/utils", tags=["utilities"])
 
 
 @app.get("/favicon.ico", include_in_schema=False)
