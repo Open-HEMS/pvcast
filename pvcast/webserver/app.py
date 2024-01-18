@@ -29,6 +29,6 @@ app.include_router(live_router, prefix="/live", tags=["live"])
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> FileResponse:
-    """Get the favicon."""
+    """Get the favicon. Favicon attribution: gungyoga04."""
     _LOGGER.info("Getting favicon")
     return FileResponse(FAV_ICON_PATH)
