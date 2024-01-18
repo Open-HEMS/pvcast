@@ -7,6 +7,8 @@ from pathlib import Path
 
 from pvlib.location import Location
 
+from pvcast.const import CONFIG_FILE_PATH, SECRETS_FILE_PATH
+
 from ...config.configreader import ConfigReader
 from ...model.model import PVSystemManager
 from ...weather import API_FACTORY
@@ -16,8 +18,8 @@ from ...weather.weather import WeatherAPI
 @lru_cache
 def get_config_reader() -> ConfigReader:
     """Get the config reader instance."""
-    config_path = Path("config.yaml")
-    secrets_path = Path("secrets.yaml")
+    config_path = Path(CONFIG_FILE_PATH)
+    secrets_path = Path(SECRETS_FILE_PATH)
     return ConfigReader(config_path, secrets_path)
 
 

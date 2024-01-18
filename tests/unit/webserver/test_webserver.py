@@ -89,10 +89,22 @@ class TestClearsky:
         )
 
     @pytest.mark.parametrize(
-        "start", [dt.datetime(2024, 1, 17, 0, 0, 0, tzinfo=dt.timezone.utc), None]
+        "start",
+        [
+            dt.datetime.now(dt.timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ),
+            None,
+        ],
     )
     @pytest.mark.parametrize(
-        "end", [dt.datetime(2024, 1, 17, 23, 59, 0, tzinfo=dt.timezone.utc), None]
+        "end",
+        [
+            dt.datetime.now(dt.timezone.utc).replace(
+                hour=12, minute=59, second=0, microsecond=0
+            ),
+            None,
+        ],
     )
     def test_get_clearsky_start_end(
         self,

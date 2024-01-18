@@ -19,8 +19,10 @@ from typing import Any
 import numpy as np
 import polars as pl
 import pytest
+import yaml
 from pvlib.location import Location
 
+from pvcast.const import SECRETS_FILE_PATH
 from pvcast.model.model import PVPlantModel, PVSystemManager
 from pvcast.weather.weather import WeatherAPI
 
@@ -290,6 +292,23 @@ def weather_api(
 @pytest.fixture
 def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
     """Get a weather API object."""
+    print(f"request.param: {request.param}")
     return MockWeatherAPI(
         location=Location(51.2, 6.1, "UTC", 0), url=test_url, data=request.param
     )
+
+
+# create fake test file secrets.yaml when the test suite is run
+# this is needed for the configreader to work
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Create a fake secrets.yaml file for testing."""
+    secrets = {
+        "lat": 51.2,
+        "lon": 6.1,
+        "alt": 0,
+        "long_lived_token": "test_token",
+        "time_zone": "UTC",
+    }
+    if not Path.exists(SECRETS_FILE_PATH):
+        with Path.open(SECRETS_FILE_PATH, "w") as outfile:
+            yaml.dump(secrets, outfile, default_flow_style=False)
