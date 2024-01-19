@@ -46,7 +46,7 @@ types-pyyaml = "^6.0.12.12"
 [tool.poetry.group.dev.dependencies]
 blacken-docs = "==1.16.0"
 black = "==23.12.1"
-ruff = "==0.1.13"
+ruff = "==0.1.14"
 pytest = "==7.4.4"
 pytest_cov = "==4.1.0"
 pytest_mock = "<3.12.1"
