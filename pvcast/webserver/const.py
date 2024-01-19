@@ -8,7 +8,7 @@ WEBSERVER_URL = "127.0.0.1"  # Bind to localhost interface only
 API_VERSION = "0.1.0"
 
 START_DT_DEFAULT = dt.datetime.now(dt.timezone.utc).replace(
-    minute=0, second=0, microsecond=0
+    hour=0, minute=0, second=0, microsecond=0
 )
 
 END_DT_DEFAULT = dt.datetime.now(dt.timezone.utc).replace(
