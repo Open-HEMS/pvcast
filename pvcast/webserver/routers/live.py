@@ -33,7 +33,7 @@ def get(
     plant_name: PVPlantNames,
     weather_source: WeatherSources,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
-    weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],
+    weather_apis: Annotated[tuple[WeatherAPI], Depends(get_weather_sources)],
     start: Annotated[
         dt.datetime | None,
         Query(
@@ -60,18 +60,11 @@ def get(
     :return: Estimated PV power output in Watts at the given interval <interval> for the given PV system <name>
     """
     # get the correct weather API from the list of weather APIs
-    for api in weather_apis:
-        if api.name == weather_source.value:
-            weather_api = api
-            break
-    else:
-        msg = f"Could not find weather source {weather_source.value}"
-        raise ValueError(msg)
-
-    # get the weather data
-    weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)
+    weather_apis_f = filter(lambda api: api.name == weather_source.value, weather_apis)
+    weather_api = next(weather_apis_f, None)
 
     # convert dict to dataframe
+    weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)
     weather_df = pl.DataFrame(weather_dict["data"]).with_columns(
         pl.col("datetime").str.to_datetime()
     )

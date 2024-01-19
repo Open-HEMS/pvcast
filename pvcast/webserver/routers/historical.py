@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import datetime as dt
-import logging
 
 import polars as pl
 from fastapi import APIRouter, Depends, Query
@@ -24,8 +23,6 @@ from pvcast.webserver.routers.dependencies import (
 from .helpers import get_forecast_result_dict
 
 router = APIRouter()
-
-_LOGGER = logging.getLogger("uvicorn")
 
 
 @router.get("/{plant_name}/{interval}")

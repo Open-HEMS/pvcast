@@ -304,6 +304,11 @@ class PVSystemManager:
         """The PV plants."""
         return self._pv_plants
 
+    @property
+    def pv_plant_count(self) -> int:
+        """The number of PV plants."""
+        return len(self._pv_plants)
+
     def get_pv_plant(self, name: str) -> PVPlantModel:
         """Get a PV plant model by name.
 
@@ -313,7 +318,8 @@ class PVSystemManager:
         try:
             return self._pv_plants[name]
         except KeyError as exc:
-            raise KeyError(f"PV plant {name} not found.") from exc
+            msg = f"PV plant {name} not found."
+            raise KeyError(msg) from exc
 
     def _create_pv_plants(
         self, inv_param: pl.DataFrame, mod_param: pl.DataFrame

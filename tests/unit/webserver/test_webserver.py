@@ -10,12 +10,13 @@ import polars as pl
 import pytest
 from fastapi.testclient import TestClient
 
+from pvcast.model.const import HISTORICAL_YEAR_MAPPING
 from tests.const import MOCK_WEATHER_API
 
 if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
-n_points = int(dt.timedelta(hours=10) / dt.timedelta(hours=1))
+n_points = int(dt.timedelta(hours=24) / dt.timedelta(hours=1))
 mock_data = pl.DataFrame(
     {
         "datetime": pl.datetime_range(
@@ -79,8 +80,8 @@ class CommonForecastTests:
     fc_type: str
     weather_source: str | None = None
 
-    @pytest.mark.parametrize("start", [mock_data["datetime"][n_points // 4], None])
-    @pytest.mark.parametrize("end", [mock_data["datetime"][n_points // 2], None])
+    @pytest.mark.parametrize("start", [mock_data["datetime"][4], None])
+    @pytest.mark.parametrize("end", [mock_data["datetime"][-4], None])
     def test_get_forecast_start_end(
         self,
         client: TestClient,
@@ -109,9 +110,14 @@ class CommonForecastTests:
         resp_start = dt.datetime.fromisoformat(response_dict["start"])
         resp_end = dt.datetime.fromisoformat(response_dict["end"])
         if start:
+            if self.fc_type == "historical":
+                start = start.replace(year=HISTORICAL_YEAR_MAPPING)
             assert resp_start == start
         if end:
+            if self.fc_type == "historical":
+                end = end.replace(year=HISTORICAL_YEAR_MAPPING)
             assert resp_end <= end
+        assert response_dict["forecast_type"] == self.fc_type
         assert response_dict["interval"] == interval
         assert response_dict["plant_name"] == plant_name
         assert "start" in response_dict
@@ -144,3 +150,9 @@ class TestLive(CommonForecastTests):
 
     fc_type = "live"
     weather_source = MOCK_WEATHER_API
+
+
+class TestHistorical(CommonForecastTests):
+    """Test the historical API."""
+
+    fc_type = "historical"

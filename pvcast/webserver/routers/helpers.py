@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import polars as pl
 
-from ...const import DT_FORMAT
-from ...model.forecasting import ForecastResult, PowerEstimate
-from ...model.model import PVSystemManager
-from ...webserver.models.base import Interval
+from pvcast.const import DT_FORMAT
+
+if TYPE_CHECKING:
+    from pvcast.model.forecasting import ForecastResult, PowerEstimate
+    from pvcast.model.model import PVSystemManager
+    from pvcast.webserver.models.base import Interval
 
 _LOGGER = logging.getLogger("uvicorn")
 
@@ -21,8 +23,9 @@ def get_forecast_result_dict(
     interval: Interval,
     weather_df: pl.DataFrame = None,
 ) -> dict[str, Any]:
-    """Use the weather data to compute the estimated PV output power in Watts at the \
-    given interval <interval> for the given PV system <name>.
+    """Use the weather data to compute the estimated PV output power in Watts.
+
+    Using interval <interval> for the given PV system <name>.
 
     :param plant_name: Name of the PV system
     :param pv_system_mngr: PV system manager
@@ -31,6 +34,14 @@ def get_forecast_result_dict(
     :param weather_df: Weather dataframe
     :return: Nested dict
     """
+    if pv_system_mngr.pv_plant_count == 0:
+        msg = "PV plant list is empty. Check the config file."
+        raise ValueError(msg)
+
+    if weather_df.is_empty():
+        msg = "Weather dataframe is empty. Check the weather API."
+        raise ValueError(msg)
+
     # loop over all PV plants and find the one with the given name
     all_arg = plant_name.lower() == "all"
     pv_plant_names = list(pv_system_mngr.pv_plants.keys()) if all_arg else [plant_name]
@@ -41,19 +52,15 @@ def get_forecast_result_dict(
         _LOGGER.info("Calculating PV output for plant: %s", pv_plant)
 
         # compute the PV output for the given PV system and datetimes
-        try:
-            pvplant = pv_system_mngr.get_pv_plant(pv_plant)
-            _LOGGER.info("PV plant found: %s", pv_plant)
-        except KeyError:
-            _LOGGER.error("No PV system found with plant_name %s", plant_name)
-            continue
+        pvplant = pv_system_mngr.get_pv_plant(pv_plant)
 
         # run forecasting algorithm
         try:
             pv_plant_type: PowerEstimate = getattr(pvplant, fc_type)
-        except AttributeError:
-            _LOGGER.error("No forecasting algorithm found with name %s", fc_type)
-            continue
+        except AttributeError as exc:
+            msg = f"No forecasting algorithm found with name {fc_type}"
+            _LOGGER.exception(msg)
+            raise AttributeError(msg) from exc
         output: ForecastResult = pv_plant_type.run(weather_df=weather_df)
 
         # upsample the output to the requested interval
@@ -85,7 +92,7 @@ def get_forecast_result_dict(
     )
 
     # construct the response dict
-    response_dict = {
+    return {
         "start": ac_w_period["datetime"].min().strftime(DT_FORMAT),
         "end": ac_w_period["datetime"].max().strftime(DT_FORMAT),
         "forecast_type": fc_type,
@@ -96,4 +103,3 @@ def get_forecast_result_dict(
             pl.col("datetime").dt.strftime(DT_FORMAT)
         ).to_dicts(),
     }
-    return response_dict
