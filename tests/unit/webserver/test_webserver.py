@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import urllib.parse
 from typing import TYPE_CHECKING
 
+import numpy as np
 import polars as pl
 import pytest
 from fastapi.testclient import TestClient
@@ -13,20 +15,24 @@ from tests.const import MOCK_WEATHER_API
 if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
-
+n_points = int(dt.timedelta(hours=10) / dt.timedelta(hours=1))
 mock_data = pl.DataFrame(
     {
-        "datetime": [
-            "2020-01-01T00:00:00+00:00",
-            "2020-01-01T01:00:00+00:00",
-            "2020-01-01T02:00:00+00:00",
-            "2020-01-01T03:00:00+00:00",
-            "2020-01-01T04:00:00+00:00",
-        ],
-        "temperature": [0, 0.5, 1, 0.5, 0],
-        "humidity": [0, 0.5, 1, 0.5, 0],
-        "wind_speed": [0, 0.5, 1, 0.5, 0],
-        "cloud_cover": [0, 0.5, 1, 0.5, 0],
+        "datetime": pl.datetime_range(
+            dt.datetime.now(dt.timezone.utc).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ),
+            dt.datetime.now(dt.timezone.utc).replace(
+                hour=23, minute=59, second=0, microsecond=0
+            ),
+            "1h",
+            eager=True,
+            time_zone="UTC",
+        )[0:n_points],
+        "cloud_cover": list(np.linspace(20, 60, n_points)),
+        "wind_speed": list(np.linspace(0, 10, n_points)),
+        "temperature": list(np.linspace(10, 25, n_points)),
+        "humidity": list(np.linspace(0, 100, n_points)),
     }
 )
 
@@ -73,12 +79,8 @@ class CommonForecastTests:
     fc_type: str
     weather_source: str | None = None
 
-    @pytest.mark.parametrize(
-        "start", [dt.datetime(2020, 1, 1, 0, 0, 0, tzinfo=dt.timezone.utc), None]
-    )
-    @pytest.mark.parametrize(
-        "end", [dt.datetime(2020, 1, 1, 2, 59, 0, tzinfo=dt.timezone.utc), None]
-    )
+    @pytest.mark.parametrize("start", [mock_data["datetime"][n_points // 4], None])
+    @pytest.mark.parametrize("end", [mock_data["datetime"][n_points // 2], None])
     def test_get_forecast_start_end(
         self,
         client: TestClient,
@@ -89,20 +91,18 @@ class CommonForecastTests:
         weather_api_fix_loc: WeatherAPI,  # noqa: ARG002
     ) -> None:
         """Test getting the clearsky with a start date."""
-        if not start and not end:
-            start_end = None
-        else:
-            start_end = {}
-            start_end.update({"start": start.isoformat()}) if start else None
-            start_end.update({"end": end.isoformat()}) if end else None
-
-        # build conditional URL
-        url = f"/{self.fc_type}/{plant_name}/{interval}{'/' +
-              self.weather_source if self.weather_source else ''}"
+        # build url
+        url = f"/{self.fc_type}/{plant_name}/{interval}"
+        url += f"/{self.weather_source}" if self.weather_source else ""
+        url += f"?start={urllib.parse.quote(start.isoformat())}" if start else ""
+        url += "&" if start and end else ""
+        url += "?" if not start and end else ""
+        url += f"end={urllib.parse.quote(end.isoformat())}" if end else ""
 
         # send request
-        response = client.post(url, json=start_end) if start_end else client.post(url)
+        response = client.get(url)
 
+        # check response
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         response_dict = response.json()

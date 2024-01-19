@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pvcast.config.configreader import ConfigReader
+from pvcast.model.model import PVSystemManager  # noqa: TCH001
 from pvcast.webserver.app import app
 from pvcast.webserver.routers.dependencies import (
     get_config_reader,
@@ -16,7 +17,6 @@ from pvcast.webserver.routers.dependencies import (
 from tests.const import TEST_CONF_PATH_NO_SEC
 
 if TYPE_CHECKING:
-    from pvcast.model.model import PVSystemManager
     from pvcast.weather.weather import WeatherAPI
 
 
