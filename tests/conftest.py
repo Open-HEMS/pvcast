@@ -62,7 +62,7 @@ def weather_df() -> pl.DataFrame:
 @pytest.fixture(scope="session")
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
-    with Path.open("tests/data/clearoutside.txt") as html_file:
+    with Path.open(Path("tests/data/clearoutside.txt")) as html_file:
         return html_file.read()
 
 
@@ -306,7 +306,7 @@ def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> Weathe
 
 # create fake test file secrets.yaml when the test suite is run
 # this is needed for the configreader to work
-def pytest_sessionstart(session: pytest.Session) -> None:
+def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
     """Create a fake secrets.yaml file for testing."""
     secrets = {
         "lat": 51.2,

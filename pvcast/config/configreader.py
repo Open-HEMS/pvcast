@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytz
 import yaml
 from pytz import UnknownTimeZoneError
 from voluptuous import Any, Coerce, Required, Schema, Url
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 _LOGGER = logging.getLogger(__name__)
 
 
-class Loader(yaml.SafeLoader):
+class Loader(yaml.SafeLoader):  # pylint: disable=too-many-ancestors
     """Custom YAML loader."""
 
 

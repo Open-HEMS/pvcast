@@ -16,7 +16,7 @@ from tests.const import MOCK_WEATHER_API
 if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
-n_points = int(dt.timedelta(hours=24) / dt.timedelta(hours=1))
+n_points = int(dt.timedelta(hours=48) / dt.timedelta(hours=1))
 mock_data = pl.DataFrame(
     {
         "datetime": pl.datetime_range(
@@ -25,7 +25,8 @@ mock_data = pl.DataFrame(
             ),
             dt.datetime.now(dt.timezone.utc).replace(
                 hour=23, minute=59, second=0, microsecond=0
-            ),
+            )
+            + dt.timedelta(days=1),
             "1h",
             eager=True,
             time_zone="UTC",

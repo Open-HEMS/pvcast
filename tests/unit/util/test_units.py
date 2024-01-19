@@ -11,7 +11,7 @@ from pvcast.util.units import convert_unit
 
 
 class TestUnitConversion:
-    """Test timestamp utilities."""
+    """Test unit conversion utilities."""
 
     # define valid test cases for speed conversion
     # fmt: off
@@ -90,7 +90,7 @@ class TestUnitConversion:
         invalid_temperature_test_cases + invalid_speed_test_cases,
     )
     def test_invalid_conversion(self, from_unit: str, to_unit: str) -> None:
-        """Test timedelta_to_pl_duration function."""
+        """Test invalid conversions."""
         with pytest.raises(
             ValueError,
             match=rf"Conversion from \[{from_unit}\] to \[{to_unit}\] not supported.",
@@ -98,6 +98,6 @@ class TestUnitConversion:
             convert_unit(self.unit_conv_data, from_unit, to_unit)
 
     def test_invalid_data_type(self) -> None:
-        """Test timedelta_to_pl_duration function."""
-        with pytest.raises(TypeError):
-            convert_unit([0, 25, 100, 37], "C", "F")
+        """Test invalid data type list instead of pl.Series."""
+        with pytest.raises(TypeError, match="Data must be a pl.Series."):
+            convert_unit([0, 25, 100, 37], "F", "C")  # type: ignore[arg-type]

@@ -51,7 +51,7 @@ class WeatherAPIHomeassistant(WeatherAPI):
         weather_df = weather_df.with_columns(pl.col("datetime").str.to_datetime())
 
         # check that timezone is in UTC, if not, convert it
-        time_zone = weather_df["datetime"].dtype.time_zone  # type: ignore[union-attr]
+        time_zone = weather_df["datetime"].dtype.time_zone  # type: ignore[attr-defined]
         if time_zone != str(dt.timezone.utc):
             _LOGGER.warning("HA weather data timezone is not UTC but: %s", time_zone)
             weather_df = weather_df.with_columns(

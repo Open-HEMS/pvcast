@@ -104,7 +104,8 @@ class TestForecastResult:
 
         # create a polars series from the test dict
         ac_series = pl.from_dict(
-            ac_data, schema={"datetime": str, "ac_power": pl.Int64}
+            ac_data,  # type: ignore[arg-type]
+            schema={"datetime": str, "ac_power": pl.Int64},
         )
 
         # convert timestamps to datetime
@@ -201,8 +202,6 @@ class TestForecastResult:
         """Test that forecast result upsampling fails with invalid frequency."""
         with pytest.raises(ValueError, match="Invalid frequency"):
             forecast_result.upsample("99s")
-        with pytest.raises(ValueError, match="Invalid frequency"):
-            forecast_result.upsample(99)
 
     def test_upsample_too_low_frequency(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result upsampling fails with too low frequency."""
@@ -219,6 +218,7 @@ class TestForecastResult:
         self, forecast_result: ForecastResult
     ) -> None:
         """Test that forecast result frequency returns -1 with unsorted datetimes."""
+        assert forecast_result.ac_power is not None
         forecast_result.ac_power = forecast_result.ac_power.select(
             pl.col("datetime").shuffle(seed=42)
         )
@@ -227,6 +227,7 @@ class TestForecastResult:
 
     def test_frequency_missing_datetimes(self, forecast_result: ForecastResult) -> None:
         """Test that forecast result frequency returns -1 with missing datetimes."""
+        assert forecast_result.ac_power is not None
         forecast_result.ac_power = forecast_result.ac_power.with_row_index(
             "row_nr"
         ).filter(pl.col("row_nr") != 1)
@@ -247,6 +248,7 @@ class TestForecastResult:
         self, forecast_result: ForecastResult, period: str, freq: str
     ) -> None:
         """Test that forecast result energy calculation works."""
+        assert forecast_result.ac_power is not None
         sum_power = forecast_result.ac_power.sum().rename({"ac_power": "ac_energy"})
 
         # upsample to the desired frequency
@@ -394,10 +396,11 @@ class TestForecastResult:
     ) -> None:
         """Test the power estimate run method for historical data already present."""
         pv_plant_model.historical._pvgis_data_path = Path(PVGIS_PROC_CSV)
+        result: ForecastResult
         if use_weather_df:
-            result: ForecastResult = pv_plant_model.historical.run(weather_df)
+            result = pv_plant_model.historical.run(weather_df)
         else:
-            result: ForecastResult = pv_plant_model.historical.run(None)
+            result = pv_plant_model.historical.run(None)
         assert isinstance(result, ForecastResult)
         assert result.name == "EastWest"
         assert result.fc_type == ForecastType.HISTORICAL

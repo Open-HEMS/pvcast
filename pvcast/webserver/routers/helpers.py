@@ -21,7 +21,7 @@ def get_forecast_result_dict(
     pv_system_mngr: PVSystemManager,
     fc_type: str,
     interval: Interval,
-    weather_df: pl.DataFrame = None,
+    weather_df: pl.DataFrame,
 ) -> dict[str, Any]:
     """Use the weather data to compute the estimated PV output power in Watts.
 
@@ -65,7 +65,7 @@ def get_forecast_result_dict(
 
         # upsample the output to the requested interval
         ac_w_period = ac_w_period.with_columns(
-            output.upsample(interval).ac_power.rename({"ac_power": f"watt_{pv_plant}"})
+            output.upsample(interval).ac_power.rename({"ac_power": f"watt_{pv_plant}"})  # type: ignore[union-attr]
         )
         ac_w_period = ac_w_period.with_columns(
             ac_w_period[f"watt_{pv_plant}"]
@@ -93,8 +93,8 @@ def get_forecast_result_dict(
 
     # construct the response dict
     return {
-        "start": ac_w_period["datetime"].min().strftime(DT_FORMAT),
-        "end": ac_w_period["datetime"].max().strftime(DT_FORMAT),
+        "start": ac_w_period["datetime"].min().strftime(DT_FORMAT),  # type: ignore[union-attr]
+        "end": ac_w_period["datetime"].max().strftime(DT_FORMAT),  # type: ignore[union-attr]
         "forecast_type": fc_type,
         "plant_name": plant_name,
         "interval": interval.value,

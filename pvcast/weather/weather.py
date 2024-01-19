@@ -104,9 +104,7 @@ class WeatherAPI(ABC):
     )
 
     # processed weather data as list of dicts
-    _weather_data: dict[str, list[dict[str, Any]] | str | None] = field(
-        default_factory=dict, repr=False, init=False
-    )
+    _weather_data: dict[str, Any] = field(default_factory=dict, repr=False, init=False)
 
     @property
     def dt_new_data(self) -> dt.timedelta:
@@ -150,7 +148,7 @@ class WeatherAPI(ABC):
 
     def get_weather(
         self, *, live: bool = False, calc_irrads: bool = False
-    ) -> dict[str, list[dict[str, Any]] | str | None]:
+    ) -> dict[str, Any]:
         """Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
@@ -220,7 +218,7 @@ class WeatherAPI(ABC):
         data_dict = processed_data.to_dict(as_series=False)
         data_list = [dict(zip(data_dict, t)) for t in zip(*data_dict.values())]
         try:
-            validated_data = {
+            validated_data: dict[str, Any] = {
                 "source": self.name,
                 "interval": timedelta_to_pl_duration(self.freq_source),
                 "data": data_list,

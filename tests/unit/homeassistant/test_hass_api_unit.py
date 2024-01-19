@@ -55,7 +55,7 @@ class TestHomeAssistantAPI:
                 token=HASS_TEST_TOKEN,
             )
         else:
-            with pytest.raises(expected, match=match):
+            with pytest.raises(expected, match=match):  # type: ignore[call-overload]
                 HomeAssistantAPI(
                     host=HASS_TEST_URL,
                     entity_id=entity_id,

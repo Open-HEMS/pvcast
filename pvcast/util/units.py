@@ -1,5 +1,12 @@
 """Unit conversion functions."""
+from __future__ import annotations
+
+from typing import Callable
+
 import polars as pl
+
+# Define a type for the conversion functions
+ConversionFunc = Callable[[pl.Series], pl.Series]
 
 # temperature conversion functions ("°C", "°F", "C", "F")
 TEMP_CONV_DICT = {
@@ -31,7 +38,7 @@ SPEED_CONV_DICT = {
 }
 
 # combine temperature and speed conversion dictionaries
-CONV_DICT = {**TEMP_CONV_DICT, **SPEED_CONV_DICT}
+CONV_DICT: dict[str, dict[str, ConversionFunc]] = {**TEMP_CONV_DICT, **SPEED_CONV_DICT}
 
 
 def convert_unit(data: pl.Series, from_unit: str, to_unit: str) -> pl.Series:

@@ -169,8 +169,10 @@ class TestWeatherAPI(CommonWeatherTests):
         for irr in ["ghi", "dni", "dhi"]:
             assert irr in irrads.columns
             assert irrads[irr].dtype == pl.Float64
-            assert irrads[irr].min() >= 0  # min irradiance on earth
-            assert irrads[irr].max() <= 1370  # max irradiance on earth
+            # min irradiance on earth
+            assert irrads[irr].min() >= 0  # type: ignore[operator]
+            # max irradiance on earth
+            assert irrads[irr].max() <= 1370  # type: ignore[operator]
             assert len(irrads[irr]) == len(weather_df)
             assert irrads[irr].is_null().sum() == 0
             assert irrads[irr].is_nan().sum() == 0
