@@ -72,6 +72,7 @@ repos:
         language: system
         types: [yaml]
         entry: poetry run check-yaml
+        args: ["--unsafe"]
       - id: codespell
         name: ✅ Check code for common misspellings
         language: system

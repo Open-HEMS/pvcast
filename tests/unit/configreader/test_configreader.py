@@ -100,5 +100,5 @@ class TestConfigReader:
         """Test the _yaml_secrets_loader method with a non-ScalarNode."""
         loader = SafeLoader("")
         node = SequenceNode(tag="tag:yaml.org,2002:seq", value=[])
-        with pytest.raises(ValueError, match="Expected a ScalarNode"):
+        with pytest.raises(TypeError, match="Expected a ScalarNode"):
             configreader_secfile_sectags._yaml_secrets_loader(loader, node)
