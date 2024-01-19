@@ -14,6 +14,10 @@ from voluptuous import Any, Coerce, Required, Schema, Url
 _LOGGER = logging.getLogger(__name__)
 
 
+class Loader(yaml.SafeLoader):
+    """Custom YAML loader."""
+
+
 @dataclass
 class ConfigReader:
     """Reads PV plant configuration from a YAML file."""
@@ -26,33 +30,30 @@ class ConfigReader:
     def __post_init__(self) -> None:
         """Initialize the class."""
         if not self.config_file_path.exists():
-            raise FileNotFoundError(
-                f"Configuration file {self.config_file_path} not found."
-            )
-
-        # load secrets file and add loader for secrets
-        if self.secrets_file_path is not None:
-            self._load_secrets_file()
-            yaml.add_constructor(
-                "!secret", self._yaml_secrets_loader, Loader=yaml.SafeLoader
-            )
-            _LOGGER.info("Loaded secrets file %s", self.secrets_file_path)
+            msg = f"Configuration file {self.config_file_path} not found."
+            raise FileNotFoundError(msg)
 
         # load the main configuration file
         with self.config_file_path.open(encoding="utf-8") as config_file:
+            # load secrets file and add loader for secrets
             try:
-                config = yaml.safe_load(config_file)
+                if self.secrets_file_path is not None:
+                    self._load_secrets_file()
+                    Loader.add_constructor("!secret", self._yaml_secrets_loader)
+                    config = next(yaml.load_all(config_file, Loader=Loader))
+                else:
+                    config = yaml.safe_load(config_file)
+                    _LOGGER.info("No secrets file loaded")
+
+                # validate the configuration
+                Schema(self._config_schema)(config)
             except yaml.YAMLError as exc:
-                _LOGGER.error(
+                _LOGGER.exception(
                     "Error parsing configuration file %s. Did you include secrets.yaml?",
                     self.config_file_path,
                 )
-                raise yaml.YAMLError(
-                    f"Error parsing configuration file {self.config_file_path}"
-                ) from exc
-
-            # validate the configuration
-            Schema(self._config_schema)(config)
+                msg = f"Error parsing configuration file {self.config_file_path}"
+                raise yaml.YAMLError(msg) from exc
 
         # check if the timezone is valid
         try:
@@ -60,9 +61,8 @@ class ConfigReader:
                 config["general"]["location"]["timezone"]
             )
         except UnknownTimeZoneError as exc:
-            raise UnknownTimeZoneError(
-                f"Unknown timezone {config['general']['location']['timezone']}"
-            ) from exc
+            msg = f"Unknown timezone {config['general']['location']['timezone']}"
+            raise UnknownTimeZoneError(msg) from exc
 
         self._config = config
 
@@ -76,12 +76,14 @@ class ConfigReader:
         if isinstance(node, yaml.ScalarNode):
             key = str(loader.construct_scalar(node))
         else:
-            raise ValueError("Expected a ScalarNode")
+            msg = "Expected a ScalarNode"
+            raise TypeError(msg)
 
         secret = self._secrets.get(key)
         if secret is None:
             _LOGGER.error("Secret not found in %s!", self.secrets_file_path)
-            raise yaml.YAMLError(f"Secret not found in {self.secrets_file_path}!")
+            msg = f"Secret not found in {self.secrets_file_path}!"
+            raise yaml.YAMLError(msg)
         return secret
 
     def _load_secrets_file(self) -> None:
@@ -90,13 +92,15 @@ class ConfigReader:
         :param secrets_file_path: The path to the secrets file.
         """
         if self.secrets_file_path is None:
-            raise ValueError("Secrets file path is not set.")
+            msg = "Secrets file path is not set."
+            raise ValueError(msg)
 
         if not self.secrets_file_path.exists():
-            raise FileNotFoundError(f"Secrets file {self.secrets_file_path} not found.")
+            msg = f"Secrets file {self.secrets_file_path} not found."
+            raise FileNotFoundError(msg)
 
         with self.secrets_file_path.open(encoding="utf-8") as secrets_file:
-            self._secrets = yaml.safe_load(secrets_file)
+            self._secrets = yaml.full_load(secrets_file)
 
     @property
     def config(self) -> dict[str, Any]:

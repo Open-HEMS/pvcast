@@ -2,8 +2,7 @@
 #   Copyright (c) Microsoft Corporation. All rights reserved.
 #   Licensed under the MIT License. See LICENSE in project root for information.
 #   ---------------------------------------------------------------------------------
-"""
-This is a configuration file for pytest containing customizations and fixtures.
+"""Configuration file for pytest containing customizations and fixtures.
 
 In VSCode, Code Coverage is recorded in config.xml. Delete this file to reset reporting.
 
@@ -13,20 +12,30 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
 import numpy as np
 import polars as pl
 import pytest
+import yaml
 from pvlib.location import Location
 
+from pvcast.const import SECRETS_FILE_PATH
 from pvcast.model.model import PVPlantModel, PVSystemManager
+from pvcast.weather.weather import WeatherAPI
 
-from .const import LOC_AUS, LOC_EUW, LOC_USW
+from .const import LOC_AUS, LOC_EUW, LOC_USW, MOCK_WEATHER_API
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
+def test_url() -> str:
+    """Fixture for a test url."""
+    return "http://fakeurl.com/"
+
+
+@pytest.fixture
 def weather_df() -> pl.DataFrame:
     """Fixture for a basic pvlib input weather dataframe."""
     n_points = int(dt.timedelta(days=2) / dt.timedelta(hours=1))
@@ -53,7 +62,7 @@ def weather_df() -> pl.DataFrame:
 @pytest.fixture(scope="session")
 def clearoutside_html_page() -> str:
     """Load the clearoutside html page."""
-    with open("tests/clearoutside.txt") as html_file:
+    with Path.open("tests/data/clearoutside.txt") as html_file:
         return html_file.read()
 
 
@@ -145,22 +154,42 @@ micro_system = [
                 },
             ],
         }
-    )
+    ),
+    MappingProxyType(
+        {
+            "name": "South",
+            "inverter": "Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_",
+            "microinverter": True,
+            "arrays": [
+                {
+                    "name": "zone_1_schuin",
+                    "tilt": 30,
+                    "azimuth": 180,
+                    "modules_per_string": 8,
+                    "strings": 1,
+                    "module": "JA_Solar_JAM72S01_385_PR",
+                }
+            ],
+        }
+    ),
 ]
 
 
 @pytest.fixture(params=[string_system, micro_system])
 def basic_config(request: pytest.FixtureRequest) -> list[MappingProxyType[str, Any]]:
+    """Fixture that creates a basic configuration."""
     var = request.param
     if isinstance(var, list):
         return var
-    raise ValueError("basic_config fixture is not a list")
+    msg = "basic_config fixture is not a list"
+    raise ValueError(msg)
 
 
 @pytest.fixture
 def pv_sys_mngr(
     basic_config: list[MappingProxyType[str, Any]], location: Location, altitude: float
 ) -> PVSystemManager:
+    """Fixture that creates a PVSystemManager."""
     return PVSystemManager(
         basic_config, lat=location.latitude, lon=location.longitude, alt=altitude
     )
@@ -170,6 +199,7 @@ def pv_sys_mngr(
 def pv_plant_model(
     basic_config: list[MappingProxyType[str, Any]], location: Location
 ) -> PVPlantModel:
+    """Fixture that creates a PVPlantModel."""
     inv_params = {
         "index": basic_config[0]["inverter"],
         "Vac": 240,
@@ -230,9 +260,61 @@ def pv_plant_model(
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
-    """
-    Add integration marker to all tests that use the homeassistant_api_setup fixture.
-    """
+    """Add integration marker to all tests that use the homeassistant_api_setup fixture."""
     for item in items:
         if "homeassistant_api_setup" in getattr(item, "fixturenames", ()):
             item.add_marker("integration")
+
+
+# mock for WeatherAPI class
+class MockWeatherAPI(WeatherAPI):
+    """Mock the WeatherAPI class."""
+
+    def __init__(
+        self, location: Location, url: str, data: pl.DataFrame, **kwargs: Any
+    ) -> None:
+        """Initialize the mock class."""
+        super().__init__(location, url, freq_source=dt.timedelta(minutes=60), **kwargs)
+        self.url = url
+        self.data = data
+
+    def retrieve_new_data(self) -> pl.DataFrame:
+        """Retrieve new data from the API."""
+        return self.data
+
+
+@pytest.fixture
+def weather_api(
+    location: Location, request: pytest.FixtureRequest, test_url: str
+) -> WeatherAPI:
+    """Get a weather API object."""
+    return MockWeatherAPI(
+        location=location, url=test_url, data=request.param, name=MOCK_WEATHER_API
+    )
+
+
+@pytest.fixture
+def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> WeatherAPI:
+    """Get a weather API object."""
+    return MockWeatherAPI(
+        location=Location(51.2, 6.1, "UTC", 0),
+        url=test_url,
+        data=request.param,
+        name=MOCK_WEATHER_API,
+    )
+
+
+# create fake test file secrets.yaml when the test suite is run
+# this is needed for the configreader to work
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Create a fake secrets.yaml file for testing."""
+    secrets = {
+        "lat": 51.2,
+        "lon": 6.1,
+        "alt": 0,
+        "long_lived_token": "test_token",
+        "time_zone": "UTC",
+    }
+    if not Path.exists(SECRETS_FILE_PATH):
+        with Path.open(SECRETS_FILE_PATH, "w") as outfile:
+            yaml.dump(secrets, outfile, default_flow_style=False)

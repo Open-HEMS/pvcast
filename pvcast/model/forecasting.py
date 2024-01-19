@@ -15,9 +15,9 @@ import pandas as pd
 import polars as pl
 from pvlib.atmosphere import gueymard94_pw
 from pvlib.iotools import get_pvgis_tmy
-from pvlib.location import Location
 
-from ..const import DT_FORMAT
+from pvcast.const import DT_FORMAT
+
 from .const import (
     CLEARSKY_MODEL_ATTRS,
     HISTORICAL_MODEL_ATTRS,
@@ -31,6 +31,8 @@ from .const import (
 )
 
 if TYPE_CHECKING:
+    from pvlib.location import Location
+
     from .model import PVPlantModel
 
 
@@ -57,62 +59,65 @@ class ForecastResult:
     """Object to store the aggregated results of the PVPlantModel simulation.
 
     :param name: The name of the PV plant.
-    :param type: The type of the result: forecast based on live weather data, clearsky, or historic based on PVGIS TMY.
+    :param fc_type: The type of the result: forecast based on live weather data, clearsky, or historic based on PVGIS TMY.
     :param ac_power: The sum of AC power outputs of all ModelChain objects in the PV plant.
     :param freq: Frequency of original data. Can be "1H" for hourly, "1D" for daily, "M" for monthly, "A" for yearly.
     """
 
     name: str
-    type: ForecastType
+    fc_type: ForecastType
     ac_power: pl.DataFrame | None = field(repr=False, default=None)
 
     def __post_init__(self) -> None:
+        """Validate the ForecastResult object."""
         if self.ac_power is None:
-            raise ValueError("Must provide AC power data.")
+            msg = "Must provide AC power data."
+            raise ValueError(msg)
         if "datetime" not in self.ac_power.columns:
-            raise ValueError("AC power data must have a 'datetime' column.")
+            msg = "AC power data must have a 'datetime' column."
+            raise ValueError(msg)
         if self.ac_power["datetime"].dtype != pl.Datetime:
-            raise ValueError(
-                f"Datetime column must have dtype datetime.datetime. Got {self.ac_power['datetime'].dtype}."
-            )
+            msg = f"Datetime column must have dtype datetime.datetime. Got {self.ac_power['datetime'].dtype}."
+            raise ValueError(msg)
         if self.ac_power.null_count().sum_horizontal().item() > 0:
-            raise ValueError("AC power data contains null values.")
+            msg = "AC power data contains null values."
+            raise ValueError(msg)
         if "ac_power" not in self.ac_power.columns:
-            raise ValueError("AC power data must have a 'ac_power' column.")
+            msg = "AC power data must have a 'ac_power' column."
+            raise ValueError(msg)
         if self.ac_power["ac_power"].dtype != pl.Int64:
-            raise ValueError(
-                f"AC power column must have dtype int64. Got {self.ac_power['ac_power'].dtype}."
-            )
+            msg = f"AC power column must have dtype int64. Got {self.ac_power['ac_power'].dtype}."
+            raise ValueError(msg)
 
     def upsample(self, freq: str) -> ForecastResult:
-        """Resample the ForecastResult to a new interval, apply linear interpolation and
-        return a new ForecastResult object.
+        """Upsample the ForecastResult to a new interval.
+
+        After upsampling apply linear interpolation and return a new ForecastResult object.
 
         :param freq: The frequency of the energy output. See polars.upsample() for valid options.
         :return: A new ForecastResult object with the resampled data.
         """
         if freq not in VALID_UPSAMPLE_FREQ:
-            raise ValueError(
-                f"Invalid frequency. Must be one of {VALID_UPSAMPLE_FREQ}."
-            )
+            msg = f"Invalid frequency. Must be one of {VALID_UPSAMPLE_FREQ}."
+            raise ValueError(msg)
         if self.ac_power is None:
-            raise ValueError("No AC power data available. Run simulation first.")
+            msg = "No AC power data available. Run simulation first."
+            raise ValueError(msg)
 
         # copy the ForecastResult object
         fc_result_cpy = copy.deepcopy(self)
         current_freq: int = fc_result_cpy.frequency
-        target_freq: int = fc_result_cpy._time_str_to_seconds(freq)
+        target_freq: int = fc_result_cpy.time_str_to_seconds(freq)
 
         if current_freq < target_freq:
-            raise ValueError(
-                f"Cannot upsample to a lower frequency. Current frequency is {fc_result_cpy.frequency}s."
-            )
+            msg = f"Cannot upsample to a lower frequency. Current frequency is {fc_result_cpy.frequency}s."
+            raise ValueError(msg)
         if current_freq == target_freq:
             return fc_result_cpy
 
         # upsample the data
         fc_result_cpy.ac_power = (
-            fc_result_cpy.ac_power.sort(by="datetime")  # type: ignore
+            fc_result_cpy.ac_power.sort(by="datetime")  # fc_type: ignore[union-attr]
             .upsample(time_column="datetime", every=freq, maintain_order=True)
             .select(pl.all().interpolate().forward_fill())
         )
@@ -121,6 +126,7 @@ class ForecastResult:
     @property
     def frequency(self) -> int:
         """Return the frequency of the data in seconds.
+
         NB: This is actually the data interval, not the frequency.
         """
         if self.ac_power is None:
@@ -129,17 +135,19 @@ class ForecastResult:
 
         # check if time series data is equidistantly spaced in time
         if not self.ac_power["datetime"].is_sorted():
-            raise ValueError("Datetime column must be sorted.")
+            msg = "Datetime column must be sorted."
+            raise ValueError(msg)
         intervals = self.ac_power["datetime"].diff()[1:].unique()
 
         # check if intervals are equidistantly spaced in time.
         # first value of diff() is NaN, hence we need two unique values
-        if not intervals.n_unique() == 1:
-            raise ValueError("Datetime column must be equidistantly spaced in time.")
+        if intervals.n_unique() != 1:
+            msg = "Datetime column must be equidistantly spaced in time."
+            raise ValueError(msg)
         interval: dt.timedelta = intervals.item()
         return interval.seconds
 
-    def _time_str_to_seconds(self, time_str: str) -> int:
+    def time_str_to_seconds(self, time_str: str) -> int:
         """Convert a time string to seconds."""
         if time_str.endswith("s"):
             return int(time_str[:-1])
@@ -149,7 +157,8 @@ class ForecastResult:
             return int(time_str[:-1]) * 60 * 60
         if time_str.endswith("d"):
             return int(time_str[:-1]) * 60 * 60 * 24
-        raise ValueError(f"Invalid time string: {time_str}.")
+        msg = f"Invalid time string: {time_str}."
+        raise ValueError(msg)
 
     def energy(self, freq: str = "1d") -> pl.DataFrame:
         """Calculate the AC energy output of the PV plant.
@@ -162,19 +171,16 @@ class ForecastResult:
         :return: A pl.Series with the energy output of the PV plant.
         """
         if self.ac_power is None:
-            raise ValueError(
-                "AC power output is not available, cannot calculate energy. Run simulation first."
-            )
+            msg = "AC power output is not available, cannot calculate energy. Run simulation first."
+            raise ValueError(msg)
         if "".join(filter(str.isalpha, freq)) not in VALID_DOWN_SAMPLE_FREQ:
-            raise ValueError(
-                f"Invalid frequency suffix. Must be one of {VALID_DOWN_SAMPLE_FREQ}."
-            )
+            msg = f"Invalid frequency suffix. Must be one of {VALID_DOWN_SAMPLE_FREQ}."
+            raise ValueError(msg)
 
         # check data frequency
         if self.frequency > SECONDS_PER_HOUR:
-            raise ValueError(
-                f"Cannot calculate energy for data with frequency {self.frequency}s. Must be <= 1H."
-            )
+            msg = f"Cannot calculate energy for data with frequency {self.frequency}s. Must be <= 1H."
+            raise ValueError(msg)
 
         # compute the conversion factor from power to energy
         conversion_factor = self.frequency / SECONDS_PER_HOUR
@@ -183,12 +189,11 @@ class ForecastResult:
         )
 
         # compute the energy output per period
-        ac_energy = (
+        return (
             ac_energy.sort(by="datetime")
             .group_by_dynamic("datetime", every=freq)
             .agg(pl.col("ac_power").sum().alias("ac_energy").cast(pl.Int64))
         )
-        return ac_energy
 
 
 @dataclass
@@ -197,12 +202,13 @@ class PowerEstimate(ABC):
 
     location: Location = field(repr=False)
     pv_plant: PVPlantModel = field(repr=False)
-    type: ForecastType = field(default=ForecastType.LIVE)
+    fc_type: ForecastType = field(default=ForecastType.LIVE)
     _result: ForecastResult | None = field(repr=False, default=None)
     _model_attrs: dict[str, str] = field(repr=False, default_factory=dict, init=False)
 
     def __post_init__(self) -> None:
-        self._model_attrs = MODEL_ATTRS[self.type]
+        """Post init method."""
+        self._model_attrs = MODEL_ATTRS[self.fc_type]
 
     def run(self, weather_df: pl.DataFrame | None = None) -> ForecastResult:
         """Run power estimate and store results.
@@ -243,12 +249,13 @@ class PowerEstimate(ABC):
             .cast(pl.Int64)
             .alias("ac_power")
         )
-        return ForecastResult(name=self.pv_plant.name, type=self.type, ac_power=results)
+        return ForecastResult(
+            name=self.pv_plant.name, fc_type=self.fc_type, ac_power=results
+        )
 
     @abstractmethod
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
-        """
-        Prepare weather data for the forecast. This method should be implemented by subclasses.
+        """Prepare weather data for the forecast. This method should be implemented by subclasses.
 
         When calling this function it may be optional or mandatory to provide weather
         data or datetimes to forecast for. Datetimes must always be ordered and provided
@@ -263,8 +270,7 @@ class PowerEstimate(ABC):
         temp_col: str = "temperature",
         rh_col: str = "humidity",
     ) -> pl.DataFrame:
-        """
-        Add a precipitable_water column to the weather dataframe.
+        """Add a precipitable_water column to the weather dataframe.
 
         Gueymard94_pw alculates precipitable water (cm) from ambient air temperature (C) and
         relatively humidity (%) using an empirical model. The accuracy of this method is
@@ -287,9 +293,8 @@ class PowerEstimate(ABC):
 
         # check if weather_df contains the required columns to calculate precipitable water
         if not {temp_col, rh_col}.issubset(weather_df.columns):
-            raise ValueError(
-                f"Missing columns: {set([temp_col, rh_col]) - set(weather_df.columns)} in weather_df."
-            )
+            msg = f"Missing columns: { {temp_col, rh_col} - set(weather_df.columns)} in weather_df."
+            raise ValueError(msg)
         temperature = weather_df[temp_col].to_numpy()
         humidity = weather_df[rh_col].to_numpy()
         precipitable_water = gueymard94_pw(temperature, humidity)
@@ -302,11 +307,12 @@ class PowerEstimate(ABC):
 class Live(PowerEstimate):
     """Class for PV power forecasts based on live weather data."""
 
-    type: ForecastType = field(default=ForecastType.LIVE)
+    fc_type: ForecastType = field(default=ForecastType.LIVE)
 
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
         if weather_df is None:
-            raise ValueError("Must provide weather data.")
+            msg = "Must provide weather data."
+            raise ValueError(msg)
         return self._add_precipitable_water(weather_df)
 
 
@@ -314,11 +320,12 @@ class Live(PowerEstimate):
 class Clearsky(PowerEstimate):
     """Class for PV power forecasts based on weather data."""
 
-    type: ForecastType = field(default=ForecastType.CLEARSKY)
+    fc_type: ForecastType = field(default=ForecastType.CLEARSKY)
 
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
         if weather_df is None:
-            raise ValueError("Must provide weather data.")
+            msg = "Must provide weather data."
+            raise ValueError(msg)
 
         # convert datetimes to a format that pvlib can handle
         dt_strings = pd.DatetimeIndex(weather_df["datetime"].dt.strftime(DT_FORMAT))
@@ -330,10 +337,11 @@ class Clearsky(PowerEstimate):
 class Historical(PowerEstimate):
     """Class for PV power forecasts based on weather data."""
 
-    type: ForecastType = field(default=ForecastType.HISTORICAL)
+    fc_type: ForecastType = field(default=ForecastType.HISTORICAL)
     _pvgis_data_path: Path = field(init=False, repr=False, default=Path())
 
     def __post_init__(self) -> None:
+        """Post init method."""
         lat_i, lat_d = str(round(self.location.latitude, 4)).split(".")
         lon_i, lon_d = str(round(self.location.longitude, 4)).split(".")
         lat = f"{lat_i}_{lat_d.ljust(4, '0')}N"
@@ -359,10 +367,8 @@ class Historical(PowerEstimate):
         upper = weather_df["datetime"].max().replace(year=HISTORICAL_YEAR_MAPPING)
         return (
             tmy_data.filter(
-                (
-                    (pl.col("datetime").str.to_datetime() >= lower)
-                    & (pl.col("datetime").str.to_datetime() <= upper)
-                )
+                (pl.col("datetime").str.to_datetime() >= lower)
+                & (pl.col("datetime").str.to_datetime() <= upper)
             )
             .collect()
             .cast({"datetime": pl.Datetime(time_unit="ms", time_zone="UTC")})
@@ -388,7 +394,7 @@ class Historical(PowerEstimate):
         )
 
         # convert the data to a polars DataFrame
-        tmy_df: pl.DataFrame = pl.from_pandas(tmy_data)  # type: ignore
+        tmy_df: pl.DataFrame = pl.from_pandas(tmy_data)  # fc_type: ignore[assignment]
         tmy_df = tmy_df.rename(
             {
                 "temp_air": "temperature",
@@ -403,12 +409,15 @@ class Historical(PowerEstimate):
         # add datetime column
         tmy_df = tmy_df.with_columns(
             pl.datetime_range(
-                dt.datetime(HISTORICAL_YEAR_MAPPING, 1, 1),
-                dt.datetime(HISTORICAL_YEAR_MAPPING, 12, 31, 23),
+                dt.datetime(HISTORICAL_YEAR_MAPPING, 1, 1, 0, tzinfo=dt.timezone.utc),
+                dt.datetime(
+                    HISTORICAL_YEAR_MAPPING, 12, 31, 23, tzinfo=dt.timezone.utc
+                ),
                 "1h",
                 eager=False,
                 time_zone="UTC",
             )
+            .slice(0, len(tmy_df))
             .cast(pl.Datetime(time_unit="ms", time_zone="UTC"))
             .alias("datetime")
         ).select(

@@ -19,3 +19,7 @@ HASS_TEST_TOKEN = """eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhMTI1Mzg4MT
 zRmODQ0YjJmMGIzZDc1MGVmOSIsImlhdCI6MTcwMTQ0MjQwNywiZXhwIjoyMDE2ODAyNDA3fQ.KkHCfCuFdkUyP\
 b3LNA8HcEvIH2IQ1rmtSDn3haGbKeM"""
 HASS_WEATHER_ENTITY_ID = "weather.forecast_thuis"
+
+# this must be one of the keys in the config file due to
+# get_weather_sources in file pvcast/webserver/models/live.py
+MOCK_WEATHER_API = "ClearOutside"

@@ -1,4 +1,5 @@
 {
+	"name": "PVCast Photovoltaic Forecasting",
 	"build": {
 		"dockerfile": "Dockerfile",
 		"context": ".."
@@ -19,13 +20,13 @@
 				"esbenp.prettier-vscode",
 				"charliermarsh.ruff",
 				"ms-python.vscode-pylance",
-				"ms-python.black-formatter",
 				"ms-vsliveshare.vsliveshare",
 				"ryanluker.vscode-coverage-gutters",
 				"tamasfe.even-better-toml",
 				"ms-python.black-formatter",
 				"mcu-debug.debug-tracker-vscode",
-				"mechatroner.rainbow-csv"
+				"mechatroner.rainbow-csv",
+				"ms-azuretools.vscode-docker"
 			],
 			"settings": {
 				"[python]": {
@@ -56,12 +57,12 @@
 		}
 	},
 	"features": {
+		"ghcr.io/devcontainers/features/git:1": {},
 		"ghcr.io/devcontainers/features/github-cli:1": {},
+		"ghcr.io/devcontainers-contrib/features/pre-commit:2": {},
 		"git-lfs": "latest"
 	},
 	"runArgs": [
 		"--network=host"
-	],
-	"name": "PVCast Photovoltaic forecasting",
-	"postAttachCommand": "pre-commit install --install-hooks"
+	]
 }

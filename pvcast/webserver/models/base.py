@@ -1,14 +1,16 @@
 """Webserver data models base module."""
 from __future__ import annotations
 
-import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 from typing_extensions import Annotated
 
-from ...model.model import PVSystemManager
-from ..routers.dependencies import get_pv_system_mngr
+from pvcast.webserver.routers.dependencies import get_pv_system_mngr
+
+if TYPE_CHECKING:
+    from pvcast.model.model import PVSystemManager
 
 res_examp = [
     {
@@ -72,30 +74,6 @@ class BaseDataModel(BaseModel):
     timezone: Annotated[str | None, "Timezone of the returned data"] = "UTC"
     interval: Annotated[Interval, "Interval of the returned data"]
     period: Annotated[list[PowerData], "PV power at the requested interval."]
-
-
-class StartEndRequest(BaseModel):
-    """Start end request body model."""
-
-    start: Annotated[
-        datetime.datetime, "Start time of the returned data."
-    ] = datetime.datetime.now(datetime.timezone.utc).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    end: Annotated[datetime.datetime, "End time of the returned data."] = (
-        datetime.datetime.now(datetime.timezone.utc)
-    ).replace(hour=23, minute=59, second=0, microsecond=0)
-
-    @validator("start", "end", pre=True)
-    def parse_datetime(
-        cls, value: str
-    ) -> datetime.datetime:  # pylint: disable=no-self-argument; # noqa: B902
-        """Parse datetime."""
-        date_time = datetime.datetime.fromisoformat(value)
-        if date_time.tzinfo is None:
-            raise ValueError("Timezone must be specified.")
-        dt_in_tz = date_time.astimezone(datetime.timezone.utc)
-        return dt_in_tz
 
 
 # create enum of pv plant names

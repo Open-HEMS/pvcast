@@ -1,4 +1,4 @@
-"""Weather API class that retrieves weather data from Home Assistant"""
+"""Weather API class that retrieves weather data from Home Assistant."""
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from dataclasses import InitVar, dataclass, field
 
 import polars as pl
 
-from ..homeassistant.homeassistantapi import HomeAssistantAPI
+from pvcast.homeassistant.homeassistantapi import HomeAssistantAPI
+
 from .weather import WeatherAPI
 
 _LOGGER = logging.getLogger(__name__)
@@ -30,8 +31,7 @@ class WeatherAPIHomeassistant(WeatherAPI):
         self._hass_api = HomeAssistantAPI(self.url, token, entity_id)
 
     def retrieve_new_data(self) -> pl.DataFrame:
-        """
-        Retrieve new weather data from the API.
+        """Retrieve new weather data from the API.
 
         :return: Response from the API
         """
@@ -51,9 +51,9 @@ class WeatherAPIHomeassistant(WeatherAPI):
         weather_df = weather_df.with_columns(pl.col("datetime").str.to_datetime())
 
         # check that timezone is in UTC, if not, convert it
-        time_zone = weather_df["datetime"].dtype.time_zone  # type: ignore
+        time_zone = weather_df["datetime"].dtype.time_zone  # type: ignore[union-attr]
         if time_zone != str(dt.timezone.utc):
-            _LOGGER.warning(f"HA weather data timezone is not UTC but: {time_zone}")
+            _LOGGER.warning("HA weather data timezone is not UTC but: %s", time_zone)
             weather_df = weather_df.with_columns(
                 pl.col("datetime").cast(pl.Datetime(time_zone=dt.timezone.utc))
             )

@@ -1,13 +1,10 @@
 """Test Home Assistant API class."""
 from __future__ import annotations
 
-from typing import Union
-
 import pytest
 
 from pvcast.homeassistant.homeassistantapi import HomeAssistantAPI
-
-from ...const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
+from tests.const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
 
 
 @pytest.mark.integration
@@ -48,7 +45,7 @@ class TestHomeAssistantAPI:
         ],
     )
     def test_init_wrong_entity_id(
-        self, entity_id: str, expected: Union[None, Exception], match: Union[None, str]
+        self, entity_id: str, expected: None | Exception, match: None | str
     ) -> None:
         """Test the Home Assistant API initialization with wrong entity_id."""
         if expected is None:
@@ -86,5 +83,4 @@ class TestHomeAssistantAPI:
     def test_get_forecast(self, homeassistant_api: HomeAssistantAPI) -> None:
         """Test the get_forecast method."""
         forecast = homeassistant_api.forecast
-        print(f"Forecast: {forecast}")
         assert forecast is not None

@@ -140,7 +140,6 @@ notebooks/weather_data/openweathermap/owm_api_key.json
 
 # pvgis data
 pvcast/data/pvgis
-pvcast/webserver/favicon.png
 
 # websocket test file
 test_websocket.py
@@ -148,3 +147,6 @@ test_pvlib.py
 
 # ruff cache
 .ruff_cache/
+
+# vscode
+.vscode/

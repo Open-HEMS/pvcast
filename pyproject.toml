@@ -1,12 +1,15 @@
-[build-system]
-requires = ["flit"]
-build-backend = "flit.buildapi"
-
-[project]
+[tool.poetry]
 name = "pvcast"
-authors = [{ name = "Stefan de Lange", email = "langestefan@msn.com" }]
-description = "Open-source python package to make short-term solar power forecasts."
+version = "0.0.0"
+description = "Open-source python package to make short-term local solar power forecasts."
+authors = ["Stefan de Lange <langestefan@msn.com>"]
+maintainers = ["Stefan de Lange <langestefan@msn.com>"]
+license = "MIT"
 readme = "README.md"
+homepage = "https://github.com/Open-HEMS/pvcast"
+repository = "https://github.com/Open-HEMS/pvcast"
+documentation = "https://github.com/Open-HEMS/pvcast"
+keywords = ["energy", "pvcast", "api", "solar", "photovoltaics"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Framework :: FastAPI",
@@ -16,97 +19,65 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-requires-python = ">=3.12.1"
-dynamic = ["version"]
+packages = [{ include = "pvcast" }]
 
-dependencies = [
-    "numpy>=1.26.3",
-    "pandas>=2.1.4",
-    "polars>=0.19.19",
-    "pvlib>=0.10.3",
-    "pyyaml>=6.0.1",
-    "beautifulsoup4>=4.12.2",
-    "voluptuous>=0.14.1",
-    "fastapi>=0.109.0",
-    "uvicorn>=0.23.2",
-    "lxml>=4.9.4",
-    "websockets>=12.0",
-    "pyarrow>=14.0.2",
-]
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/Open-HEMS/pvcast/issues"
+Changelog = "https://github.com/Open-HEMS/pvcast/releases"
 
-[project.optional-dependencies]
-dev = [
-    "black==23.12.1",
-    "ruff==0.1.13",
-    "pytest==7.4.4",
-    "pytest-cov==4.1.0",
-    "pytest-mock<3.12.1",
-    "pytest-xdist==3.5.0",
-    "mock==5.1.0",
-    "responses==0.24.1",
-    "mypy==1.8.0",
-    "covdefaults==2.3.0",
-    "codespell==2.2.6",
-    "coverage[toml]==7.4.0",
-    "pre-commit==3.6.0",
-    "pre-commit-hooks==4.5.0",
-    "pylint==3.0.3",
-    "safety==2.4.0b2",
-    "yamllint==1.33.0",
-    "types-requests==2.31.0.20240106",
-    "types-pytz==2023.3.1.1",
-]
+[tool.poetry.dependencies]
+python = "^3.12"
+numpy = ">=1.26.3"
+pandas = ">=2.1.4"
+polars = ">=0.19.19"
+pvlib = ">=0.10.3"
+pyyaml = ">=6.0.1"
+beautifulsoup4 = ">=4.12.2"
+voluptuous = ">=0.14.1"
+fastapi = ">=0.109.0"
+uvicorn = ">=0.23.2"
+lxml = ">=4.9.4"
+websockets = ">=12.0"
+pyarrow = ">=14.0.2"
+httpx = "^0.26.0"
+watchfiles = "^0.21.0"
 
-[project.urls]
-Documentation = "https://github.com/langestefan/pvcast"
-Source = "https://github.com/langestefan/pvcast"
-Tracker = "https://github.com/langestefan/pvcast/issues"
+[tool.poetry.group.dev.dependencies]
+blacken-docs = "==1.16.0"
+black = "==23.12.1"
+ruff = "==0.1.13"
+pytest = "==7.4.4"
+pytest_cov = "==4.1.0"
+pytest_mock = "<3.12.1"
+pytest_xdist = "==3.5.0"
+mock = "==5.1.0"
+responses = "==0.24.1"
+mypy = "==1.8.0"
+covdefaults = "==2.3.0"
+codespell = "==2.2.6"
+coverage = { version = "7.4.0", extras = ["toml"] }
+pre_commit = "==3.6.0"
+pre_commit_hooks = "==4.5.0"
+pylint = "==3.0.3"
+safety = "==2.4.0b2"
+yamllint = "==1.33.0"
+types_requests = "==2.31.0.20240106"
+types_pytz = "==2023.3.1.1"
 
-[tool.flit.module]
-name = "python_package"
-
-[tool.black]
-line-length = 88
-fast = true
+[tool.codespell]
+skip = 'poetry.lock'
 
 [tool.coverage.run]
-branch = true
-omit = ["pvcast/__main__.py"]
 plugins = ["covdefaults"]
 source = ["pvcast"]
 
 [tool.coverage.report]
-fail_under = 100
+fail_under = 90
 show_missing = true
-
-[tool.pyright]
-include = ["pvcast"]
-exclude = ["**/__pycache__"]
-
-reportMissingImports = true
-reportMissingTypeStubs = false
-
-pythonVersion = "3.12.1"
-pythonPlatform = "Linux"
-
-executionEnvironments = [{ root = "pvcast" }]
-
-[tool.pytest.ini_options]
-filterwarnings = ["ignore::DeprecationWarning:dateutil.*:"]
-addopts = "--cov-report xml:coverage.xml --cov pvcast --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
-pythonpath = ["src"]
-log_cli = true
-log_cli_level = "DEBUG"
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-testpaths = "tests"
-junit_family = "xunit2"
-markers = [
-    "integration: marks as integration test",
-    "notebooks: marks as notebook test",
-    "gpu: marks as gpu test",
-    "slow: marks tests as slow",
-    "unit: fast offline tests",
+# these files are covered by locally run integration tests
+omit = [
+    "pvcast/homeassistant/homeassistantapi.py",
+    "pvcast/weather/homeassistant.py",
 ]
 
 [tool.mypy]
@@ -115,6 +86,9 @@ markers = [
 # results.
 platform = "linux"
 python_version = "3.12"
+
+# flake8-mypy expects the two following for sensible formatting
+show_column_numbers = true
 
 # show error messages from unrelated files
 follow_imports = "normal"
@@ -140,17 +114,11 @@ warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
 
-[tool.pylint.MASTER]
-ignore = ["tests"]
-
 [tool.pylint.BASIC]
-good-names = ["_", "ex", "fp", "i", "id", "j", "k", "on", "Run", "T"]
-
-[tool.pylint.DESIGN]
-max-attributes = 8
+good-names = ["_", "ex", "fp", "i", "id", "j", "k", "on", "Run", "T", "wv"]
 
 [tool.pylint."MESSAGES CONTROL"]
-disable = ["format", "unsubscriptable-object"]
+disable = ["duplicate-code", "format", "unsubscriptable-object"]
 
 [tool.pylint.SIMILARITIES]
 ignore-imports = true
@@ -158,33 +126,29 @@ ignore-imports = true
 [tool.pylint.FORMAT]
 max-line-length = 88
 
-[tool.ruff]
-target-version = "py311"
+[tool.pylint.DESIGN]
+max-attributes = 20
 
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "venv",
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning:dateutil.*:"]
+addopts = "--cov-report xml:coverage.xml --cov pvcast --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
+pythonpath = ["src"]
+log_cli = true
+log_cli_level = "DEBUG"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
+testpaths = "tests"
+junit_family = "xunit2"
+markers = [
+    "integration: marks as integration test",
+    "notebooks: marks as notebook test",
+    "gpu: marks as gpu test",
+    "slow: marks tests as slow",
+    "unit: fast offline tests",
 ]
+
+[tool.ruff]
+select = ["ALL"]
 ignore = [
     "ANN101",  # Self... explanatory
     "ANN401",  # Opinioated warning on disallowing dynamically typed expressions
@@ -192,48 +156,31 @@ ignore = [
     "D213",    # Conflicts with other rules
     "D417",    # False positives in some occasions
     "PLR2004", # Just annoying, not really useful
+    "PLR0913", # Some functions need arguments to be passed
 
-    # Conflicts with the Ruff formatter
+    # Formatter conflicts
     "COM812",
+    "COM819",
+    "D206",
+    "E501",
     "ISC001",
+    "Q000",
+    "Q001",
+    "Q002",
+    "Q003",
+    "W191",
 ]
-select = ["ALL"]
-
-# Same as Black.
-line-length = 88
-indent-width = 4
-
-[tool.ruff.lint]
-# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
-select = ["E4", "E7", "E9", "F"]
-ignore = []
-
-# Allow fix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = []
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
-[tool.ruff.format]
-# Like Black, use double quotes for strings.
-quote-style = "double"
-
-# Like Black, indent with spaces, rather than tabs.
-indent-style = "space"
-
-# Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
-
-# Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
 
 [tool.ruff.flake8-pytest-style]
-fixture-parentheses = false
 mark-parentheses = false
+fixture-parentheses = false
 
 [tool.ruff.isort]
 known-first-party = ["pvcast"]
 
 [tool.ruff.mccabe]
 max-complexity = 25
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]

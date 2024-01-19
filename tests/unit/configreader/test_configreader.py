@@ -9,8 +9,7 @@ from yaml import ScalarNode, SequenceNode, YAMLError
 from yaml.loader import SafeLoader
 
 from pvcast.config.configreader import ConfigReader
-
-from ...const import (
+from tests.const import (
     TEST_CONF_PATH_ERROR,
     TEST_CONF_PATH_MISSING_SEC,
     TEST_CONF_PATH_NO_SEC,
@@ -30,12 +29,7 @@ class TestConfigReader:
     @pytest.fixture
     def configreader_no_secfile_no_sectags(self) -> ConfigReader:
         """Fixture for the configreader initialized without a secrets file and no !secret tags in config."""
-        return ConfigReader(config_file_path=TEST_CONF_PATH_NO_SEC)
-
-    def test_configreader_secrets_no_secrets_file(self) -> None:
-        """Test the configreader with a secrets file but no secrets file path."""
-        with pytest.raises(YAMLError):
-            _ = ConfigReader(TEST_CONF_PATH_SEC).config
+        return ConfigReader(TEST_CONF_PATH_NO_SEC)
 
     def test_configreader_no_secrets(
         self, configreader_no_secfile_no_sectags: ConfigReader
@@ -50,7 +44,6 @@ class TestConfigReader:
     def test_configreader_load_secrets_none(self) -> None:
         """Test the _load_secrets_file method with None as secrets file path."""
         configreader = ConfigReader(TEST_CONF_PATH_NO_SEC, None)
-        # raise ValueError("Secrets file path is not set.")
         with pytest.raises(ValueError, match="Secrets file path is not set."):
             configreader._load_secrets_file()
 
@@ -77,12 +70,12 @@ class TestConfigReader:
     def test_configreader_wrong_config_file(self) -> None:
         """Test the configreader with a wrong config file."""
         with pytest.raises(FileNotFoundError):
-            ConfigReader(Path("wrongfile.yaml")).config
+            ConfigReader(Path("wrongfile.yaml"))
 
     def test_configreader_wrong_secrets_file(self) -> None:
         """Test the configreader with a wrong secrets file."""
         with pytest.raises(FileNotFoundError):
-            ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml")).config
+            ConfigReader(TEST_CONF_PATH_SEC, Path("wrongfile.yaml"))
 
     def test_invalid_timezone(self) -> None:
         """Test the configreader with an invalid timezone."""
@@ -96,8 +89,10 @@ class TestConfigReader:
         loader = SafeLoader("")
         node = ScalarNode(tag="tag:yaml.org,2002:str", value="test_key")
         configreader_secfile_sectags._secrets = {"test_key": "test_value"}
-        secret = configreader_secfile_sectags._yaml_secrets_loader(loader, node)
-        assert secret == "test_value"
+        assert (
+            configreader_secfile_sectags._yaml_secrets_loader(loader, node)
+            == "test_value"
+        )
 
     def test_yaml_secrets_loader_non_scalar_node(
         self, configreader_secfile_sectags: ConfigReader
@@ -105,5 +100,5 @@ class TestConfigReader:
         """Test the _yaml_secrets_loader method with a non-ScalarNode."""
         loader = SafeLoader("")
         node = SequenceNode(tag="tag:yaml.org,2002:seq", value=[])
-        with pytest.raises(ValueError, match="Expected a ScalarNode"):
+        with pytest.raises(TypeError, match="Expected a ScalarNode"):
             configreader_secfile_sectags._yaml_secrets_loader(loader, node)

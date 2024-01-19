@@ -7,42 +7,50 @@ from pathlib import Path
 
 from pvlib.location import Location
 
+from pvcast.const import CONFIG_FILE_PATH, SECRETS_FILE_PATH
+
 from ...config.configreader import ConfigReader
 from ...model.model import PVSystemManager
 from ...weather import API_FACTORY
 from ...weather.weather import WeatherAPI
 
-# create a singleton config reader
-_config_path = Path("config.yaml")
-_secrets_path = Path("secrets.yaml")
-_config_reader = ConfigReader(_config_path, _secrets_path)
+
+@lru_cache
+def get_config_reader() -> ConfigReader:
+    """Get the config reader instance."""
+    config_path = Path(CONFIG_FILE_PATH)
+    secrets_path = Path(SECRETS_FILE_PATH)
+    return ConfigReader(config_path, secrets_path)
 
 
 @lru_cache
 def get_pv_system_mngr() -> PVSystemManager:
     """Get the PV system manager instance."""
+    config_reader = get_config_reader()
     return PVSystemManager(
-        config=_config_reader.config["plant"],
-        lat=_config_reader.config["general"]["location"]["latitude"],
-        lon=_config_reader.config["general"]["location"]["longitude"],
-        alt=_config_reader.config["general"]["location"]["altitude"],
+        config=config_reader.config["plant"],
+        lat=config_reader.config["general"]["location"]["latitude"],
+        lon=config_reader.config["general"]["location"]["longitude"],
+        alt=config_reader.config["general"]["location"]["altitude"],
     )
 
 
 @lru_cache
 def get_weather_sources() -> tuple[WeatherAPI, ...]:
-    """Get the weather API instances from _config_reader."""
+    """Get the weather API instances from config_reader."""
+    config_reader = get_config_reader()
+
     # all sources of weather data must be listed in the config file
-    weather_data_sources = _config_reader.config["general"]["weather"]["sources"]
+    weather_data_sources = config_reader.config["general"]["weather"]["sources"]
 
     max_forecast_days = dt.timedelta(
-        days=int(_config_reader.config["general"]["weather"]["max_forecast_days"])
+        days=int(config_reader.config["general"]["weather"]["max_forecast_days"])
     )
 
     # get the location
-    latitude = _config_reader.config["general"]["location"]["latitude"]
-    longitude = _config_reader.config["general"]["location"]["longitude"]
-    altitude = _config_reader.config["general"]["location"]["altitude"]
+    latitude = config_reader.config["general"]["location"]["latitude"]
+    longitude = config_reader.config["general"]["location"]["longitude"]
+    altitude = config_reader.config["general"]["location"]["altitude"]
     location = Location(
         latitude=latitude, longitude=longitude, tz="UTC", altitude=altitude
     )

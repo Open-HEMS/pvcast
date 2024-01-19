@@ -6,115 +6,124 @@ repos:
         name: 🐶 Ruff Linter
         language: system
         types: [python]
-        entry: ruff check --fix
+        entry: poetry run ruff check --fix
         require_serial: true
         stages: [commit, push, manual]
       - id: ruff-format
         name: 🐶 Ruff Formatter
         language: system
         types: [python]
-        entry: ruff format
+        entry: poetry run ruff format
         require_serial: true
         stages: [commit, push, manual]
+      - id: blacken-docs
+        name: ☕️ Format documentation examples using black
+        language: system
+        files: '\.(rst|md|markdown|py|tex)$'
+        entry: poetry run blacken-docs
+        require_serial: true
       - id: check-ast
         name: 🐍 Check Python AST
         language: system
         types: [python]
-        entry: check-ast
+        entry: poetry run check-ast
       - id: check-case-conflict
         name: 🔠 Check for case conflicts
         language: system
-        entry: check-case-conflict
+        entry: poetry run check-case-conflict
       - id: check-docstring-first
         name: ℹ️  Check docstring is first
         language: system
         types: [python]
-        entry: check-docstring-first
+        entry: poetry run check-docstring-first
       - id: check-executables-have-shebangs
         name: 🧐 Check that executables have shebangs
         language: system
         types: [text, executable]
-        entry: check-executables-have-shebangs
+        entry: poetry run check-executables-have-shebangs
         stages: [commit, push, manual]
       - id: check-json
         name: ｛ Check JSON files
         language: system
         types: [json]
-        entry: check-json
+        entry: poetry run check-json
       - id: check-merge-conflict
         name: 💥 Check for merge conflicts
         language: system
         types: [text]
-        entry: check-merge-conflict
+        entry: poetry run check-merge-conflict
       - id: check-symlinks
         name: 🔗 Check for broken symlinks
         language: system
         types: [symlink]
-        entry: check-symlinks
+        entry: poetry run check-symlinks
       - id: check-toml
         name: ✅ Check TOML files
         language: system
         types: [toml]
-        entry: check-toml
+        entry: poetry run check-toml
       - id: check-xml
         name: ✅ Check XML files
-        entry: check-xml
+        entry: poetry run check-xml
         language: system
         types: [xml]
       - id: check-yaml
         name: ✅ Check YAML files
         language: system
         types: [yaml]
-        entry: check-yaml
+        entry: poetry run check-yaml
+        args: ["--unsafe"]
       - id: codespell
         name: ✅ Check code for common misspellings
         language: system
         types: [text]
-        entry: codespell
-        exclude: '^requirements\.txt$'
+        exclude: ^poetry\.lock|notebooks/.*\.ipynb|data/
+        exclude_types: [csv, json]
+        entry: poetry run codespell
+        args: [--ignore-words=.codespell-ignore]
       - id: detect-private-key
         name: 🕵️  Detect Private Keys
         language: system
         types: [text]
-        entry: detect-private-key
+        entry: poetry run detect-private-key
       - id: end-of-file-fixer
         name: ⮐  Fix End of Files
         language: system
         types: [text]
-        entry: end-of-file-fixer
+        entry: poetry run end-of-file-fixer
         stages: [commit, push, manual]
       - id: mypy
         name: 🆎 Static type checking using mypy
         language: system
         types: [python]
-        entry: mypy
-        require_serial: true
-      - id: prettier
-        name: 💄 Ensuring files are prettier
+        entry: poetry run mypy
+      - id: no-commit-to-branch
+        name: 🛑 Don't commit to main branch
         language: system
-        types: [yaml, json, markdown]
-        entry: npm run prettier
+        entry: poetry run no-commit-to-branch
         pass_filenames: false
+        always_run: true
+        args:
+          - --branch=main
+      - id: poetry
+        name: 📜 Check pyproject with Poetry
+        language: system
+        entry: poetry check
+        pass_filenames: false
+        always_run: true
       - id: pylint
         name: 🌟 Starring code with pylint
         language: system
         types: [python]
-        entry: pylint
-      - id: pytest
-        name: 🧪 Running tests and test coverage with pytest
-        language: system
-        types: [python]
-        entry: pytest -n auto
-        pass_filenames: false
-        stages: [push, manual]
+        entry: poetry run pylint
       - id: trailing-whitespace
         name: ✄  Trim Trailing Whitespace
         language: system
         types: [text]
-        entry: trailing-whitespace-fixer
+        entry: poetry run trailing-whitespace-fixer
         stages: [commit, push, manual]
       - id: yamllint
-        name: 🎗  Check YAML files with yamllint
+        name: 🎗 Check YAML files with yamllint
         language: system
         types: [yaml]
-        entry: yamllint
+        entry: poetry run yamllint
