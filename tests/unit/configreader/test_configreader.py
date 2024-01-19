@@ -37,7 +37,13 @@ class TestConfigReader:
         """Test the configreader without a secrets file and no !secret tags in config."""
         assert isinstance(configreader_no_secfile_no_sectags, ConfigReader)
         config = configreader_no_secfile_no_sectags.config
-        assert isinstance(config, dict)
+        if not isinstance(config, dict):
+            msg = "Config must be a dictionary."
+            raise TypeError(msg)
+        plant_config = config.get("plant")
+        if not isinstance(plant_config, list):
+            msg = "Plant config must be a list."
+            raise TypeError(msg)
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
@@ -53,7 +59,13 @@ class TestConfigReader:
         """Test the configreader with a secrets file and !secret tags in config."""
         assert isinstance(configreader_secfile_sectags, ConfigReader)
         config = configreader_secfile_sectags.config
-        assert isinstance(config, dict)
+        if not isinstance(config, dict):
+            msg = "Config must be a dictionary."
+            raise TypeError(msg)
+        plant_config = config.get("plant")
+        if not isinstance(plant_config, list):
+            msg = "Plant config must be a list."
+            raise TypeError(msg)
         assert config["plant"][0]["name"] == "EastWest"
         assert config["plant"][1]["name"] == "NorthSouth"
 
@@ -88,7 +100,7 @@ class TestConfigReader:
         """Test the _yaml_secrets_loader method with a ScalarNode."""
         loader = SafeLoader("")
         node = ScalarNode(tag="tag:yaml.org,2002:str", value="test_key")
-        configreader_secfile_sectags._secrets = {"test_key": "test_value"}
+        configreader_secfile_sectags._secrets = {"test_key": "test_value"}  # type: ignore[dict-item]
         assert (
             configreader_secfile_sectags._yaml_secrets_loader(loader, node)
             == "test_value"

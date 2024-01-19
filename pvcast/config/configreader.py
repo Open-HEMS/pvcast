@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class Loader(yaml.SafeLoader):
+class Loader(yaml.SafeLoader):  # pylint: disable=too-many-ancestors
     """Custom YAML loader."""
 
 

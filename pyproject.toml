@@ -41,6 +41,7 @@ websockets = ">=12.0"
 pyarrow = ">=14.0.2"
 httpx = "^0.26.0"
 watchfiles = "^0.21.0"
+types-pyyaml = "^6.0.12.12"
 
 [tool.poetry.group.dev.dependencies]
 blacken-docs = "==1.16.0"
@@ -129,6 +130,11 @@ max-line-length = 88
 [tool.pylint.DESIGN]
 max-attributes = 20
 
+[tool.pylint.MASTER]
+ignore-paths = [
+  "tests",
+]
+
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning:dateutil.*:"]
 addopts = "--cov-report xml:coverage.xml --cov pvcast --cov-fail-under 0 --cov-append -m 'not integration' --cov-report term-missing"
@@ -175,7 +181,7 @@ ignore = [
 mark-parentheses = false
 fixture-parentheses = false
 
-[tool.ruff.lint.per-file-ignores]
+[tool.ruff.per-file-ignores]
 "scripts/*" = ["INP001"]
 
 [tool.ruff.isort]

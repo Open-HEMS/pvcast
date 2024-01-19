@@ -20,38 +20,46 @@ class TestPVModelChain:
     altitude = 10.0
 
     @pytest.fixture(scope="class")
-    def basic_config_wrong_inv(self) -> dict[str, Any]:
+    def basic_config_wrong_inv(self) -> list[MappingProxyType[str, Any]]:
         """Fixture for a basic config with wrong inverter model."""
-        return {
-            "name": "EastWest",
-            "inverter": "wrong_inverter",
-            "microinverter": False,
-            "arrays": [
+        return [
+            MappingProxyType(
                 {
-                    "azimuth": 180,
-                    "tilt": 30,
-                    "module": "LG_Electronics_Inc__LG300N1C_B3",
-                    "strings": 1,
+                    "name": "EastWest",
+                    "inverter": "wrong_inverter",
+                    "microinverter": False,
+                    "arrays": [
+                        {
+                            "azimuth": 180,
+                            "tilt": 30,
+                            "module": "LG_Electronics_Inc__LG300N1C_B3",
+                            "strings": 1,
+                        }
+                    ],
                 }
-            ],
-        }
+            )
+        ]
 
     @pytest.fixture(scope="class")
-    def basic_config_wrong_mod(self) -> dict[str, Any]:
+    def basic_config_wrong_mod(self) -> list[MappingProxyType[str, Any]]:
         """Fixture for a basic config with wrong module model."""
-        return {
-            "name": "EastWest",
-            "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
-            "microinverter": False,
-            "arrays": [
+        return [
+            MappingProxyType(
                 {
-                    "azimuth": 180,
-                    "tilt": 30,
-                    "module": "wrong_module",
-                    "strings": 1,
+                    "name": "EastWest",
+                    "inverter": "SolarEdge_Technologies_Ltd___SE4000__240V_",
+                    "microinverter": False,
+                    "arrays": [
+                        {
+                            "azimuth": 180,
+                            "tilt": 30,
+                            "module": "wrong_module",
+                            "strings": 1,
+                        }
+                    ],
                 }
-            ],
-        }
+            )
+        ]
 
     def test_pv_sys_mngr_init(
         self, basic_config: list[dict[str, Any]], pv_sys_mngr: PVSystemManager
@@ -90,10 +98,10 @@ class TestPVModelChain:
         """Test the init_pv_system function with wrong inverter model."""
         with pytest.raises(
             KeyError,
-            match=f"Device {basic_config_wrong_inv['inverter']} not found in the database.",
+            match=f"Device {basic_config_wrong_inv[0]['inverter']} not found in the database.",
         ):
             PVSystemManager(
-                [MappingProxyType(basic_config_wrong_inv)],
+                basic_config_wrong_inv,
                 *self.location,
                 self.altitude,
             )
@@ -106,7 +114,7 @@ class TestPVModelChain:
             KeyError, match=f"One of { {'wrong_module'} } not found in the database."
         ):
             PVSystemManager(
-                [MappingProxyType(basic_config_wrong_mod)],
+                basic_config_wrong_mod,
                 *self.location,
                 self.altitude,
             )

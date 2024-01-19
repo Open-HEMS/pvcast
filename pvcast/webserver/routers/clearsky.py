@@ -26,7 +26,7 @@ router = APIRouter()
 
 
 @router.get("/{plant_name}/{interval}")
-def get(
+def get(  # pylint: disable=too-many-arguments
     plant_name: PVPlantNames,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
     weather_apis: Annotated[list[WeatherAPI], Depends(get_weather_sources)],

@@ -8,11 +8,9 @@ from urllib.parse import urljoin
 import polars as pl
 import pytest
 import responses
-from pvlib.location import Location
 
 from pvcast.weather import API_FACTORY
 from pvcast.weather.homeassistant import WeatherAPIHomeassistant
-from pvcast.weather.weather import WeatherAPI
 from tests.const import HASS_TEST_TOKEN, HASS_TEST_URL, HASS_WEATHER_ENTITY_ID
 
 from .test_weather import CommonWeatherTests
@@ -20,8 +18,9 @@ from .test_weather import CommonWeatherTests
 if TYPE_CHECKING:
     import typing
 
+    from pvlib.location import Location
+
     from pvcast.weather.weather import WeatherAPI
-    from tests.conftest import Location
 
 
 class WeatherPlatform(CommonWeatherTests):

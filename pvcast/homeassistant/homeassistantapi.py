@@ -9,7 +9,7 @@ import typing
 from dataclasses import InitVar, dataclass, field
 
 from voluptuous import All, Coerce, MultipleInvalid, Range, Required, Schema
-from websockets.sync.client import Connection, connect  # type: ignore[import]
+from websockets.sync.client import Connection, connect  # type: ignore[attr-defined]
 
 _LOGGER = logging.getLogger("uvicorn")
 

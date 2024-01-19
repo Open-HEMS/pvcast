@@ -117,19 +117,17 @@ class PVPlantModel:
         """
         _LOGGER.debug("Creating PV system model for system %s", config["name"])
         micro: bool = config["microinverter"]
-        inverter: str = config["inverter"]
         arrays: list[dict[str, str | int]] = config["arrays"]
-        name: str = config["name"]
 
         # get inverter params from the SAM database
-        inv_df: pl.DataFrame = inv_param.filter(index=inverter).collect()
+        inv_df: pl.DataFrame = inv_param.filter(index=config["inverter"]).collect()
         if inv_df.is_empty():
-            msg = f"Device {inverter} not found in the database."
+            msg = f"Device {config["inverter"]} not found in the database."
             raise KeyError(msg)
         inv_dict = dict(inv_df.rows_by_key(key=["index"], named=True, unique=True))
 
         # get module params from the SAM database
-        modules = pl.Series([array["module"] for array in arrays]).unique()
+        modules = pl.Series([array["module"] for array in arrays]).unique()  # pylint: disable=assignment-from-no-return
         mod_df: pl.DataFrame = mod_param.filter(index=modules).collect()
 
         if len(modules) != len(mod_df):
@@ -143,13 +141,13 @@ class PVPlantModel:
         # system uses microinverters, create one model chain for each PV module
         if micro:
             pv_systems = self._build_system_micro(
-                arrays, inv_param=inv_dict, mod_param=mod_dict, name=name
+                arrays, inv_param=inv_dict, mod_param=mod_dict, name=config["name"]
             )
 
         # system uses a single inverter, create one model chain for the whole system
         else:
             pv_systems = self._build_system_string(
-                arrays, inv_param=inv_dict, mod_param=mod_dict, name=name
+                arrays, inv_param=inv_dict, mod_param=mod_dict, name=config["name"]
             )
         return pv_systems
 
@@ -176,7 +174,7 @@ class PVPlantModel:
             mount = FixedMount(
                 surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
             )
-            module_param = mod_param[array["module"]]
+            module_param = mod_param[array["module"]]  # type: ignore[index]
 
             # each module has it's own inverter therefore must have its own PVSystem
             for module_id in range(n_modules):
@@ -227,7 +225,7 @@ class PVPlantModel:
             mount = FixedMount(
                 surface_tilt=array["tilt"], surface_azimuth=array["azimuth"]
             )
-            module_param = mod_param[array["module"]]
+            module_param = mod_param[array["module"]]  # type: ignore[index]
 
             # define PV array
             arr = Array(
@@ -280,7 +278,7 @@ class PVSystemManager:
     )
     _pv_plants: dict[str, PVPlantModel] = field(init=False, repr=False)
 
-    def __post_init__(
+    def __post_init__(  # pylint: disable=too-many-arguments
         self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path
     ) -> None:
         """Perform post-initialization tasks for the PVSystemManager."""
@@ -324,7 +322,7 @@ class PVSystemManager:
             raise KeyError(msg) from exc
 
     def _create_pv_plants(
-        self, inv_param: pl.DataFrame, mod_param: pl.DataFrame
+        self, inv_param: pl.LazyFrame, mod_param: pl.LazyFrame
     ) -> dict[str, PVPlantModel]:
         """Create a PVPlantModel object from a user supplied config.
 

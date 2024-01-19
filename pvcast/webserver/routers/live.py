@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger("uvicorn")
 
 
 @router.get("/{plant_name}/{interval}/{weather_source}")
-def get(
+def get(  # pylint: disable=too-many-arguments
     plant_name: PVPlantNames,
     weather_source: WeatherSources,
     pv_system_mngr: Annotated[PVSystemManager, Depends(get_pv_system_mngr)],
@@ -61,7 +61,7 @@ def get(
     """
     # get the correct weather API from the list of weather APIs
     weather_apis_f = filter(lambda api: api.name == weather_source.value, weather_apis)
-    weather_api = next(weather_apis_f, None)
+    weather_api: WeatherAPI = next(weather_apis_f)
 
     # convert dict to dataframe
     weather_dict: dict[str, Any] = weather_api.get_weather(calc_irrads=True)

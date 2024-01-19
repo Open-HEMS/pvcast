@@ -30,10 +30,10 @@ def get_pv_system_mngr() -> PVSystemManager:
     """Get the PV system manager instance."""
     config_reader = get_config_reader()
     return PVSystemManager(
-        config=config_reader.config["plant"],
-        lat=config_reader.config["general"]["location"]["latitude"],
-        lon=config_reader.config["general"]["location"]["longitude"],
-        alt=config_reader.config["general"]["location"]["altitude"],
+        config=config_reader.config["plant"],  # type: ignore[arg-type]
+        lat=config_reader.config["general"]["location"]["latitude"],  # type: ignore[index]
+        lon=config_reader.config["general"]["location"]["longitude"],  # type: ignore[index]
+        alt=config_reader.config["general"]["location"]["altitude"],  # type: ignore[index]
     )
 
 
@@ -43,16 +43,16 @@ def get_weather_sources() -> tuple[WeatherAPI, ...]:
     config_reader = get_config_reader()
 
     # all sources of weather data must be listed in the config file
-    weather_data_sources = config_reader.config["general"]["weather"]["sources"]
+    weather_data_sources = config_reader.config["general"]["weather"]["sources"]  # type: ignore[index]
 
     max_forecast_days = dt.timedelta(
-        days=int(config_reader.config["general"]["weather"]["max_forecast_days"])
+        days=int(config_reader.config["general"]["weather"]["max_forecast_days"])  # type: ignore[index]
     )
 
     # get the location
-    latitude = config_reader.config["general"]["location"]["latitude"]
-    longitude = config_reader.config["general"]["location"]["longitude"]
-    altitude = config_reader.config["general"]["location"]["altitude"]
+    latitude = config_reader.config["general"]["location"]["latitude"]  # type: ignore[index]
+    longitude = config_reader.config["general"]["location"]["longitude"]  # type: ignore[index]
+    altitude = config_reader.config["general"]["location"]["altitude"]  # type: ignore[index]
     location = Location(
         latitude=latitude, longitude=longitude, tz="UTC", altitude=altitude
     )

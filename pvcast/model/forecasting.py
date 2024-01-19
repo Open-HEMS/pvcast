@@ -117,7 +117,7 @@ class ForecastResult:
 
         # upsample the data
         fc_result_cpy.ac_power = (
-            fc_result_cpy.ac_power.sort(by="datetime")  # fc_type: ignore[union-attr]
+            fc_result_cpy.ac_power.sort(by="datetime")  # type: ignore[union-attr]
             .upsample(time_column="datetime", every=freq, maintain_order=True)
             .select(pl.all().interpolate().forward_fill())
         )
@@ -239,7 +239,7 @@ class PowerEstimate(ABC):
             model_chain.run_model(weather_df_pd)
 
             # add the results to the results DataFrame
-            ac: pl.Series = pl.from_pandas(model_chain.results.ac, include_index=False)
+            ac: pl.Series = pl.from_pandas(model_chain.results.ac, include_index=False)  # type: ignore[assignment]
             result_df = result_df.with_columns(ac.alias(model_chain.name))
 
         # sum the results of all model chains horizontally and return the ForecastResult
@@ -351,20 +351,21 @@ class Historical(PowerEstimate):
         )
 
     def _prepare_weather(self, weather_df: pl.DataFrame | None = None) -> pl.DataFrame:
-        # if the PVGIS data file does not exist, retrieve it from the API and save it
+        # if the PVGIS data file does not exist, retrieve it from the API and store it
+        tmy_data: pl.LazyFrame
         if not self._pvgis_data_path.exists():
-            tmy_data = self._store_pvgis_data_api()
+            self._store_pvgis_data_api()
 
         # scan data from CSV file
-        tmy_data: pl.LazyFrame = pl.scan_csv(self._pvgis_data_path)
+        tmy_data = pl.scan_csv(self._pvgis_data_path)
 
         # if there are no specifically requested dates, return the entire TMY dataset
         if weather_df is None:
             return tmy_data.collect()
 
         # get start and end dates we want to obtain TMY data for
-        lower = weather_df["datetime"].min().replace(year=HISTORICAL_YEAR_MAPPING)
-        upper = weather_df["datetime"].max().replace(year=HISTORICAL_YEAR_MAPPING)
+        lower = weather_df["datetime"].min().replace(year=HISTORICAL_YEAR_MAPPING)  # type: ignore[union-attr, call-arg]
+        upper = weather_df["datetime"].max().replace(year=HISTORICAL_YEAR_MAPPING)  # type: ignore[union-attr, call-arg]
         return (
             tmy_data.filter(
                 (pl.col("datetime").str.to_datetime() >= lower)
