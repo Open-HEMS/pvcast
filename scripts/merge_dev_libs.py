@@ -1,11 +1,9 @@
-"""Script to retrieve inverter / PV module CSV files from PVLib and System Advisor Model (SAM) and merge
-them into a single CSV file.
-"""
+"""Retrieve inverter / PV module CSVs from PVLib and SAM and merge them into a single CSV file."""
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import pvlib
@@ -19,6 +17,9 @@ from const import (
     MOD_SAM_PATH,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -29,13 +30,13 @@ def retrieve_sam_wrapper(path: Path) -> pd.DataFrame:
     :return: The SAM database as a pandas DataFrame.
     """
     if not path.exists():
-        raise FileNotFoundError(f"Database {path} does not exist.")
+        msg = f"Database {path} does not exist."
+        raise FileNotFoundError(msg)
 
     # retrieve database
     pv_df = pvlib.pvsystem.retrieve_sam(name=None, path=str(path))
     pv_df = pv_df.transpose()
-    pv_df = pv_df.reset_index()
-    return pv_df
+    return pv_df.reset_index()
 
 
 def retrieve_and_merge(path1: Path, path2: Path) -> pd.DataFrame:
@@ -46,10 +47,10 @@ def retrieve_and_merge(path1: Path, path2: Path) -> pd.DataFrame:
     :return: The merged SAM databases as a pandas DataFrame.
     """
     df1 = retrieve_sam_wrapper(path1)
-    _LOGGER.info(f"{path1.name} length: {len(df1)}")
+    _LOGGER.info("%s length: %s", path1.name, len(df1))
 
     df2 = retrieve_sam_wrapper(path2)
-    _LOGGER.info(f"{path2.name} length: {len(df2)}")
+    _LOGGER.info("%s length: %s", path2.name, len(df2))
 
     # merge databases
     merged_df = pd.concat([df1, df2], axis=0)
@@ -57,18 +58,18 @@ def retrieve_and_merge(path1: Path, path2: Path) -> pd.DataFrame:
     # drop duplicates
     if merged_df.duplicated(subset=["index"]).any():
         _LOGGER.info(
-            f"Dropping {len(merged_df[merged_df.duplicated(subset=['index'])])} duplicate entries for {path1.name}."
+            "Dropping %s duplicate entries for %s.",
+            len(merged_df[merged_df.duplicated(subset=["index"])]),
+            path1.name,
         )
         merged_df = merged_df.drop_duplicates(subset=["index"], keep="first")
 
     # sort in alphabetical order
-    merged_df = merged_df.sort_values(by=["index"])
-
-    return merged_df
+    return merged_df.sort_values(by=["index"])
 
 
 def main() -> None:
-    """Main function."""
+    """Entry point for the script."""
     # configure logging
     logging.basicConfig(level=logging.DEBUG)
     fmt = "%(asctime)s %(levelname)s (%(threadName)s) " + "[%(name)s] %(message)s"
@@ -88,7 +89,6 @@ def main() -> None:
 
     # apply manual corrections
     for key, value in MANUAL_CORRECTIONS_INV.items():
-        print(f"Got: {inv_df.loc[inv_df['index'] == key, list(value.keys())].head()}")
         inv_df.loc[inv_df["index"] == key, list(value.keys())] = list(value.values())
 
     # save databases

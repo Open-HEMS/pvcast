@@ -244,7 +244,7 @@ class PVPlantModel:
         # create the PV system
         pv_system = PVSystem(
             arrays=pv_arrays,
-            inverter=list(inv_param.keys())[0],
+            inverter=next(iter(inv_param.keys())),
             inverter_parameters=next(iter(inv_param.values())),
             name=name,
         )
@@ -254,6 +254,7 @@ class PVPlantModel:
 @dataclass
 class PVSystemManager:
     """Interface between the PV system model and the rest of the application.
+
     This class is responsible for instantiating the PV system model and running the simulation,
     and returning the results. Everything in PVModel is done in UTC timezone.
 
@@ -282,6 +283,7 @@ class PVSystemManager:
     def __post_init__(
         self, lat: float, lon: float, alt: float, inv_path: Path, mod_path: Path
     ) -> None:
+        """Perform post-initialization tasks for the PVSystemManager."""
         self._loc = Location(
             lat, lon, tz="UTC", altitude=alt, name=f"PV plant at {lat}, {lon}"
         )

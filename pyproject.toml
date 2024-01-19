@@ -175,6 +175,9 @@ ignore = [
 mark-parentheses = false
 fixture-parentheses = false
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["INP001"]
+
 [tool.ruff.isort]
 known-first-party = ["pvcast"]
 

@@ -4,15 +4,17 @@ from __future__ import annotations
 import datetime as dt
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pvlib.location import Location
 
+from pvcast.config.configreader import ConfigReader
 from pvcast.const import CONFIG_FILE_PATH, SECRETS_FILE_PATH
+from pvcast.model.model import PVSystemManager
+from pvcast.weather import API_FACTORY
 
-from ...config.configreader import ConfigReader
-from ...model.model import PVSystemManager
-from ...weather import API_FACTORY
-from ...weather.weather import WeatherAPI
+if TYPE_CHECKING:
+    from pvcast.weather.weather import WeatherAPI
 
 
 @lru_cache

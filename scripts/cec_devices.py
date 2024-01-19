@@ -12,14 +12,12 @@ _LOGGER = logging.getLogger(__name__)
 
 def get_cec_inverters() -> pd.DataFrame:
     """Retrieve CEC inverters from PVLib."""
-    cec_inverters = pvlib.pvsystem.retrieve_sam("CECInverter")
-    return cec_inverters
+    return pvlib.pvsystem.retrieve_sam("CECInverter")
 
 
 def get_cec_modules() -> pd.DataFrame:
     """Retrieve CEC modules from PVLib."""
-    cec_modules = pvlib.pvsystem.retrieve_sam("CECMod")
-    return cec_modules
+    return pvlib.pvsystem.retrieve_sam("CECMod")
 
 
 def save_to_csv(data: pd.DataFrame, path: pl.Path) -> None:
@@ -30,14 +28,14 @@ def save_to_csv(data: pd.DataFrame, path: pl.Path) -> None:
 
     # Move name to first column
     names = data["Name"]
-    data.drop(labels=["Name"], axis=1, inplace=True)
+    data = data.drop(labels=["Name"], axis=1)
     data.insert(0, "Name", names)
 
     data.to_csv(path, index=False)
 
 
 def main() -> None:
-    """Main function."""
+    """Entry point for the script."""
     # configure logging
     logging.basicConfig(level=logging.DEBUG)
     fmt = "%(asctime)s %(levelname)s (%(threadName)s) " + "[%(name)s] %(message)s"

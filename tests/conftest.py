@@ -306,7 +306,7 @@ def weather_api_fix_loc(request: pytest.FixtureRequest, test_url: str) -> Weathe
 
 # create fake test file secrets.yaml when the test suite is run
 # this is needed for the configreader to work
-def pytest_sessionstart(session: pytest.Session) -> None:
+def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
     """Create a fake secrets.yaml file for testing."""
     secrets = {
         "lat": 51.2,
