@@ -47,7 +47,7 @@ class TestWebserver:
         client_base: TestClient,
     ) -> None:
         """Test getting the favicon."""
-        response = client_base.get("/favicon.ico")
+        response = client_base.get("/favicon")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
 
