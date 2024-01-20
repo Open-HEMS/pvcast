@@ -39,9 +39,7 @@ uvicorn = ">=0.23.2"
 lxml = ">=4.9.4"
 websockets = ">=12.0"
 pyarrow = ">=14.0.2"
-httpx = "^0.26.0"
 watchfiles = "^0.21.0"
-types-pyyaml = "^6.0.12.12"
 
 [tool.poetry.group.dev.dependencies]
 blacken-docs = "==1.16.0"
@@ -64,6 +62,8 @@ safety = "==3.0.1"
 yamllint = "==1.33.0"
 types_requests = "==2.31.0.20240106"
 types_pytz = "==2023.3.1.1"
+types-pyyaml = "^6.0.12.12"
+httpx = "^0.26.0"
 
 [tool.codespell]
 skip = 'poetry.lock'
