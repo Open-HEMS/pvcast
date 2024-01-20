@@ -5,7 +5,7 @@ import datetime as dt
 
 PORT = 4557
 WEBSERVER_URL = "127.0.0.1"  # Bind to localhost interface only
-API_VERSION = "0.1.0"
+API_VERSION = "0.1.2"
 
 START_DT_DEFAULT = dt.datetime.now(dt.timezone.utc).replace(
     hour=0, minute=0, second=0, microsecond=0

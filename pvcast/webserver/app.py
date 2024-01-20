@@ -1,10 +1,11 @@
 """Main module for the webserver."""
 from __future__ import annotations
 
-import logging
-
 from fastapi import FastAPI
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import HTMLResponse  # noqa: TCH002
 
 from .const import API_VERSION
 from .routers.clearsky import router as clearsky_router
@@ -12,25 +13,39 @@ from .routers.historical import router as historical_router
 from .routers.live import router as live_router
 from .routers.utils import router as utils_router
 
-_LOGGER = logging.getLogger("uvicorn")
-FAV_ICON_PATH = "pvcast/webserver/favicon.png"
+FAV_ICON_PATH = "pvcast/webserver/static/favicon.png"
 
 app = FastAPI(
     title="PV Cast",
     description="A webserver for the PV Cast project.",
     version=API_VERSION,
-    docs_url="/",
+    docs_url=None,
     redoc_url=None,
 )
 
+app.mount("/static", StaticFiles(directory="pvcast/webserver/static/"), name="static")
+
+# add core function routers
 app.include_router(clearsky_router, prefix="/clearsky", tags=["clearsky"])
 app.include_router(historical_router, prefix="/historical", tags=["historical"])
 app.include_router(live_router, prefix="/live", tags=["live"])
 app.include_router(utils_router, prefix="/utils", tags=["utilities"])
 
 
-@app.get("/favicon.ico", include_in_schema=False)
+@app.get("/", include_in_schema=False)
+def overridden_swagger() -> HTMLResponse:
+    """Override the default swagger page to add a favicon.
+
+    :return: The swagger page.
+    """
+    return get_swagger_ui_html(
+        openapi_url="/openapi.json",
+        title="PV Cast",
+        swagger_favicon_url="http://localhost:4557/favicon",
+    )
+
+
+@app.get("/favicon", include_in_schema=False)
 async def favicon() -> FileResponse:
     """Get the favicon. Favicon attribution: gungyoga04."""
-    _LOGGER.info("Getting favicon")
     return FileResponse(FAV_ICON_PATH)
