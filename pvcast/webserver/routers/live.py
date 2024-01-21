@@ -25,7 +25,7 @@ from .helpers import get_forecast_result_dict
 
 router = APIRouter()
 
-_LOGGER = logging.getLogger("uvicorn")
+_LOGGER = logging.getLogger(__name__)
 
 
 @router.get("/{plant_name}/{interval}/{weather_source}")
