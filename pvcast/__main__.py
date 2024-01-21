@@ -3,19 +3,23 @@
 from __future__ import annotations
 
 import logging
+import os
+from typing import Any
 
 import uvicorn
 
-from .webserver.const import PORT, WEBSERVER_URL
+from pvcast.commandline.commandline import get_args
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def init_logger() -> None:
+def init_logger(log_level: int = logging.INFO) -> None:
     """Initialize python logger."""
-    logging.basicConfig(level=logging.DEBUG)
-    fmt = "%(asctime)s %(levelname)s (%(threadName)s) " + "[%(name)s] %(message)s"
+    fmt = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
     datefmt = "%Y-%m-%d %H:%M:%S"
+
+    # set the application logger
+    logging.basicConfig(level=log_level, format=fmt, datefmt=datefmt)
 
     # stdout handler
     logging.getLogger().handlers[0].setFormatter(
@@ -25,18 +29,25 @@ def init_logger() -> None:
 
 def main() -> None:
     """Entry point for the application script."""
-    init_logger()
-    _LOGGER.info("Starting pvcast webserver")
+    args: dict[str, Any] = get_args()
+
+    # set config file paths as environment variables
+    os.environ["CONFIG_FILE_PATH"] = str(args["config"])
+    if args["secrets"]:
+        os.environ["SECRETS_FILE_PATH"] = str(args["secrets"])
+
+    # initialize logger
+    init_logger(args["log_level"])
+    _LOGGER.info("Starting pvcast webserver ... log level: %s", args["log_level"])
 
     # start uvicorn server
     uvicorn.run(
         "pvcast.webserver.app:app",
-        host=WEBSERVER_URL,
-        port=PORT,
-        reload=True,
-        workers=3,
-        reload_includes=["*.yaml", "*.yml"],
-        reload_excludes=["*.pyc", "*.pyo", "__pycache__"],
+        host=args["host"],
+        port=args["port"],
+        reload=False,
+        workers=args["workers"],
+        log_level=logging.getLevelName(args["log_level"]).lower(),
     )
 
 

@@ -181,7 +181,12 @@ class WeatherAPI(ABC):
             )
 
         # check for gaps and NaN values
-        if not all(processed_data["datetime"].diff()[1:] == self.freq_source):
+        if not all(
+            processed_data["datetime"]
+            .diff()
+            .filter(processed_data["datetime"].diff().is_not_null())
+            == self.freq_source
+        ):
             msg = "Processed data contains gaps."
             raise WeatherAPIError(msg)
         if any(col.has_validity() for col in processed_data):

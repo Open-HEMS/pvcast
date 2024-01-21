@@ -120,6 +120,14 @@ class TestWeatherAPI(CommonWeatherTests):
         t_now = dt.datetime.now(dt.timezone.utc)
         assert t_now - weather_api._last_update < dt.timedelta(seconds=1)
 
+    # test get_weather with only one input datapoint
+    @pytest.mark.parametrize("weather_api", [common_df.head(1)], indirect=True)
+    def test_get_weather_one_datapoint(self, weather_api: WeatherAPI) -> None:
+        """Test the get_weather function with only one input datapoint."""
+        weather = weather_api.get_weather()
+        assert isinstance(weather, dict)
+        assert len(weather["data"]) == 1
+
     @pytest.mark.parametrize(
         ("weather_api", "error_match"),
         [

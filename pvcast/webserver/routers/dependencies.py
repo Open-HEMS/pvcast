@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -17,11 +18,15 @@ if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
 
+_LOGGER = logging.getLogger("uvicorn")
+
+
 @lru_cache
 def get_config_reader() -> ConfigReader:
     """Get the config reader instance."""
     config_path = Path(CONFIG_FILE_PATH)
     secrets_path = Path(SECRETS_FILE_PATH)
+    _LOGGER.info("Reading config file: %s", config_path)
     return ConfigReader(config_path, secrets_path)
 
 

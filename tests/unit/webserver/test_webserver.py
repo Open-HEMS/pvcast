@@ -73,7 +73,7 @@ class TestWebserver:
 
 
 @pytest.mark.parametrize("weather_api_fix_loc", [mock_data], indirect=True)
-@pytest.mark.parametrize("plant_name", ["EastWest", "South"])
+@pytest.mark.parametrize("plant_name", ["EastWest", "South", "All"])
 @pytest.mark.parametrize("interval", ["1m", "5m", "15m", "30m", "1h"])
 class CommonForecastTests:
     """Common tests for the forecast API."""
