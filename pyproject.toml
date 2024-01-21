@@ -63,7 +63,7 @@ yamllint = "==1.33.0"
 types_requests = "==2.31.0.20240106"
 types_pytz = "==2023.3.1.1"
 types-pyyaml = "^6.0.12.12"
-httpx = "^0.26.0"
+httpx = "0.26.0"
 
 [tool.codespell]
 skip = 'poetry.lock'
