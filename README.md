@@ -5,6 +5,7 @@
 [![Python Versions][python-versions-shield]][pypi]
 [![PyPi Downloads][downloads-shield]][downloads-url]
 [![License][license-shield]](LICENSE)
+[![Discord][discord-shield]][discord-url]
 
 For all documentation please refer to the [wiki](https://github.com/Open-HEMS/pvcast/wiki).
 
@@ -42,5 +43,8 @@ SOFTWARE.
 [downloads-shield]: https://img.shields.io/pypi/dm/pvcast
 [downloads-url]: https://pypistats.org/packages/pvcast
 [license-shield]: https://img.shields.io/github/license/Open-HEMS/pvcast?color=blue
+[discord-shield]: https://img.shields.io/discord/1182408466019655700?logo=discord&label=discord&color=%235662F6
+[discord-url]: https://discord.gg/M9dqkkB64K
+
 
 
