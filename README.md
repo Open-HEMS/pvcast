@@ -45,6 +45,3 @@ SOFTWARE.
 [license-shield]: https://img.shields.io/github/license/Open-HEMS/pvcast?color=blue
 [discord-shield]: https://img.shields.io/discord/1182408466019655700?logo=discord&label=discord&color=%235662F6
 [discord-url]: https://discord.gg/M9dqkkB64K
-
-
-
