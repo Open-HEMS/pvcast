@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-BASE_DIR = Path("pvcast")
-BASE_CEC_DATA_PATH = BASE_DIR / "data/proc"
+CWD = Path(__file__).parent.parent.absolute()
+BASE_CEC_DATA_PATH = CWD / "data/proc"
 
 VALID_UPSAMPLE_FREQ = ("1h", "60m", "30m", "15m", "5m", "1m")
 VALID_DOWN_SAMPLE_FREQ = ("h", "d", "w", "mo", "y")

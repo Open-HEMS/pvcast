@@ -1,6 +1,8 @@
 """Main module for the webserver."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import FileResponse
@@ -13,7 +15,7 @@ from .routers.historical import router as historical_router
 from .routers.live import router as live_router
 from .routers.utils import router as utils_router
 
-FAV_ICON_PATH = "pvcast/webserver/static/favicon.png"
+STATIC_PATH = Path(__file__).parent / "static"
 
 app = FastAPI(
     title="PV Cast",
@@ -23,7 +25,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
-app.mount("/static", StaticFiles(directory="pvcast/webserver/static/"), name="static")
+app.mount("/static", StaticFiles(directory=STATIC_PATH), name="static")
 
 # add core function routers
 app.include_router(clearsky_router, prefix="/clearsky", tags=["clearsky"])
@@ -48,4 +50,4 @@ def overridden_swagger() -> HTMLResponse:
 @app.get("/favicon", include_in_schema=False)
 async def favicon() -> FileResponse:
     """Get the favicon. Favicon attribution: gungyoga04."""
-    return FileResponse(FAV_ICON_PATH)
+    return FileResponse(STATIC_PATH / "favicon.png")
