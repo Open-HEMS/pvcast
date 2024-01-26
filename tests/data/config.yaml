@@ -1,0 +1,81 @@
+# configuration file for pvcast
+
+# general configuration
+---
+general:
+  weather:
+    max_forecast_days: 7
+    sources:
+      - name: HomeAssistant
+        type: homeassistant
+        entity_id: weather.forecast_thuis
+        url: http://192.168.1.217:8123
+        token: !secret long_lived_token
+      - name: ClearOutside
+        type: clearoutside
+  location:
+    latitude: !secret lat
+    longitude: !secret lon
+    timezone: !secret time_zone
+    altitude: !secret alt
+
+# PV system configuration
+plant:
+  - name: EastWest
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: East
+        tilt: 30
+        azimuth: 90
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: West
+        tilt: 30
+        azimuth: 270
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+  - name: South
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: South
+        tilt: 30
+        azimuth: 180
+        modules_per_string: 16
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+  - name: MicroMixed
+    inverter: Enphase_Energy_Inc___IQ7X_96_x_ACM_US__240V_
+    microinverter: true
+    arrays:
+      - name: zone_1_schuin
+        tilt: 30
+        azimuth: 90
+        modules_per_string: 5
+        strings: 1
+        module: JA_Solar_JAM72S01_385_PR
+      - name: zone_2_plat
+        tilt: 15
+        azimuth: 160
+        modules_per_string: 8
+        strings: 1
+        module: JA_Solar_JAM72S01_385_PR
+  - name: home
+    inverter: SolarEdge_Technologies_Ltd___SE4000__240V_
+    microinverter: false
+    arrays:
+      - name: NE
+        tilt: 23
+        azimuth: 44
+        modules_per_string: 4
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_
+      - name: SW
+        tilt: 23
+        azimuth: 224
+        modules_per_string: 8
+        strings: 1
+        module: Trina_Solar_TSM_330DD14A_II_

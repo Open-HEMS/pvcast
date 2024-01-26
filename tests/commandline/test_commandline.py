@@ -40,6 +40,13 @@ class TestCommandline:
         with pytest.raises(argparse.ArgumentTypeError, match="does not exist"):
             _check_file_exists(non_existing_file)
 
+    def test_check_file_exists_directory(self, tmp_path: Path) -> None:
+        """Test if _check_file_exists raises an error if the path is a directory."""
+        directory = tmp_path / "directory"
+        directory.mkdir()
+        with pytest.raises(argparse.ArgumentTypeError, match="is not a file"):
+            _check_file_exists(directory)
+
     @patch("argparse.ArgumentParser.parse_args")
     @patch("pvcast.commandline.commandline._check_file_exists")
     @pytest.mark.parametrize(
@@ -62,11 +69,9 @@ class TestCommandline:
 
         # assertions
         assert args["log_level"] == logging.DEBUG
-        assert args["config"] == Path("test_config.yaml")
+        assert args["config"] == "test_config.yaml"
         assert (
-            args["secrets"] == Path("test_secrets.yaml")
-            if "secrets" in mock_args
-            else True
+            args["secrets"] == "test_secrets.yaml" if "secrets" in mock_args else True
         )
         assert args["workers"] == 5
         assert args["host"] == "localhost"
