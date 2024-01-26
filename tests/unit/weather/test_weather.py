@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 
+import numpy as np
 import polars as pl
 import pytest
 from pvlib.location import Location
@@ -132,12 +133,16 @@ class TestWeatherAPI(CommonWeatherTests):
         ("weather_api", "error_match"),
         [
             (
-                common_df.with_columns(pl.Series([0, None, 1]).alias("temperature")),
+                common_df.with_columns(pl.Series([0, np.nan, 1]).alias("temperature")),
                 "Processed data contains NaN values.",
             ),
             (
                 common_df.with_columns(pl.lit(0).alias("invalid_column")),
                 "Error validating weather data:",
+            ),
+            (
+                common_df.with_columns(pl.Series([0, None, 1]).alias("temperature")),
+                "Processed data contains null values.",
             ),
         ],
         indirect=["weather_api"],
