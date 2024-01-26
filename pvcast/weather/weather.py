@@ -180,7 +180,7 @@ class WeatherAPI(ABC):
                 pl.col("datetime").str.to_datetime()
             )
 
-        # check for gaps and NaN values
+        # check for gaps in the datetime index
         if not all(
             processed_data["datetime"]
             .diff()
@@ -189,8 +189,29 @@ class WeatherAPI(ABC):
         ):
             msg = "Processed data contains gaps."
             raise WeatherAPIError(msg)
-        if any(col.has_validity() for col in processed_data):
+
+        # check for NaN values
+        if (
+            processed_data.with_columns(
+                pl.exclude("datetime").is_nan().any(ignore_nulls=True)
+            )
+            .sum()
+            .sum_horizontal()
+            .item()
+            != 0
+        ):
             msg = "Processed data contains NaN values."
+            raise WeatherAPIError(msg)
+
+        # check for null values
+        if (
+            processed_data.with_columns(pl.exclude("datetime").is_null().any())
+            .sum()
+            .sum_horizontal()
+            .item()
+            != 0
+        ):
+            msg = "Processed data contains null values."
             raise WeatherAPIError(msg)
 
         # cut off the data that exceeds max_forecast_days

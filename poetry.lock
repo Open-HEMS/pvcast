@@ -1210,17 +1210,17 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "polars-lts-cpu"
-version = "0.20.5"
+version = "0.20.6"
 description = "Blazingly fast DataFrame library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "polars_lts_cpu-0.20.5-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:93571c70a9cd536468430ab66a7a9f8c327220de0a5ee6c6324a062ac7265c38"},
-    {file = "polars_lts_cpu-0.20.5-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:92274673531530028ee11a544bd524c934ee758782676b58caf107ae198c2aad"},
-    {file = "polars_lts_cpu-0.20.5-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:dcc4b291f60811a2ee1e0eb9da8a807af61ce7224ea06c11feb4cc2cba4558b6"},
-    {file = "polars_lts_cpu-0.20.5-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:790bfcf8e63b801a7af93c4b6fd11d2630cff14849989013ab9e97c8f42dc28a"},
-    {file = "polars_lts_cpu-0.20.5-cp38-abi3-win_amd64.whl", hash = "sha256:3d211e3dc956ad1fd0a81f2a2c573d40ede0b0551c0ce4080361b741bfdc2105"},
-    {file = "polars_lts_cpu-0.20.5.tar.gz", hash = "sha256:4ff6e38dcf45c0e89185414a9c0beda1988275c3086dabd1d12a90a2c42cf07f"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:6f1ed2a7ad13dd30aefb4b983dfcce0ed787c304d32585f651061e63b6d3ada6"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:20fafc5f9ea467718cf7b61184f1ca38816de4b9bf4a84b0c6dbe413ae5738c1"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c27275b4f9ddfb4d3f8d6df1cffa2285621fc008778ca4e0a6794cfaabf8a403"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:40454b8d904f5582f3ab1741e7842ad3de74005285277237148232b7c003b4cf"},
+    {file = "polars_lts_cpu-0.20.6-cp38-abi3-win_amd64.whl", hash = "sha256:1693aa7d59d17b49c7aa485c9a6d8a2006a9e2b6b03fbc5509e2bd8fb7acef2f"},
+    {file = "polars_lts_cpu-0.20.6.tar.gz", hash = "sha256:914d0e1ba51d7076e7b3156a0739b5111dd31a563ad0b11fa3ef3a1d3f21c59d"},
 ]
 
 [package.extras]
@@ -2276,4 +2276,4 @@ dev = ["doc8", "flake8", "flake8-import-order", "rstcheck[sphinx]", "sphinx"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "4caa62e6d6d0cd8b7f5eafe4af8d7bdb099b2108b03347aae2ada63d0d3774fa"
+content-hash = "b35a7e0a4ae232ff0aaf73ba640a330c0ccbbb48940613fc1da9bfb4a7de502a"
