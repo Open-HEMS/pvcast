@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from pvcast.weather.weather import WeatherAPI
 
 
-_LOGGER = logging.getLogger("uvicorn")
+_LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache

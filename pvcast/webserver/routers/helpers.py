@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pvcast.model.model import PVSystemManager
     from pvcast.webserver.models.base import Interval
 
-_LOGGER = logging.getLogger("uvicorn")
+_LOGGER = logging.getLogger(__name__)
 
 
 def get_forecast_result_dict(
