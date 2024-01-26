@@ -51,11 +51,8 @@ class ConfigReader:
                 # validate the configuration
                 Schema(self._config_schema)(config)
             except yaml.YAMLError as exc:
-                _LOGGER.exception(
-                    "Error parsing configuration file %s. Did you include secrets.yaml?",
-                    self.config_file_path,
-                )
-                msg = f"Error parsing configuration file {self.config_file_path}"
+                msg = f"Error parsing configuration file {self.config_file_path}. Did you forget to include --secrets?"
+                _LOGGER.exception(msg)
                 raise yaml.YAMLError(msg) from exc
 
         # check if the timezone is valid

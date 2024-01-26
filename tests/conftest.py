@@ -12,6 +12,7 @@ See https://stackoverflow.com/questions/34466027/in-pytest-what-is-the-use-of-co
 from __future__ import annotations
 
 import datetime as dt
+import os
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -22,11 +23,15 @@ import pytest
 import yaml
 from pvlib.location import Location
 
-from pvcast.const import SECRETS_FILE_PATH
 from pvcast.model.model import PVPlantModel, PVSystemManager
 from pvcast.weather.weather import WeatherAPI
 
 from .const import LOC_AUS, LOC_EUW, LOC_USW, MOCK_WEATHER_API
+
+SECRETS_FILE_PATH_TEST = Path("tests/data/secrets.yaml")
+CONFIG_FILE_PATH_TEST = Path("tests/data/config.yaml")
+os.environ["SECRETS_FILE_PATH"] = str(SECRETS_FILE_PATH_TEST)
+os.environ["CONFIG_FILE_PATH"] = str(CONFIG_FILE_PATH_TEST)
 
 
 @pytest.fixture(scope="session")
@@ -315,6 +320,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # noqa: ARG001
         "long_lived_token": "test_token",
         "time_zone": "UTC",
     }
-    if not Path.exists(SECRETS_FILE_PATH):
-        with Path.open(SECRETS_FILE_PATH, "w") as outfile:
+    if not Path.exists(SECRETS_FILE_PATH_TEST):
+        with Path.open(SECRETS_FILE_PATH_TEST, "w") as outfile:
             yaml.dump(secrets, outfile, default_flow_style=False)
