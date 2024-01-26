@@ -9,14 +9,15 @@ from typing import Any
 import uvicorn
 
 from pvcast.commandline.commandline import get_args
+from pvcast.const import DATE_FORMAT, LOG_FORMAT, UVICORN_LOG_CONFIG
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def init_logger(log_level: int = logging.INFO) -> None:
     """Initialize python logger."""
-    fmt = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-    datefmt = "%Y-%m-%d %H:%M:%S"
+    fmt = LOG_FORMAT
+    datefmt = DATE_FORMAT
 
     # set the application logger
     logging.basicConfig(level=log_level, format=fmt, datefmt=datefmt)
@@ -48,6 +49,7 @@ def main() -> None:
         reload=False,
         workers=args["workers"],
         log_level=logging.getLevelName(args["log_level"]).lower(),
+        log_config=UVICORN_LOG_CONFIG,
     )
 
 
