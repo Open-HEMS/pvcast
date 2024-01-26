@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 import uvicorn
@@ -31,11 +30,6 @@ def init_logger(log_level: int = logging.INFO) -> None:
 def main() -> None:
     """Entry point for the application script."""
     args: dict[str, Any] = get_args()
-
-    # set config file paths as environment variables
-    os.environ["CONFIG_FILE_PATH"] = str(args["config"])
-    if args["secrets"]:
-        os.environ["SECRETS_FILE_PATH"] = str(args["secrets"])
 
     # initialize logger
     init_logger(args["log_level"])
