@@ -41,9 +41,7 @@ def overridden_swagger() -> HTMLResponse:
     :return: The swagger page.
     """
     return get_swagger_ui_html(
-        openapi_url="/openapi.json",
-        title="PV Cast",
-        swagger_favicon_url="http://localhost:4557/favicon",
+        openapi_url="/openapi.json", title="PV Cast", swagger_favicon_url="/favicon"
     )
 
 
