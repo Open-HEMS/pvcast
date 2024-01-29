@@ -1,6 +1,7 @@
 """Main module for the webserver."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -33,8 +34,14 @@ app.include_router(historical_router, prefix="/historical", tags=["historical"])
 app.include_router(live_router, prefix="/live", tags=["live"])
 app.include_router(utils_router, prefix="/utils", tags=["utilities"])
 
+# if env variable SOLARA_APP is set, enable and import solara
+if os.environ.get("SOLARA_APP"):
+    import solara.server.fastapi
 
-@app.get("/", include_in_schema=False)
+    app.mount("/solara", app=solara.server.fastapi.app)
+
+
+@app.get("/docs", include_in_schema=False)
 def overridden_swagger() -> HTMLResponse:
     """Override the default swagger page to add a favicon.
 

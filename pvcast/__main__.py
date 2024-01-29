@@ -19,12 +19,11 @@ def init_logger(log_level: int = logging.INFO) -> None:
     datefmt = DATE_FORMAT
 
     # set the application logger
-    logging.basicConfig(level=log_level, format=fmt, datefmt=datefmt)
+    logging.basicConfig(level=log_level, format=fmt, datefmt=datefmt, force=True)
 
-    # stdout handler
-    logging.getLogger().handlers[0].setFormatter(
-        logging.Formatter(fmt, datefmt=datefmt)
-    )
+    # set log level of imported modules
+    logging.getLogger("solara").setLevel(logging.WARNING)
+    logging.getLogger("reacton").setLevel(logging.WARNING)
 
 
 def main() -> None:
@@ -33,7 +32,10 @@ def main() -> None:
 
     # initialize logger
     init_logger(args["log_level"])
-    _LOGGER.info("Starting pvcast webserver ... log level: %s", args["log_level"])
+    _LOGGER.info(
+        "Starting pvcast webserver ... log level: %s",
+        logging.getLevelName(args["log_level"]),
+    )
 
     # start uvicorn server
     uvicorn.run(
@@ -42,7 +44,6 @@ def main() -> None:
         port=args["port"],
         reload=False,
         workers=args["workers"],
-        log_level=logging.getLevelName(args["log_level"]).lower(),
         log_config=UVICORN_LOG_CONFIG,
     )
 
