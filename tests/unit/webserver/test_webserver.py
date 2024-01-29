@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import urllib.parse
+from importlib import reload
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, call, patch
 
 import numpy as np
 import polars as pl
@@ -11,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pvcast.model.const import HISTORICAL_YEAR_MAPPING
+from pvcast.webserver import app
 from tests.const import MOCK_WEATHER_API
 
 if TYPE_CHECKING:
@@ -56,7 +60,7 @@ class TestWebserver:
         client_base: TestClient,
     ) -> None:
         """Test getting the docs."""
-        response = client_base.get("/")
+        response = client_base.get("/docs")
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/html; charset=utf-8"
         assert "PV Cast" in response.text
@@ -70,6 +74,27 @@ class TestWebserver:
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         assert len(response.json()) > 0
+
+    @patch.dict(os.environ, {"SOLARA_APP": "1"})
+    @patch("fastapi.FastAPI", autospec=True)
+    def test_solara_app_mounted(self, mock_app: MagicMock) -> None:
+        """Test that solara is mounted if the env variable is set."""
+        reload(app)
+        assert app.os.environ.get("SOLARA_APP") == "1"  # type: ignore[attr-defined]
+        mock_app.return_value.mount.assert_called_with(
+            "/solara", app=mock_app.return_value
+        )
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch("fastapi.FastAPI", autospec=True)
+    def test_solara_app_not_mounted(self, mock_app: MagicMock) -> None:
+        """Test that solara is not mounted if the env variable is not set."""
+        reload(app)
+        assert app.os.environ.get("SOLARA_APP") is None  # type: ignore[attr-defined]
+        assert (
+            call("/solara", app=mock_app.return_value)
+            not in mock_app.return_value.mount.call_args_list
+        )
 
 
 @pytest.mark.parametrize("weather_api_fix_loc", [mock_data], indirect=True)

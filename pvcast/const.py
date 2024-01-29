@@ -30,7 +30,10 @@ UVICORN_LOG_CONFIG: dict[str, Any] = {
     },
     "loggers": {
         "uvicorn.error": {"level": "INFO", "handlers": ["default"], "propagate": False},
-        "uvicorn.access": {"level": "INFO", "handlers": ["access"], "propagate": False},
+        "uvicorn.access": {
+            "level": "WARNING",
+            "handlers": ["access"],
+            "propagate": False,
+        },
     },
-    "root": {"level": "DEBUG", "handlers": ["default"], "propagate": False},
 }

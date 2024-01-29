@@ -150,3 +150,6 @@ test_pvlib.py
 
 # vscode
 .vscode/
+
+# pvcastfrontend
+pvcast-frontend/

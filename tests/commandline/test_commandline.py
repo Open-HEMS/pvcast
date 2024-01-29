@@ -47,6 +47,11 @@ class TestCommandline:
         with pytest.raises(argparse.ArgumentTypeError, match="is not a file"):
             _check_file_exists(directory)
 
+    def test_check_file_exists_not_path(self) -> None:
+        """Test if _check_file_exists raises an error if the path is not a Path object."""
+        with pytest.raises(argparse.ArgumentTypeError, match="is not a valid path"):
+            _check_file_exists("not_a_path")  # type: ignore[arg-type]
+
     @patch("argparse.ArgumentParser.parse_args")
     @patch("pvcast.commandline.commandline._check_file_exists")
     @pytest.mark.parametrize(
