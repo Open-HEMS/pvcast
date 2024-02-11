@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytz
 import yaml
 from pytz import UnknownTimeZoneError
-from voluptuous import Any, Coerce, Required, Schema, Url
+from voluptuous import All, Any, Coerce, Range, Required, Schema, Url
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -148,10 +148,14 @@ class ConfigReader:
                         Required("arrays"): [
                             {
                                 Required("name"): str,
-                                Required("tilt"): Coerce(float),
-                                Required("azimuth"): Coerce(float),
-                                Required("modules_per_string"): int,
-                                Required("strings"): int,
+                                Required("tilt"): All(
+                                    Coerce(float), Range(min=0, max=90)
+                                ),
+                                Required("azimuth"): All(
+                                    Coerce(float), Range(min=0, max=360)
+                                ),
+                                Required("modules_per_string"): All(int, Range(min=1)),
+                                Required("strings"): All(int, Range(min=1)),
                                 Required("module"): str,
                             }
                         ],
