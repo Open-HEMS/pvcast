@@ -21,18 +21,20 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_config_reader() -> ConfigReader:
     """Get the config reader instance."""
+    _LOGGER.debug("Creating new ConfigReader instance.")
     config_path = os.environ.get("CONFIG_FILE_PATH")
     secrets_path = os.environ.get("SECRETS_FILE_PATH")
     _LOGGER.info("Reading config file: %s", config_path)
     return ConfigReader(Path(config_path), Path(secrets_path) if secrets_path else None)  # type: ignore[arg-type]
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_pv_system_mngr() -> PVSystemManager:
     """Get the PV system manager instance."""
+    _LOGGER.debug("Creating new PVSystemManager instance.")
     config_reader = get_config_reader()
     return PVSystemManager(
         config=config_reader.config["plant"],  # type: ignore[arg-type]
@@ -42,9 +44,10 @@ def get_pv_system_mngr() -> PVSystemManager:
     )
 
 
-@lru_cache
+@lru_cache(maxsize=1)
 def get_weather_sources() -> tuple[WeatherAPI, ...]:
     """Get the weather API instances from config_reader."""
+    _LOGGER.debug("Creating new WeatherAPI instances.")
     config_reader = get_config_reader()
 
     # all sources of weather data must be listed in the config file

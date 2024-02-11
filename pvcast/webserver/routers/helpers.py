@@ -34,6 +34,11 @@ def get_forecast_result_dict(
     :param weather_df: Weather dataframe
     :return: Nested dict
     """
+    _LOGGER.debug(
+        "Computing forecast for plant %s with forecasting algorithm %s",
+        plant_name,
+        fc_type,
+    )
     if pv_system_mngr.pv_plant_count == 0:
         msg = "PV plant list is empty. Check the config file."
         raise ValueError(msg)
@@ -49,8 +54,6 @@ def get_forecast_result_dict(
     # loop over all PV plants and compute the estimated power output
     ac_w_period = pl.DataFrame()
     for pv_plant in pv_plant_names:
-        _LOGGER.info("Calculating PV output for plant: %s", pv_plant)
-
         # compute the PV output for the given PV system and datetimes
         pvplant = pv_system_mngr.get_pv_plant(pv_plant)
 
