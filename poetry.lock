@@ -1698,17 +1698,17 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "polars-lts-cpu"
-version = "0.20.9"
+version = "0.20.10"
 description = "Blazingly fast DataFrame library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "polars_lts_cpu-0.20.9-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:a792f3b0ed734e685383f44a742ce22a4e64c8316fd39251d7151e0187c71526"},
-    {file = "polars_lts_cpu-0.20.9-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:25451f1e57d2035729b24a4a56537df305f098a6a8ee618dc19c5ab2e1da4265"},
-    {file = "polars_lts_cpu-0.20.9-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4445d8d0af4a03154ac37dd4cfdab17755da9c63fdd2ff125a5e848569a5b981"},
-    {file = "polars_lts_cpu-0.20.9-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:c7d51891c9432c3a5def50e9276014e190b516d742fdf47a5271df52f308662c"},
-    {file = "polars_lts_cpu-0.20.9-cp38-abi3-win_amd64.whl", hash = "sha256:e1d22bce565bcb57b1c20c546a4a070594e134c803520154c87fd0dafd3d4d3d"},
-    {file = "polars_lts_cpu-0.20.9.tar.gz", hash = "sha256:7bb316aeb2654720f0a922c2fe51ef328e08e471d32a6c27f55e32d444de6429"},
+    {file = "polars_lts_cpu-0.20.10-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:318afd0a8d43ec68514a9360de1fea63e39566ac5d988c32711e857e26440c8c"},
+    {file = "polars_lts_cpu-0.20.10-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:41c8e398190f2b507aff3c5ed248099b0bb07c4b6d3f899d696cc5b743b6b1ff"},
+    {file = "polars_lts_cpu-0.20.10-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ae3be92f3a79b2f1d295830e339a4df2002c65202e996a9918f6ef7fc5cf211e"},
+    {file = "polars_lts_cpu-0.20.10-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:aac7da30f91b59dac22e4a925f35c492a968ce4d6b26796b35d863640b90fd19"},
+    {file = "polars_lts_cpu-0.20.10-cp38-abi3-win_amd64.whl", hash = "sha256:f0bedc9f3801f4db73b41b15a202c07f2818e9a0190d009a90c59c9fece5eb98"},
+    {file = "polars_lts_cpu-0.20.10.tar.gz", hash = "sha256:534d1911c1978cb8a4e154ba4dec20ae0f513e115db9a068597aeae031878c9f"},
 ]
 
 [package.extras]
