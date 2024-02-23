@@ -57,7 +57,7 @@ responses = "==0.25.0"
 mypy = "==1.8.0"
 covdefaults = "==2.3.0"
 codespell = "==2.2.6"
-coverage = { version = "7.4.2", extras = ["toml"] }
+coverage = { version = "7.4.3", extras = ["toml"] }
 pre_commit = "==3.6.2"
 pre_commit_hooks = "==4.5.0"
 pylint = "==3.0.3"
