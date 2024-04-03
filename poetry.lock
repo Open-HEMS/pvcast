@@ -2774,13 +2774,13 @@ files = [
 
 [[package]]
 name = "solara"
-version = "1.29.1"
+version = "1.30.1"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "solara-1.29.1-py2.py3-none-any.whl", hash = "sha256:461330aab755a0072485edecc321deb9670c6e09299a89269c3e93f6ecbd50c2"},
-    {file = "solara-1.29.1.tar.gz", hash = "sha256:e8bed67959851990694e4400fc0a97986b2038cddd63c322a2055e76f47685eb"},
+    {file = "solara-1.30.1-py2.py3-none-any.whl", hash = "sha256:3f05f5268b81face8a5a5d4c5eae62c03571f76bef0a0e76f47ab83557a67253"},
+    {file = "solara-1.30.1.tar.gz", hash = "sha256:86ca619ce2e5209ebe0bda9f6f13036eac045dfea2a5f11def336f51e93d136f"},
 ]
 
 [package.dependencies]
@@ -2808,7 +2808,7 @@ watchfiles = {version = "*", markers = "python_version > \"3.6\""}
 websockets = "*"
 
 [package.extras]
-assets = ["solara-assets (==1.29.1)"]
+assets = ["solara-assets (==1.30.1)"]
 dev = ["black", "bqplot", "bqplot-image-gl", "bump2version", "codespell", "dask[dataframe]", "flake8", "ipyreact", "mdit-py-plugins", "mypy", "playwright", "plotly", "polars", "pre-commit", "pytest", "pytest-cov", "pytest-mock", "pytest-playwright", "pytest-timeout", "python-dotenv", "types-markdown", "types-pyyaml", "types-requests", "vaex-core", "vaex-hdf5", "vaex-jupyter"]
 documentation = ["altair", "bqplot", "folium", "ipycanvas", "ipyleaflet", "matplotlib", "numpy", "openai", "plotly", "tiktoken", "vaex-core", "vaex-hdf5", "vega-datasets"]
 extra = ["numpy", "pillow", "pygments", "pygments (==2.10)"]
