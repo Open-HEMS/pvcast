@@ -1206,6 +1206,7 @@ files = [
     {file = "lxml-5.2.1-cp36-cp36m-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:c38d7b9a690b090de999835f0443d8aa93ce5f2064035dfc48f27f02b4afc3d0"},
     {file = "lxml-5.2.1-cp36-cp36m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5670fb70a828663cc37552a2a85bf2ac38475572b0e9b91283dc09efb52c41d1"},
     {file = "lxml-5.2.1-cp36-cp36m-manylinux_2_28_x86_64.whl", hash = "sha256:958244ad566c3ffc385f47dddde4145088a0ab893504b54b52c041987a8c1863"},
+    {file = "lxml-5.2.1-cp36-cp36m-manylinux_2_5_x86_64.manylinux1_x86_64.whl", hash = "sha256:b6241d4eee5f89453307c2f2bfa03b50362052ca0af1efecf9fef9a41a22bb4f"},
     {file = "lxml-5.2.1-cp36-cp36m-musllinux_1_1_aarch64.whl", hash = "sha256:2a66bf12fbd4666dd023b6f51223aed3d9f3b40fef06ce404cb75bafd3d89536"},
     {file = "lxml-5.2.1-cp36-cp36m-musllinux_1_1_ppc64le.whl", hash = "sha256:9123716666e25b7b71c4e1789ec829ed18663152008b58544d95b008ed9e21e9"},
     {file = "lxml-5.2.1-cp36-cp36m-musllinux_1_1_s390x.whl", hash = "sha256:0c3f67e2aeda739d1cc0b1102c9a9129f7dc83901226cc24dd72ba275ced4218"},
@@ -1781,17 +1782,17 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "polars-lts-cpu"
-version = "0.20.18"
+version = "0.20.20"
 description = "Blazingly fast DataFrame library"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "polars_lts_cpu-0.20.18-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:49e5350bc05935ac6f1032f7bfec7c1614f404183e9a7f325e633a07564fe427"},
-    {file = "polars_lts_cpu-0.20.18-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:ed147576ddb97c92df8f7936b8d3287252fd7261dc5277de5d32a6af8bdf9085"},
-    {file = "polars_lts_cpu-0.20.18-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e740b041031985a1fbb61da4acc5160ced71af289022ad032521f07f65b55c00"},
-    {file = "polars_lts_cpu-0.20.18-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:fc35b5aaf2b58f241acc2b41879e83c4fbad5dab154ae99e62a2e3675d48f957"},
-    {file = "polars_lts_cpu-0.20.18-cp38-abi3-win_amd64.whl", hash = "sha256:9ac0fe3d7548e7449d996149b3f31edd52a7def7cc9a1b56a1bf68af11b3f9dc"},
-    {file = "polars_lts_cpu-0.20.18.tar.gz", hash = "sha256:8a7abf4970ec1a1217f4934ffe9c6469207131edd0db909bb04f62e48fb88057"},
+    {file = "polars_lts_cpu-0.20.20-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:2198eb53700afd7b9dd562f011df3a323a9ea95e59b08b355dcaab4902fb40bb"},
+    {file = "polars_lts_cpu-0.20.20-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:dd82793d35c23eae6ed567236f2a6bc08e7b1a1253464a033de98b20f25c9527"},
+    {file = "polars_lts_cpu-0.20.20-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:45ae6d8f070d9d801f22c4582f32f2985159cd175d016044fd95fe5b269093de"},
+    {file = "polars_lts_cpu-0.20.20-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:1a360a16030db75d94876254374af181b390415f3b451d09b0553b96c6dbef6d"},
+    {file = "polars_lts_cpu-0.20.20-cp38-abi3-win_amd64.whl", hash = "sha256:d1d09d6c64f2358d16562f56aec193ad8b62160df270e120e1f8dee79f89cfed"},
+    {file = "polars_lts_cpu-0.20.20.tar.gz", hash = "sha256:8f2371ab55ab9efeb2e5dd7cbca60d5556836d914309a1fdf03cbaff1516bd56"},
 ]
 
 [package.extras]
