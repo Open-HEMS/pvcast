@@ -42,7 +42,7 @@ WEATHER_SCHEMA = vol.Schema(
                 vol.Required("wind_speed"): vol.All(
                     vol.Coerce(float), vol.Range(min=0)
                 ),
-                vol.Required("cloud_cover"): vol.All(
+                vol.Optional("cloud_cover"): vol.All(
                     vol.Coerce(float), vol.Range(min=0, max=100)
                 ),
                 vol.Optional("ghi"): vol.All(vol.Coerce(float), vol.Range(0, 1400)),
@@ -146,9 +146,7 @@ class WeatherAPI(ABC):
         :return: Response from the API
         """
 
-    def get_weather(
-        self, *, live: bool = False, calc_irrads: bool = False
-    ) -> dict[str, Any]:
+    def get_weather(self, *, live: bool = False) -> dict[str, Any]:
         """Get weather data from API response. This function will always return data return in UTC.
 
         :param live: Before returning weather data force a weather API update.
@@ -229,10 +227,17 @@ class WeatherAPI(ABC):
         )
 
         # calculate irradiance from cloud cover
-        if calc_irrads:
+        if 'ghi' not in processed_data:
             _LOGGER.debug("Calculating irradiance from cloud cover.")
             processed_data = processed_data.with_columns(
                 self.cloud_cover_to_irradiance(processed_data)
+            )
+
+        # calculate direct irradiance from global irradiance
+        if 'ghi' in processed_data and not {'dni', 'dhi'}.issubset(processed_data.columns) :
+            _LOGGER.debug("Calculating direct irradiance from ghi.")
+            processed_data = processed_data.with_columns(
+                self.global_to_direct_irradiance(processed_data)
             )
 
         # convert datetime column to str
@@ -257,6 +262,33 @@ class WeatherAPI(ABC):
         # cache data
         self._weather_data = validated_data
         return validated_data
+
+    def global_to_direct_irradiance(
+        self, data: pl.DataFrame, **kwargs: Any
+    ) -> pl.DataFrame:
+        """Convert cloud cover to irradiance using the clearsky scaling method.
+
+        :param data: Global Horizontal Irradiance as a polars pl.Series
+        :param **kwargs: Passed to the selected method.
+        :return: Irradiance, columns include dni, dhi.
+        """
+        times = pd.date_range(
+            data["datetime"].min(),
+            data["datetime"].max(),
+            freq=self.freq_source,
+        )
+        ghi = pl.Series.to_pandas(data["ghi"]).to_numpy()
+
+        # get clear sky data for provided datetimes
+        solpos = self.location.get_solarposition(times)
+
+        dni = disc(ghi, solpos["zenith"], times)["dni"]
+        dhi = ghi - dni * np.cos(np.radians(solpos["zenith"]))
+
+        # construct df with ghi, dni, dhi and fill NaNs with 0
+        return (
+            pl.DataFrame({"dni": dni, "dhi": dhi}).fill_null(0).fill_nan(0)
+        )
 
     def cloud_cover_to_irradiance(
         self, cloud_cover: pl.DataFrame, how: str = "clearsky_scaling", **kwargs: Any
