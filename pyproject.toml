@@ -58,7 +58,7 @@ mypy = "==1.9.0"
 covdefaults = "==2.3.0"
 codespell = "==2.2.6"
 coverage = { version = "7.5.4", extras = ["toml"] }
-pre_commit = "==3.7.0"
+pre_commit = "==3.7.1"
 pre_commit_hooks = "==4.6.0"
 pylint = "==3.1.0"
 safety = "==3.1.0"
