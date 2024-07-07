@@ -44,7 +44,7 @@ polars-lts-cpu = "^0.20.6"
 solara = ">=1.25.1"
 
 [tool.poetry.group.dev.dependencies]
-watchfiles = "==0.21.0"
+watchfiles = "==0.22.0"
 blacken-docs = "==1.18.0"
 black = "==24.4.2"
 ruff = "==0.5.1"
