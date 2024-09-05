@@ -3032,35 +3032,35 @@ files = [
 
 [[package]]
 name = "solara"
-version = "1.34.1"
+version = "1.39.0"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "solara-1.34.1-py2.py3-none-any.whl", hash = "sha256:5cea71cba85641e837d6bb56814e1af841f3fe2025c5cb5543d5ba5500d17d63"},
-    {file = "solara-1.34.1.tar.gz", hash = "sha256:3fc5062cf10b5d5406f77ae504b14f9c9a32162b760e626812512be7b6a4deed"},
+    {file = "solara-1.39.0-py2.py3-none-any.whl", hash = "sha256:c9b016b28055d7fdaf2cf0c0231b93b1eec0eb59473d5b29473d472e6cfa4505"},
+    {file = "solara-1.39.0.tar.gz", hash = "sha256:77a930cad4decea4cb24f519b43b0d39be633d95ea593d497a80483aebeb8bb2"},
 ]
 
 [package.dependencies]
-solara-server = {version = "1.34.1", extras = ["dev", "starlette"]}
-solara-ui = {version = "1.34.1", extras = ["all"]}
+solara-server = {version = "1.39.0", extras = ["dev", "starlette"]}
+solara-ui = {version = "1.39.0", extras = ["all"]}
 
 [package.extras]
 all = ["solara[assets]", "solara[dev]", "solara[documentation]", "solara[pytest]"]
-assets = ["solara-assets (==1.34.1)"]
+assets = ["solara-assets (==1.39.0)"]
 dev = ["bqplot", "bqplot-image-gl", "bump2version", "codespell", "dask[dataframe]", "ipyreact", "mdit-py-plugins", "mypy", "numpy (<2)", "playwright", "plotly", "polars", "pre-commit", "pytest", "pytest-cov", "pytest-mock", "pytest-playwright", "pytest-timeout", "python-dotenv", "ruff", "types-markdown", "types-pyyaml", "types-requests", "vaex-core", "vaex-hdf5", "vaex-jupyter"]
 documentation = ["altair", "bqplot", "folium", "ipycanvas", "ipyleaflet", "matplotlib", "numpy (<2)", "openai", "plotly", "tiktoken", "vaex-core", "vaex-hdf5", "vega-datasets"]
-pytest = ["pytest-ipywidgets[all] (==1.34.1)"]
+pytest = ["pytest-ipywidgets[all] (==1.39.0)"]
 
 [[package]]
 name = "solara-server"
-version = "1.34.1"
+version = "1.39.0"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "solara_server-1.34.1-py2.py3-none-any.whl", hash = "sha256:6da2f54dd17889570609e128f84e9e0141f0564af15daf5f4a733fb7ec3b019b"},
-    {file = "solara_server-1.34.1.tar.gz", hash = "sha256:1113f6a30af4d4b626a8b7dbc23d733f49d8fb7825731b7c8c91bc7295fa5a07"},
+    {file = "solara_server-1.39.0-py2.py3-none-any.whl", hash = "sha256:a16160cc423d39a70bab42ca2b3a51a305596464c5233e2c84d7988ee15c9e3b"},
+    {file = "solara_server-1.39.0.tar.gz", hash = "sha256:af4e273da9fd9e1497cc4b77e424071b2b424ae92b61c457f7adc5e0b1528232"},
 ]
 
 [package.dependencies]
@@ -3086,13 +3086,13 @@ starlette = ["starlette", "uvicorn", "websockets"]
 
 [[package]]
 name = "solara-ui"
-version = "1.34.1"
+version = "1.39.0"
 description = ""
 optional = false
 python-versions = "*"
 files = [
-    {file = "solara_ui-1.34.1-py2.py3-none-any.whl", hash = "sha256:0d73ce2a1558abf9c4d1af02bc00310b776c56963fb76c8dc9672ddb57eaa95e"},
-    {file = "solara_ui-1.34.1.tar.gz", hash = "sha256:67aec396a35cab5f6a7dc954ae2a2c95204feded81f5ae9c9ea8a983f20695ad"},
+    {file = "solara_ui-1.39.0-py2.py3-none-any.whl", hash = "sha256:87fd10fd08573af1e1237160b4a043f84073afdf89e73f337fb44526238d26b6"},
+    {file = "solara_ui-1.39.0.tar.gz", hash = "sha256:586a8d10ac23526ad62ab819bcbba4de1432738eaef96e371ce2a076f3fdcd6c"},
 ]
 
 [package.dependencies]
