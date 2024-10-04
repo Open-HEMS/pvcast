@@ -60,7 +60,7 @@ codespell = "==2.3.0"
 coverage = { version = "7.6.1", extras = ["toml"] }
 pre_commit = "==3.8.0"
 pre_commit_hooks = "==4.6.0"
-pylint = "==3.2.7"
+pylint = "==3.3.1"
 safety = "==3.2.7"
 yamllint = "==1.35.1"
 types_requests = "==2.32.0.20240914"
