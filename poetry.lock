@@ -1937,39 +1937,41 @@ testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
 name = "polars-lts-cpu"
-version = "0.20.31"
+version = "1.9.0"
 description = "Blazingly fast DataFrame library"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "polars_lts_cpu-0.20.31-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:f86d8c487fdf4bcbbadbee35609c9b6f9dbbd88531f4c8e30c7f2934dc0df928"},
-    {file = "polars_lts_cpu-0.20.31-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:559ae9ad949d483e2cbcabdd87e629adb37e94c5f0ab1d4545db5c91a7e0afd7"},
-    {file = "polars_lts_cpu-0.20.31-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9a70af95bcfec2b02a0298e158ccdfa1ab7f54e1990aa8c80662b46fbd643694"},
-    {file = "polars_lts_cpu-0.20.31-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:150365a512d39f57811405d90851bd567ba2d2041def3cfca4d52981608357cc"},
-    {file = "polars_lts_cpu-0.20.31-cp38-abi3-win_amd64.whl", hash = "sha256:e7b57f0a19e8553df571cf67d609bb00e81e0799fcc374438a7f4d1cd8c08de4"},
-    {file = "polars_lts_cpu-0.20.31.tar.gz", hash = "sha256:367633ef523e9ed717bc56f30a6d4bc5be1a5403bd4974bca12286f83fc36435"},
+    {file = "polars_lts_cpu-1.9.0-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:1dd1484b9a08171184f198c7b1a1bdcea7457de4a7d481949ec410ee96a49bc9"},
+    {file = "polars_lts_cpu-1.9.0-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:fb10fd9f8a8c0145ec70c4f3dde3ff1ef9f18079964c9dc40e8aac3d7521a862"},
+    {file = "polars_lts_cpu-1.9.0-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9eb332c2e5837759a5cb406566a1d0feddf145711176cf89f745dba010c739a9"},
+    {file = "polars_lts_cpu-1.9.0-cp38-abi3-manylinux_2_24_aarch64.whl", hash = "sha256:e8f8eb6d9c5b017eb4ffb6276255b77d4eb8508e30bc2898e2b55ebe8bc9715c"},
+    {file = "polars_lts_cpu-1.9.0-cp38-abi3-win_amd64.whl", hash = "sha256:0c199d86e3d6b775264e3a596ebfbae4c7848b88bed4248822b7b498b2e96f2d"},
+    {file = "polars_lts_cpu-1.9.0.tar.gz", hash = "sha256:4848ea9f54cb59cce6b08a5f161a5c488684b55729f2ef076c65ca92759a985e"},
 ]
 
 [package.extras]
-adbc = ["adbc-driver-manager", "adbc-driver-sqlite"]
-all = ["polars[adbc,async,cloudpickle,connectorx,deltalake,fastexcel,fsspec,gevent,iceberg,numpy,pandas,plot,pyarrow,pydantic,sqlalchemy,timezone,xlsx2csv,xlsxwriter]"]
-async = ["nest-asyncio"]
+adbc = ["adbc-driver-manager[dbapi]", "adbc-driver-sqlite[dbapi]"]
+all = ["polars-lts-cpu[async,cloudpickle,database,deltalake,excel,fsspec,graph,iceberg,numpy,pandas,plot,pyarrow,pydantic,style,timezone]"]
+async = ["gevent"]
+calamine = ["fastexcel (>=0.9)"]
 cloudpickle = ["cloudpickle"]
 connectorx = ["connectorx (>=0.3.2)"]
+database = ["nest-asyncio", "polars-lts-cpu[adbc,connectorx,sqlalchemy]"]
 deltalake = ["deltalake (>=0.15.0)"]
-fastexcel = ["fastexcel (>=0.9)"]
+excel = ["polars-lts-cpu[calamine,openpyxl,xlsx2csv,xlsxwriter]"]
 fsspec = ["fsspec"]
-gevent = ["gevent"]
+gpu = ["cudf-polars-cu12"]
+graph = ["matplotlib"]
 iceberg = ["pyiceberg (>=0.5.0)"]
-matplotlib = ["matplotlib"]
 numpy = ["numpy (>=1.16.0)"]
 openpyxl = ["openpyxl (>=3.0.0)"]
-pandas = ["pandas", "pyarrow (>=7.0.0)"]
-plot = ["hvplot (>=0.9.1)"]
+pandas = ["pandas", "polars-lts-cpu[pyarrow]"]
+plot = ["altair (>=5.4.0)"]
 pyarrow = ["pyarrow (>=7.0.0)"]
 pydantic = ["pydantic"]
-pyxlsb = ["pyxlsb (>=1.0)"]
-sqlalchemy = ["pandas", "sqlalchemy"]
+sqlalchemy = ["polars-lts-cpu[pandas]", "sqlalchemy"]
+style = ["great-tables (>=0.8.0)"]
 timezone = ["backports-zoneinfo", "tzdata"]
 xlsx2csv = ["xlsx2csv (>=0.8.0)"]
 xlsxwriter = ["xlsxwriter"]
@@ -3725,4 +3727,4 @@ dev = ["doc8", "flake8", "flake8-import-order", "rstcheck[sphinx]", "sphinx"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "ae97b9f43293671e48613c061edb84719065637f39c8e0c6167bd71f6a2f7315"
+content-hash = "8494495ed668c183b3e0cbdcb1d6144f6db05fc4e26c0abeeec83c10f16006d6"
