@@ -59,7 +59,7 @@ covdefaults = "==2.3.0"
 codespell = "==2.3.0"
 coverage = { version = "7.6.1", extras = ["toml"] }
 pre_commit = "==3.8.0"
-pre_commit_hooks = "==4.6.0"
+pre_commit_hooks = "==5.0.0"
 pylint = "==3.3.1"
 safety = "==3.2.8"
 yamllint = "==1.35.1"
